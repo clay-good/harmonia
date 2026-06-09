@@ -131,6 +131,21 @@ def cmd_export(args) -> int:
         out = args.output or "exports/"
         written = registry.build_all(ds, out, dataset_version=__version__)
         print(f"wrote {len(written)} artifacts under {out}")
+        # Exports are generated artifacts, never hand-edited: round-trip-validate
+        # them so a drift between the dataset/kernel and the exports fails loudly
+        # (spec.md §6, §7). Covers the numeric CiPA round trip, the parameter
+        # round trip, and the ODE round trip (the AST re-integrates to the kernel).
+        errors = list(registry.roundtrip_cipa(ds))
+        for ap in registry.list_ap_models(ds):
+            errors += registry.roundtrip_parameters(ds, ap)
+            errors += registry.roundtrip_ode(ds, ap)
+        if errors:
+            print("round-trip validation FAILED:", file=sys.stderr)
+            for e in errors:
+                print(f"  - {e}", file=sys.stderr)
+            return 1
+        print(f"round-trip validated: CiPA + parameters + ODE across "
+              f"{len(registry.list_ap_models(ds))} AP models")
         return 0
 
     fmt = args.format

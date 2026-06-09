@@ -167,6 +167,11 @@ Every model export is generated from **one** renderer-agnostic
 [`model_spec`](python/harmonia/export/model_spec.py) (a tiny expression AST), so
 the Myokit, CellML, and SBML artifacts cannot drift from each other or from the
 [`reference`](python/harmonia/export/reference.py) kernel — the numeric oracle.
+"Cannot drift" is *enforced*, not asserted: the AST carries a pure-Python
+evaluator, and `registry.roundtrip_ode` re-integrates it with the kernel's own
+solver settings and confirms the resulting action potential matches to ≈1e-7
+relative — the "round-trip validates ~1e-4 ODE" guarantee from spec.md §6, now
+enforced in CI.
 
 ---
 
@@ -369,11 +374,16 @@ Every exported model carries a universal, machine-readable
 `harmonia:clinicalUse = "PROHIBITED — research / safety-methodology / education
 only; not a regulatory determination"` annotation, plus the propagated tier and
 `bqbiol:isDescribedBy` DOI links as MIRIAM-style RDF. **Exports are generated,
-never hand-edited** (CI regenerates and round-trip-validates on every push). The
-CiPA-input export has a true numeric round trip (parse back ⇒ dataset values);
-the kernel constants are verified to survive the CellML/SBML/Myokit text; and
-every exported CellML model is checked in CI for **declaration-level unit
-conformance** (`cellml.conformance_violations` — every variable and `<cn>`
+never hand-edited** (CI regenerates and round-trip-validates on every push —
+`harmonia export --all` fails if any round trip drifts). Three round trips guard
+the exports: the CiPA-input export has a true numeric round trip (parse back ⇒
+dataset values); the kernel constants are verified to survive the
+CellML/SBML/Myokit text; and — the strongest — the **ODE round trip**
+re-integrates the model AST that every CellML/SBML/Myokit export is rendered from
+and confirms it reproduces the reference-kernel action potential (≈1e-7 relative
+on the V trace, far inside the 1e-4 target), so the exported *equations*, not
+merely the constants, provably match the numeric oracle. Every exported CellML
+model is also checked in CI for **declaration-level unit conformance** (`cellml.conformance_violations` — every variable and `<cn>`
 literal carries a defined or built-in unit, no dangling references). Full
 dimensional validation and the Myokit/OpenCOR cross-check against the *canonical*
 ORd CellML remain an optional local step (they need a heavy engine, so are not

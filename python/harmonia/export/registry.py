@@ -4,7 +4,11 @@ loaded dataset into every export format, plus the round-trip validation hooks.
 ``build_all`` writes the full set of artifacts to a directory; the CLI and CI
 call it. ``roundtrip_cipa`` is the one true numeric round trip (CiPA inputs parse
 back to the dataset values); ``roundtrip_parameters`` checks that the kernel
-constants survive the CellML/SBML/Myokit text exports.
+constants survive the CellML/SBML/Myokit text exports; ``roundtrip_ode``
+re-integrates the model AST (the single source every CellML/SBML/Myokit export is
+rendered from) and confirms it reproduces the reference-kernel action potential
+within tolerance — so the exported *equations*, not merely the constants, provably
+match the numeric oracle (spec.md §6, "round-trip validates ~1e-4 ODE").
 """
 from __future__ import annotations
 
@@ -14,7 +18,7 @@ from typing import Callable, Dict, List, Optional
 
 from ..load import Dataset
 from . import cellml, cipa_inputs, combine, csv_bibtex, myokit, sbml, sedml
-from .model_spec import build_model_spec
+from .model_spec import build_model_spec, simulate_spec
 
 # format -> (file extension, builder returning text). 'omex' is binary, handled
 # separately in build_all.
@@ -131,4 +135,43 @@ def roundtrip_parameters(ds: Dataset, ap_model: str = "cipaordv1.0") -> List[str
         for fmt, text in texts.items():
             if token not in text:
                 errors.append(f"{fmt}: parameter {p.name}={token} not found in export")
+    return errors
+
+
+def roundtrip_ode(ds: Dataset, ap_model: str = "cipaordv1.0",
+                  block: Optional[Dict[str, float]] = None,
+                  rel_tol: float = 1e-4, apd_tol_ms: float = 0.5) -> List[str]:
+    """Re-integrate the model AST and confirm it reproduces the reference kernel.
+
+    The AST (``model_spec``) is the single description every CellML/SBML/Myokit
+    export is rendered from; ``reference.py`` is the numeric oracle the metrics and
+    thresholds are calibrated to. Integrating the AST with identical solver
+    settings and matching the kernel's action potential proves the two cannot
+    drift — the exported *equations*, not just the constants, are the kernel's.
+
+    Returns a list of out-of-tolerance discrepancies (empty == success). The
+    tolerances are generous relative to the ~1e-7 actually achieved.
+    """
+    from ..simulate import _resolve_ap_model
+    from .reference import KernelParams, simulate_beats
+
+    rec = _resolve_ap_model(ds, ap_model)
+    spec = build_model_spec(conductance_scales=rec.conductance_scales, block=block)
+    spec_res = simulate_spec(spec)
+
+    p = KernelParams().with_scales(rec.conductance_scales)
+    if block:
+        p.block.update(block)
+    ker_res = simulate_beats(p)
+
+    errors: List[str] = []
+    span = float(spec_res.V.max() - spec_res.V.min()) or 1.0
+    rel = float(abs(spec_res.V - ker_res.V).max()) / span
+    if rel > rel_tol:
+        errors.append(f"{ap_model}: AST/kernel V-trace rel diff {rel:.2e} > {rel_tol:.0e}")
+    import math as _m
+    if not (_m.isnan(spec_res.apd90) and _m.isnan(ker_res.apd90)):
+        dapd = abs(spec_res.apd90 - ker_res.apd90)
+        if dapd > apd_tol_ms:
+            errors.append(f"{ap_model}: AST/kernel APD90 diff {dapd:.3f} ms > {apd_tol_ms} ms")
     return errors

@@ -6,6 +6,19 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — export integrity (closes a spec/implementation gap)
+- **ODE round-trip validation** (`registry.roundtrip_ode`): the model AST that
+  every CellML/SBML/Myokit export is rendered from now carries a pure-Python
+  evaluator (`Expr.eval`) and is independently re-integrated by `simulate_spec`
+  with the kernel's own solver settings. It reproduces the reference-kernel action
+  potential to ≈1e-7 relative on the V trace (well inside the 1e-4 the spec/
+  architecture promised but never enforced), so the exported *equations* — not
+  just the constants — provably match the numeric oracle. Tested across all three
+  AP models, drug-free and under block, with a drift-detection guard.
+- `harmonia export --all` now **round-trip-validates** the artifacts it writes
+  (CiPA numeric + parameter + ODE round trips) and exits non-zero on any drift,
+  making "exports are generated, never hand-edited" enforced rather than asserted.
+
 ### Added — Phase F (release hardening)
 - **Executable reference notebook** [`notebooks/01_flip_frequency.ipynb`](notebooks/01_flip_frequency.ipynb)
   reproducing the headline input-variability → classification-flip analysis from

@@ -59,6 +59,31 @@ def test_parameter_roundtrip(ds):
         assert registry.roundtrip_parameters(ds, ap) == []
 
 
+@pytest.mark.parametrize("ap", ["ord", "cipaordv1.0", "tor_ord"])
+@pytest.mark.parametrize("block", [None, {"IKr": 0.4}, {"ICaL": 0.5, "IKr": 0.6}])
+def test_ode_roundtrip_ast_matches_kernel(ds, ap, block):
+    """The exported equations (the model AST) re-integrate to the reference
+    kernel's action potential — not just the constants survive the text. This is
+    the ~1e-4 ODE round trip the spec/architecture promises."""
+    assert registry.roundtrip_ode(ds, ap, block=block) == []
+
+
+def test_ode_roundtrip_catches_drift(ds, monkeypatch):
+    """If the AST drifted from the kernel, the round trip must fail — otherwise it
+    is a no-op. Perturb only the AST-integration side and confirm a discrepancy is
+    reported."""
+    real = registry.simulate_spec
+
+    def drifted(spec, **kw):
+        r = real(spec, **kw)
+        r.V = r.V + 5.0        # 5 mV offset, well beyond the V-trace tolerance
+        r.apd90 = r.apd90 + 10.0
+        return r
+
+    monkeypatch.setattr(registry, "simulate_spec", drifted)
+    assert registry.roundtrip_ode(ds, "ord") != []
+
+
 def test_cipa_csv_reports_identifiability(ds):
     rows = cipa_inputs.parse_csv(cipa_inputs.to_csv(ds))
     by = {(r["drug"], r["channel"]): r for r in rows}

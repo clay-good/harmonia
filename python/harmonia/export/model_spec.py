@@ -27,6 +27,9 @@ class Expr:
     def mathml(self) -> str:                   # content MathML <apply>...</apply>
         raise NotImplementedError
 
+    def eval(self, env: Dict[str, float]):     # numeric evaluation (round-trip)
+        raise NotImplementedError
+
     # operator overloads for ergonomic construction
     def __add__(self, o): return Add(self, _e(o))
     def __radd__(self, o): return Add(_e(o), self)
@@ -56,6 +59,9 @@ class Num(Expr):
     def mathml(self) -> str:
         return f"<cn>{self.mmt()}</cn>"
 
+    def eval(self, env):
+        return self.v
+
 
 @dataclass
 class Var(Expr):
@@ -66,6 +72,9 @@ class Var(Expr):
 
     def mathml(self) -> str:
         return f"<ci>{self.name}</ci>"
+
+    def eval(self, env):
+        return env[self.name]
 
 
 def _bin(op_ml, *children):
@@ -79,6 +88,7 @@ class Add(Expr):
     b: Expr
     def mmt(self): return f"({self.a.mmt()} + {self.b.mmt()})"
     def mathml(self): return _bin("<plus/>", self.a, self.b)
+    def eval(self, env): return self.a.eval(env) + self.b.eval(env)
 
 
 @dataclass
@@ -87,6 +97,7 @@ class Sub(Expr):
     b: Expr
     def mmt(self): return f"({self.a.mmt()} - {self.b.mmt()})"
     def mathml(self): return _bin("<minus/>", self.a, self.b)
+    def eval(self, env): return self.a.eval(env) - self.b.eval(env)
 
 
 @dataclass
@@ -95,6 +106,7 @@ class Mul(Expr):
     b: Expr
     def mmt(self): return f"({self.a.mmt()} * {self.b.mmt()})"
     def mathml(self): return _bin("<times/>", self.a, self.b)
+    def eval(self, env): return self.a.eval(env) * self.b.eval(env)
 
 
 @dataclass
@@ -103,6 +115,7 @@ class Div(Expr):
     b: Expr
     def mmt(self): return f"({self.a.mmt()} / {self.b.mmt()})"
     def mathml(self): return _bin("<divide/>", self.a, self.b)
+    def eval(self, env): return self.a.eval(env) / self.b.eval(env)
 
 
 @dataclass
@@ -110,6 +123,7 @@ class Neg(Expr):
     a: Expr
     def mmt(self): return f"(-{self.a.mmt()})"
     def mathml(self): return f"<apply><minus/>{self.a.mathml()}</apply>"
+    def eval(self, env): return -self.a.eval(env)
 
 
 @dataclass
@@ -118,6 +132,7 @@ class Pow(Expr):
     b: Expr
     def mmt(self): return f"({self.a.mmt()}^{self.b.mmt()})"
     def mathml(self): return _bin("<power/>", self.a, self.b)
+    def eval(self, env): return self.a.eval(env) ** self.b.eval(env)
 
 
 @dataclass
@@ -125,6 +140,7 @@ class ExpF(Expr):
     a: Expr
     def mmt(self): return f"exp({self.a.mmt()})"
     def mathml(self): return f"<apply><exp/>{self.a.mathml()}</apply>"
+    def eval(self, env): return np.exp(self.a.eval(env))
 
 
 @dataclass
@@ -132,6 +148,7 @@ class Floor(Expr):
     a: Expr
     def mmt(self): return f"floor({self.a.mmt()})"
     def mathml(self): return f"<apply><floor/>{self.a.mathml()}</apply>"
+    def eval(self, env): return np.floor(self.a.eval(env))
 
 
 @dataclass
@@ -140,6 +157,7 @@ class Lt(Expr):
     b: Expr
     def mmt(self): return f"({self.a.mmt()} < {self.b.mmt()})"
     def mathml(self): return _bin("<lt/>", self.a, self.b)
+    def eval(self, env): return self.a.eval(env) < self.b.eval(env)
 
 
 @dataclass
@@ -149,6 +167,8 @@ class Piecewise(Expr):
     cond: Expr
     otherwise: Expr
     def mmt(self): return f"piecewise({self.cond.mmt()}, {self.value.mmt()}, {self.otherwise.mmt()})"
+    def eval(self, env):
+        return np.where(self.cond.eval(env), self.value.eval(env), self.otherwise.eval(env))
     def mathml(self):
         return ("<piecewise>"
                 f"<piece>{self.value.mathml()}{self.cond.mathml()}</piece>"
@@ -305,3 +325,58 @@ def build_model_spec(name: str = "harmonia_ord_reduced",
         states.append(StateVar(gname, init[gname], rate, "dimensionless"))
 
     return ModelSpec(name=name, parameters=params, states=states, assignments=assigns)
+
+
+# --------------------------------------------------------------------------- #
+# ODE round-trip: integrate the AST and compare to the reference kernel
+# --------------------------------------------------------------------------- #
+def simulate_spec(spec: ModelSpec, cl: float = 2000.0, n_beats: int = 3,
+                  max_step: float = 2.0, dt_record: float = 1.0,
+                  rtol: float = 1e-6) -> "ref.BeatResult":
+    """Integrate a :class:`ModelSpec` by interpreting its expression AST, with the
+    *same* solver settings as ``reference.simulate_beats``, and return a
+    ``BeatResult`` analysed identically.
+
+    This is the load-bearing half of the ODE round trip: the AST is what every
+    model export (Myokit / CellML / SBML) is rendered from, so re-integrating it
+    and matching the reference kernel proves the *exported equations* — not just
+    the constants — agree with the numeric oracle. See ``registry.roundtrip_ode``.
+    """
+    from scipy.integrate import solve_ivp
+
+    pvals = {p.name: p.value for p in spec.parameters}
+    state_names = [s.name for s in spec.states]
+    y0 = np.array([s.init for s in spec.states], dtype=float)
+
+    def rhs(t, y):
+        env = dict(pvals)
+        env["time"] = t
+        for nm, val in zip(state_names, y):
+            env[nm] = val
+        for a in spec.assignments:
+            env[a.name] = a.expr.eval(env)
+        return np.array([float(s.rate.eval(env)) for s in spec.states], dtype=float)
+
+    y = y0
+    t0 = 0.0
+    for _ in range(max(n_beats - 1, 0)):
+        sol = solve_ivp(rhs, (t0, t0 + cl), y, method="LSODA",
+                        rtol=rtol, atol=1e-8, max_step=max_step)
+        y = sol.y[:, -1]
+        t0 += cl
+    n = int(cl / dt_record) + 1
+    t_eval = np.linspace(t0, t0 + cl, n)
+    sol = solve_ivp(rhs, (t0, t0 + cl), y, method="LSODA",
+                    rtol=rtol, atol=1e-8, max_step=max_step, t_eval=t_eval)
+    t = sol.t - t0
+    Y = sol.y
+
+    # vectorised current evaluation over the recorded trace (for qNet etc.)
+    env = dict(pvals)
+    env["time"] = sol.t
+    for i, nm in enumerate(state_names):
+        env[nm] = Y[i]
+    for a in spec.assignments:
+        env[a.name] = a.expr.eval(env)
+    cur = {name: np.asarray(env[name], dtype=float) for name in ref.CURRENT_NAMES}
+    return ref._analyse(t, Y[0], cur, cl)
