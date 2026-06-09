@@ -7,78 +7,85 @@ research / education infrastructure, not a regulatory or clinical tool.
 Primary sources: https://doi.org/10.3389/fphys.2017.00616
 -->
 <sbml xmlns="http://www.sbml.org/sbml/level3/version2/core" level="3" version="2">
-  <model id="harmonia_0" name="harmonia_0" timeUnits="dimensionless">
+  <model id="harmonia_0" name="harmonia_0" timeUnits="ms">
+    <listOfUnitDefinitions>
+      <unitDefinition id="mS_per_uF"><listOfUnits><unit kind="siemens" exponent="1" scale="-3" multiplier="1"/><unit kind="farad" exponent="-1" scale="-6" multiplier="1"/></listOfUnits></unitDefinition>
+      <unitDefinition id="mV"><listOfUnits><unit kind="volt" exponent="1" scale="-3" multiplier="1"/></listOfUnits></unitDefinition>
+      <unitDefinition id="ms"><listOfUnits><unit kind="second" exponent="1" scale="-3" multiplier="1"/></listOfUnits></unitDefinition>
+      <unitDefinition id="uA_per_uF"><listOfUnits><unit kind="ampere" exponent="1" scale="-6" multiplier="1"/><unit kind="farad" exponent="-1" scale="-6" multiplier="1"/></listOfUnits></unitDefinition>
+      <unitDefinition id="uF_per_cm2"><listOfUnits><unit kind="farad" exponent="1" scale="-6" multiplier="1"/><unit kind="metre" exponent="-2" scale="-2" multiplier="1"/></listOfUnits></unitDefinition>
+    </listOfUnitDefinitions>
     <listOfParameters>
-      <parameter id="Cm" value="1.0" constant="true"/>
-      <parameter id="ENa" value="70.0" constant="true"/>
-      <parameter id="EK" value="-87.0" constant="true"/>
-      <parameter id="EKs" value="-80.0" constant="true"/>
-      <parameter id="ECaL" value="45.0" constant="true"/>
-      <parameter id="ENCX" value="-10.0" constant="true"/>
-      <parameter id="gNa" value="11.0" constant="true"/>
-      <parameter id="gNaL" value="0.078" constant="true"/>
-      <parameter id="gto" value="0.18" constant="true"/>
-      <parameter id="gCaL" value="0.14" constant="true"/>
-      <parameter id="gKr" value="0.36" constant="true"/>
-      <parameter id="gKs" value="0.045" constant="true"/>
-      <parameter id="gK1" value="0.34" constant="true"/>
-      <parameter id="gNaCa" value="0.03" constant="true"/>
-      <parameter id="stim_amplitude" value="-52.0" constant="true"/>
-      <parameter id="stim_duration" value="1.0" constant="true"/>
-      <parameter id="stim_period" value="2000.0" constant="true"/>
-      <parameter id="block_INa" value="1.0" constant="true"/>
-      <parameter id="block_INaL" value="1.0" constant="true"/>
-      <parameter id="block_Ito" value="1.0" constant="true"/>
-      <parameter id="block_ICaL" value="1.0" constant="true"/>
-      <parameter id="block_IKr" value="1.0" constant="true"/>
-      <parameter id="block_IKs" value="1.0" constant="true"/>
-      <parameter id="V" value="-85.0" constant="false"/>
-      <parameter id="m" value="0.0031726828424851893" constant="false"/>
-      <parameter id="h" value="0.9378643669135703" constant="false"/>
-      <parameter id="j" value="0.9378643669135703" constant="false"/>
-      <parameter id="mL" value="0.005220125693558397" constant="false"/>
-      <parameter id="hL" value="0.5" constant="false"/>
-      <parameter id="a" value="0.0039372280939690045" constant="false"/>
-      <parameter id="iF" value="0.9964063974185798" constant="false"/>
-      <parameter id="d" value="1.9133238744270502e-06" constant="false"/>
-      <parameter id="f" value="0.9997616091118722" constant="false"/>
-      <parameter id="xr" value="0.000295957113513077" constant="false"/>
-      <parameter id="xs" value="0.008279043875619086" constant="false"/>
-      <parameter id="m_inf" constant="false"/>
-      <parameter id="m_tau" constant="false"/>
-      <parameter id="h_inf" constant="false"/>
-      <parameter id="h_tau" constant="false"/>
-      <parameter id="j_inf" constant="false"/>
-      <parameter id="j_tau" constant="false"/>
-      <parameter id="mL_inf" constant="false"/>
-      <parameter id="mL_tau" constant="false"/>
-      <parameter id="hL_inf" constant="false"/>
-      <parameter id="hL_tau" constant="false"/>
-      <parameter id="a_inf" constant="false"/>
-      <parameter id="a_tau" constant="false"/>
-      <parameter id="iF_inf" constant="false"/>
-      <parameter id="iF_tau" constant="false"/>
-      <parameter id="d_inf" constant="false"/>
-      <parameter id="d_tau" constant="false"/>
-      <parameter id="f_inf" constant="false"/>
-      <parameter id="f_tau" constant="false"/>
-      <parameter id="xr_inf" constant="false"/>
-      <parameter id="xr_tau" constant="false"/>
-      <parameter id="xs_inf" constant="false"/>
-      <parameter id="xs_tau" constant="false"/>
-      <parameter id="Rkr" constant="false"/>
-      <parameter id="xK1_inf" constant="false"/>
-      <parameter id="wncx" constant="false"/>
-      <parameter id="INa" constant="false"/>
-      <parameter id="INaL" constant="false"/>
-      <parameter id="Ito" constant="false"/>
-      <parameter id="ICaL" constant="false"/>
-      <parameter id="IKr" constant="false"/>
-      <parameter id="IKs" constant="false"/>
-      <parameter id="IK1" constant="false"/>
-      <parameter id="INaCa" constant="false"/>
-      <parameter id="i_ion" constant="false"/>
-      <parameter id="i_stim" constant="false"/>
+      <parameter id="Cm" value="1.0" units="uF_per_cm2" constant="true"/>
+      <parameter id="ENa" value="70.0" units="mV" constant="true"/>
+      <parameter id="EK" value="-87.0" units="mV" constant="true"/>
+      <parameter id="EKs" value="-80.0" units="mV" constant="true"/>
+      <parameter id="ECaL" value="45.0" units="mV" constant="true"/>
+      <parameter id="ENCX" value="-10.0" units="mV" constant="true"/>
+      <parameter id="gNa" value="11.0" units="mS_per_uF" constant="true"/>
+      <parameter id="gNaL" value="0.078" units="mS_per_uF" constant="true"/>
+      <parameter id="gto" value="0.18" units="mS_per_uF" constant="true"/>
+      <parameter id="gCaL" value="0.14" units="mS_per_uF" constant="true"/>
+      <parameter id="gKr" value="0.36" units="mS_per_uF" constant="true"/>
+      <parameter id="gKs" value="0.045" units="mS_per_uF" constant="true"/>
+      <parameter id="gK1" value="0.34" units="mS_per_uF" constant="true"/>
+      <parameter id="gNaCa" value="0.03" units="mS_per_uF" constant="true"/>
+      <parameter id="stim_amplitude" value="-52.0" units="uA_per_uF" constant="true"/>
+      <parameter id="stim_duration" value="1.0" units="ms" constant="true"/>
+      <parameter id="stim_period" value="2000.0" units="ms" constant="true"/>
+      <parameter id="block_INa" value="1.0" units="dimensionless" constant="true"/>
+      <parameter id="block_INaL" value="1.0" units="dimensionless" constant="true"/>
+      <parameter id="block_Ito" value="1.0" units="dimensionless" constant="true"/>
+      <parameter id="block_ICaL" value="1.0" units="dimensionless" constant="true"/>
+      <parameter id="block_IKr" value="1.0" units="dimensionless" constant="true"/>
+      <parameter id="block_IKs" value="1.0" units="dimensionless" constant="true"/>
+      <parameter id="V" value="-85.0" units="mV" constant="false"/>
+      <parameter id="m" value="0.0031726828424851893" units="dimensionless" constant="false"/>
+      <parameter id="h" value="0.9378643669135703" units="dimensionless" constant="false"/>
+      <parameter id="j" value="0.9378643669135703" units="dimensionless" constant="false"/>
+      <parameter id="mL" value="0.005220125693558397" units="dimensionless" constant="false"/>
+      <parameter id="hL" value="0.5" units="dimensionless" constant="false"/>
+      <parameter id="a" value="0.0039372280939690045" units="dimensionless" constant="false"/>
+      <parameter id="iF" value="0.9964063974185798" units="dimensionless" constant="false"/>
+      <parameter id="d" value="1.9133238744270502e-06" units="dimensionless" constant="false"/>
+      <parameter id="f" value="0.9997616091118722" units="dimensionless" constant="false"/>
+      <parameter id="xr" value="0.000295957113513077" units="dimensionless" constant="false"/>
+      <parameter id="xs" value="0.008279043875619086" units="dimensionless" constant="false"/>
+      <parameter id="m_inf" units="dimensionless" constant="false"/>
+      <parameter id="m_tau" units="ms" constant="false"/>
+      <parameter id="h_inf" units="dimensionless" constant="false"/>
+      <parameter id="h_tau" units="ms" constant="false"/>
+      <parameter id="j_inf" units="dimensionless" constant="false"/>
+      <parameter id="j_tau" units="ms" constant="false"/>
+      <parameter id="mL_inf" units="dimensionless" constant="false"/>
+      <parameter id="mL_tau" units="ms" constant="false"/>
+      <parameter id="hL_inf" units="dimensionless" constant="false"/>
+      <parameter id="hL_tau" units="ms" constant="false"/>
+      <parameter id="a_inf" units="dimensionless" constant="false"/>
+      <parameter id="a_tau" units="ms" constant="false"/>
+      <parameter id="iF_inf" units="dimensionless" constant="false"/>
+      <parameter id="iF_tau" units="ms" constant="false"/>
+      <parameter id="d_inf" units="dimensionless" constant="false"/>
+      <parameter id="d_tau" units="ms" constant="false"/>
+      <parameter id="f_inf" units="dimensionless" constant="false"/>
+      <parameter id="f_tau" units="ms" constant="false"/>
+      <parameter id="xr_inf" units="dimensionless" constant="false"/>
+      <parameter id="xr_tau" units="ms" constant="false"/>
+      <parameter id="xs_inf" units="dimensionless" constant="false"/>
+      <parameter id="xs_tau" units="ms" constant="false"/>
+      <parameter id="Rkr" units="dimensionless" constant="false"/>
+      <parameter id="xK1_inf" units="dimensionless" constant="false"/>
+      <parameter id="wncx" units="dimensionless" constant="false"/>
+      <parameter id="INa" units="uA_per_uF" constant="false"/>
+      <parameter id="INaL" units="uA_per_uF" constant="false"/>
+      <parameter id="Ito" units="uA_per_uF" constant="false"/>
+      <parameter id="ICaL" units="uA_per_uF" constant="false"/>
+      <parameter id="IKr" units="uA_per_uF" constant="false"/>
+      <parameter id="IKs" units="uA_per_uF" constant="false"/>
+      <parameter id="IK1" units="uA_per_uF" constant="false"/>
+      <parameter id="INaCa" units="uA_per_uF" constant="false"/>
+      <parameter id="i_ion" units="uA_per_uF" constant="false"/>
+      <parameter id="i_stim" units="uA_per_uF" constant="false"/>
     </listOfParameters>
     <listOfRules>
       <assignmentRule variable="m_inf"><math xmlns="http://www.w3.org/1998/Math/MathML"><apply><divide/><cn>1</cn><apply><plus/><cn>1</cn><apply><exp/><apply><divide/><apply><minus/><apply><minus/><ci>V</ci><cn>-39</cn></apply></apply><cn>8</cn></apply></apply></apply></apply></math></assignmentRule>

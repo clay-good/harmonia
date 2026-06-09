@@ -5,8 +5,15 @@ import zipfile
 
 import pytest
 
-from harmonia.export import (registry, cellml, sedml, myokit, combine,
+from harmonia.export import (registry, cellml, sbml, sedml, myokit, combine,
                              cipa_inputs, csv_bibtex)
+
+try:
+    import libsbml  # noqa: F401
+    _HAVE_LIBSBML = True
+except ImportError:
+    _HAVE_LIBSBML = False
+needs_libsbml = pytest.mark.skipif(not _HAVE_LIBSBML, reason="python-libsbml not installed")
 
 
 @pytest.mark.parametrize("fmt", ["cellml", "sbml", "sedml"])
@@ -40,6 +47,37 @@ def test_cellml_conformance_check_catches_a_dangling_unit(ds):
     broken = cellml.build(ds, "ord").replace('units="mV"', 'units="furlong"', 1)
     violations = cellml.conformance_violations(broken)
     assert any("furlong" in v for v in violations)
+
+
+@needs_libsbml
+@pytest.mark.parametrize("ap", ["ord", "cipaordv1.0", "tor_ord"])
+def test_sbml_passes_libsbml_validator(ds, ap):
+    """Every exported SBML model is valid per the canonical SBML validator
+    (libSBML checkConsistency): zero ERROR/FATAL-severity problems. This makes
+    'SBML → COPASI/Tellurium/BioModels' a verified claim, not asserted (§7)."""
+    assert sbml.consistency_violations(sbml.build(ds, ap)) == []
+
+
+@needs_libsbml
+def test_sbml_validator_catches_a_real_error(ds):
+    """The validator must actually flag a broken model — otherwise it is a no-op
+    that silently passes everything. A rateRule whose target is not a defined
+    parameter is an SBML error."""
+    broken = sbml.build(ds, "ord").replace(
+        '<rateRule variable="V">', '<rateRule variable="ghost_state">', 1)
+    assert sbml.consistency_violations(broken) != []
+
+
+@needs_libsbml
+@pytest.mark.parametrize("ap", ["ord", "cipaordv1.0", "tor_ord"])
+def test_sbml_every_parameter_declares_units(ds, ap):
+    """The units fix: libSBML reports no 'no units defined' warning, i.e. every
+    <parameter> carries a units attribute (parity with the CellML export)."""
+    doc = libsbml.readSBMLFromString(sbml.build(ds, ap))
+    doc.checkConsistency()
+    nounit = [doc.getError(i) for i in range(doc.getNumErrors())
+              if "No units defined for the parameter" in doc.getError(i).getShortMessage()]
+    assert nounit == []
 
 
 def test_myokit_structure(ds):

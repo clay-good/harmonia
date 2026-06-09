@@ -426,17 +426,21 @@ and confirms it reproduces the reference-kernel action potential (≈1e-7 relati
 on the V trace, far inside the 1e-4 target), so the exported *equations*, not
 merely the constants, provably match the numeric oracle. Every exported CellML
 model is also checked in CI for **declaration-level unit conformance** (`cellml.conformance_violations` — every variable and `<cn>`
-literal carries a defined or built-in unit, no dangling references). Full
-dimensional validation and the Myokit/OpenCOR cross-check against the *canonical*
-ORd CellML remain an optional local step (they need a heavy engine, so are not
-run in CI).
+literal carries a defined or built-in unit, no dangling references), and every
+exported **SBML** model is validated against the **canonical SBML validator**
+(libSBML's `checkConsistency` — zero ERROR/FATAL problems; `sbml.consistency_violations`),
+so "SBML → COPASI/Tellurium/BioModels" is *verified*, not asserted. The SBML
+parameters declare units (mirroring CellML), so the two formats carry identical
+unit metadata. Full dimensional validation and the Myokit/OpenCOR cross-check
+against the *canonical* ORd CellML remain an optional local step (they need a
+heavy engine, so are not run in CI).
 
 ---
 
 ## Validation & testing
 
 Everything downstream of the dataset is a deterministic projection, so the test
-suite (112 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
+suite (121 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 *provable non-drift* rather than fixtures:
 
 | Guard | What it proves | Where |
@@ -448,6 +452,7 @@ suite (112 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 | **Parameter round trip** | the kernel conductances appear verbatim in the CellML/SBML/Myokit text | `registry.roundtrip_parameters` |
 | **ODE round trip** | the model AST re-integrates to the reference-kernel AP within ≈1e-7 — the exported *equations* match the oracle, not just the constants | `registry.roundtrip_ode` |
 | **CellML unit conformance** | every variable and `<cn>` carries a defined/built-in unit, no dangling references | `cellml.conformance_violations` |
+| **SBML validity** | the exported SBML passes the canonical validator (libSBML `checkConsistency`) with zero errors; every parameter declares units | `sbml.consistency_violations` |
 | **SED-ML reference resolution** | every task→model/sim, variable→task, curve→dataGenerator reference resolves; the model `source` points at a file that exists | `sedml.reference_violations` |
 | **OMEX manifest consistency** | the COMBINE manifest lists exactly the archive's files, with one master | `combine.manifest_violations` |
 | **Executable notebook** | the headline flip-frequency analysis runs clean and its assertions hold | `nbmake notebooks/` |
@@ -455,9 +460,9 @@ suite (112 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 | **Recorded performance** | the honest, live confusion matrix vs CiPA expert labels — never hidden behind one accuracy number | `harmonia performance` |
 
 `harmonia export --all` runs all of these checks (the three round trips, CellML
-unit conformance, SED-ML reference resolution, and OMEX manifest consistency) and
-exits non-zero on any drift, so a regenerated artifact that disagrees with the
-dataset or kernel fails the build. The OpenCOR/libcellml dimensional cross-check
+unit conformance, SBML validity, SED-ML reference resolution, and OMEX manifest
+consistency) and exits non-zero on any drift, so a regenerated artifact that
+disagrees with the dataset or kernel fails the build. The OpenCOR/libcellml dimensional cross-check
 against the *canonical* ORd CellML is the one validation deliberately left out of
 CI (it needs a heavy engine); it remains an optional local step.
 

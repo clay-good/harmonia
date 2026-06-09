@@ -6,6 +6,24 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — SBML validated against the canonical validator + units declared
+- **`sbml.consistency_violations`** runs **libSBML's `checkConsistency`** (the
+  canonical SBML validator) over every exported model and returns any
+  ERROR/FATAL-severity problem. Wired into `harmonia export --all` and CI, it
+  turns "SBML L3v2 → COPASI/Tellurium/BioModels" into a *verified* claim rather
+  than an asserted one — the SBML analog of the CellML declaration-level unit
+  check. `python-libsbml` is now in the `dev` extra; the check skips gracefully
+  if libSBML is absent (CI installs it). Tested across all three AP models, with
+  a negative test (a dangling `rateRule` target is caught) so the gate can't be a
+  no-op.
+- **SBML exports now declare units.** Every `<parameter>` carries a `units`
+  attribute and the model a `timeUnits`, backed by a `<listOfUnitDefinitions>`
+  that mirrors the CellML export's custom units (ms, mV, µA/µF, mS/µF, µF/cm²).
+  This drops libSBML's warnings from **257 → 27** (and eliminates every "no units
+  defined" warning); the residual warnings are the same declaration-level
+  limitation the CellML export documents (numeric `<cn>` literals are
+  dimensionless, not fully dimensionally audited). Exports regenerated.
+
 ### Added — triangulation biomarker surfaced (completes a spec §3 readout)
 - The reference kernel already computed **triangulation** (APD90 − APD50, the *T*
   in the TRIaD proarrhythmia profile) on every beat but discarded it. `assess`
