@@ -52,6 +52,14 @@ def test_cipa_csv_reports_identifiability(ds):
     assert rano["tier"] == "D"
 
 
+def test_omex_is_byte_reproducible(ds):
+    """Exports are deterministic projections: regenerating the .omex must produce
+    identical bytes (the zip uses a fixed timestamp, not the current time)."""
+    a = combine.build_bytes(ds, "ord")
+    b = combine.build_bytes(ds, "ord")
+    assert a == b
+
+
 def test_omex_is_valid_zip_with_manifest(ds):
     data = combine.build_bytes(ds, "ord")
     z = zipfile.ZipFile(io.BytesIO(data))

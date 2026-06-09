@@ -64,6 +64,10 @@ def cmd_info(args) -> int:
     unident = [b.id for b in ds.channel_blocks if not b.identifiable]  # type: ignore[attr-defined]
     if unident:
         print(f"  UNIDENTIFIABLE IC50 (max block < 60% -> Tier D): {', '.join(unident)}")
+    pops = ds.populations
+    if pops:
+        print(f"  populations (HYPOTHESIS-TIER, not for prediction): "
+              f"{', '.join(p.id.split('.', 1)[1] for p in pops)}")
     print("\n  NOT a clinical tool / NOT a regulatory determination. "
           "Outputs are risk distributions, never verdicts.")
     return 0
@@ -95,6 +99,16 @@ def cmd_combo(args) -> int:
     res = assess_combination(ds, args.drugs, ap_model=args.ap_model, n_mc=args.mc,
                              metric=args.metric, exposure_multiple=args.exposure_multiple,
                              seed=args.seed)
+    print(res.summary())
+    return 0
+
+
+def cmd_population(args) -> int:
+    from .populations import assess_population
+    ds = _load(args)
+    res = assess_population(ds, args.drug, population=args.population,
+                           ap_model=args.ap_model, n_models=args.n, metric=args.metric,
+                           exposure_multiple=args.exposure_multiple, seed=args.seed)
     print(res.summary())
     return 0
 
@@ -183,6 +197,17 @@ def build_parser() -> argparse.ArgumentParser:
     cb.add_argument("--exposure-multiple", type=float, default=4.0, dest="exposure_multiple")
     cb.add_argument("--seed", type=int, default=0)
     cb.set_defaults(func=cmd_combo)
+
+    pop = sub.add_parser("population",
+                         help="population-of-models spread (HYPOTHESIS-TIER, not for prediction)")
+    pop.add_argument("drug")
+    pop.add_argument("--population", default="illustrative_v0")
+    pop.add_argument("--ap-model", default="cipaordv1.0", dest="ap_model")
+    pop.add_argument("--metric", default="qnet", choices=["qnet", "apd90"])
+    pop.add_argument("--n", type=int, default=None, help="number of virtual myocytes")
+    pop.add_argument("--exposure-multiple", type=float, default=4.0, dest="exposure_multiple")
+    pop.add_argument("--seed", type=int, default=0)
+    pop.set_defaults(func=cmd_population)
 
     pf = sub.add_parser("performance", help="score the kernel's classification vs CiPA expert labels")
     pf.add_argument("--ap-model", default="cipaordv1.0", dest="ap_model")

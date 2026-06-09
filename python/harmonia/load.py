@@ -62,6 +62,17 @@ class Dataset:
     def drug_references(self) -> List[Record]:
         return self.of_kind("drug_reference")
 
+    @property
+    def populations(self) -> List[Record]:
+        return self.of_kind("population")
+
+    def population(self, name: str) -> Optional[Record]:
+        """Lookup a population record by id or short name."""
+        if name in self._by_id:
+            return self._by_id[name]
+        full = f"population.{name}"
+        return self._by_id.get(full)
+
     def drugs(self) -> List[str]:
         names = {r.drug for r in self.channel_blocks}  # type: ignore[attr-defined]
         return sorted(names)

@@ -87,6 +87,18 @@ CITATIONS_TABLE = [
          authors="Fermini B, Hancox JC, Abi-Gerges N, Bridgland-Taylor M, Chaudhary KW, Colatsky T, et al.",
          journal="Journal of Biomolecular Screening", year=2016,
          doi="10.1177/1087057115594589", pmid="26170255"),
+    dict(key="britton-2013", type="article",
+         title="Experimentally calibrated population of models predicts and explains "
+               "intersubject variability in cardiac cellular electrophysiology",
+         authors="Britton OJ, Bueno-Orovio A, Van Ammel K, Lu HR, Towart R, Gallacher DJ, Rodriguez B",
+         journal="Proceedings of the National Academy of Sciences", year=2013,
+         doi="10.1073/pnas.1304382110", pmid="23690584"),
+    dict(key="passini-2017", type="article",
+         title="Human In Silico Drug Trials Demonstrate Higher Accuracy than Animal "
+               "Models in Predicting Clinical Pro-Arrhythmic Cardiotoxicity",
+         authors="Passini E, Britton OJ, Lu HR, Rohrbacher J, Hermans AN, Gallacher DJ, Greig RJH, Bueno-Orovio A, Rodriguez B",
+         journal="Frontiers in Physiology", year=2017,
+         doi="10.3389/fphys.2017.00668", pmid="28955244"),
 ]
 
 # --------------------------------------------------------------------------- #
@@ -527,6 +539,42 @@ def build_ap_models():
     return models
 
 
+def build_populations():
+    """Population-of-models specs. HYPOTHESIS-TIER (Tier D) — illustrative
+    inter-individual conductance variability, NOT calibrated to human data and
+    NOT for prediction (spec.md §3, §10). The CVs are loosely inspired by the
+    population-of-models literature (Britton 2013; Passini 2017) but are
+    deliberately round, illustrative numbers."""
+    return [{
+        "id": "population.illustrative_v0",
+        "kind": "population",
+        "subsystem": "populations",
+        "tier": "D",
+        "primary_citation": "britton-2013",
+        "population": {
+            "name": "Illustrative inter-individual conductance variability (v0)",
+            "n_default": 100,
+            "conductance_cv": {
+                "IKr": 0.22, "IKs": 0.28, "ICaL": 0.18, "INaL": 0.25,
+                "Ito": 0.30, "IK1": 0.15, "INaCa": 0.20,
+            },
+            "predictive": False,
+        },
+        "extraction": {
+            "review_status": "unverified",
+            "method": "illustrative conductance CVs inspired by population-of-models studies",
+            "verified_by": [],
+            "notes": "CVs are illustrative, NOT calibrated to experimental population data.",
+        },
+        "notes": "HYPOTHESIS-TIER — DO NOT USE FOR PREDICTION. A population of virtual "
+                 "myocytes built by sampling conductances at these CVs illustrates how "
+                 "inter-individual repolarization-reserve variability could spread a "
+                 "drug's risk classification across a population. The CVs are not "
+                 "calibrated to human data; every population assessment is capped at "
+                 "Tier D and labelled non-predictive.",
+    }]
+
+
 def write_json(path, obj):
     path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
@@ -553,6 +601,10 @@ def main():
 
     for m in build_ap_models():
         write_json(RECORDS / f"{m['id']}.json", m)
+        n_rec += 1
+
+    for pop in build_populations():
+        write_json(RECORDS / f"{pop['id']}.json", pop)
         n_rec += 1
 
     for c in CITATIONS_TABLE:

@@ -265,6 +265,24 @@ class DrugReference(Record):
         return self.eftpc_nm / fu if fu else None
 
 
+class Population(Record):
+    @property
+    def name(self) -> str:
+        return _get(self.raw, "population", "name", default=self.id)
+
+    @property
+    def n_default(self) -> int:
+        return _get(self.raw, "population", "n_default", default=100)
+
+    @property
+    def conductance_cv(self) -> Dict[str, float]:
+        return _get(self.raw, "population", "conductance_cv", default={})
+
+    @property
+    def predictive(self) -> bool:
+        return bool(_get(self.raw, "population", "predictive", default=False))
+
+
 def wrap(record_dict: Dict[str, Any]) -> Record:
     kind = record_dict.get("kind")
     if kind == "channel_block":
@@ -273,4 +291,6 @@ def wrap(record_dict: Dict[str, Any]) -> Record:
         return APModel(record_dict)
     if kind == "drug_reference":
         return DrugReference(record_dict)
+    if kind == "population":
+        return Population(record_dict)
     return Record(record_dict)

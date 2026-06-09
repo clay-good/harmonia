@@ -58,11 +58,18 @@ def build_bytes(ds: Dataset, ap_model: str = "cipaordv1.0",
     ]
     manifest = _manifest(entries)
 
+    # Deterministic archive: a fixed timestamp + fixed ordering so the .omex is
+    # byte-reproducible (plain writestr() would stamp the current time, making the
+    # archive non-reproducible — exports must be deterministic projections).
+    fixed_dt = (1980, 1, 1, 0, 0, 0)
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-        z.writestr("manifest.xml", manifest)
-        for name, content in files.items():
-            z.writestr(name, content)
+        members = [("manifest.xml", manifest)] + sorted(files.items())
+        for name, content in members:
+            zi = zipfile.ZipInfo(filename=name, date_time=fixed_dt)
+            zi.compress_type = zipfile.ZIP_DEFLATED
+            zi.external_attr = 0o644 << 16
+            z.writestr(zi, content)
     return buf.getvalue()
 
 

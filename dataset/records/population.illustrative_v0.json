@@ -1,0 +1,28 @@
+{
+  "id": "population.illustrative_v0",
+  "kind": "population",
+  "subsystem": "populations",
+  "tier": "D",
+  "primary_citation": "britton-2013",
+  "population": {
+    "name": "Illustrative inter-individual conductance variability (v0)",
+    "n_default": 100,
+    "conductance_cv": {
+      "IKr": 0.22,
+      "IKs": 0.28,
+      "ICaL": 0.18,
+      "INaL": 0.25,
+      "Ito": 0.3,
+      "IK1": 0.15,
+      "INaCa": 0.2
+    },
+    "predictive": false
+  },
+  "extraction": {
+    "review_status": "unverified",
+    "method": "illustrative conductance CVs inspired by population-of-models studies",
+    "verified_by": [],
+    "notes": "CVs are illustrative, NOT calibrated to experimental population data."
+  },
+  "notes": "HYPOTHESIS-TIER — DO NOT USE FOR PREDICTION. A population of virtual myocytes built by sampling conductances at these CVs illustrates how inter-individual repolarization-reserve variability could spread a drug's risk classification across a population. The CVs are not calibrated to human data; every population assessment is capped at Tier D and labelled non-predictive."
+}

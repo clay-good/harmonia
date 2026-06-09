@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/clay-good/harmonia/dataset/schema/record.schema.json",
   "title": "Harmonia record",
-  "description": "A single channel-block, ap-model, or drug-reference record. The dataset is the source of truth; everything else is a deterministic projection.",
+  "description": "A single channel-block, ap-model, drug-reference, or population record. The dataset is the source of truth; everything else is a deterministic projection.",
   "type": "object",
   "required": ["id", "kind", "subsystem", "tier", "extraction"],
   "additionalProperties": false,
@@ -12,7 +12,7 @@
       "pattern": "^[a-z0-9_]+\\.[a-z0-9_.-]+$",
       "description": "Stable dotted id, e.g. channel_block.dofetilide.ikr"
     },
-    "kind": { "enum": ["channel_block", "ap_model", "drug_reference"] },
+    "kind": { "enum": ["channel_block", "ap_model", "drug_reference", "population"] },
     "subsystem": {
       "enum": [
         "ion_channels",
@@ -207,6 +207,22 @@
         "total_cmax_nm": { "type": ["number", "null"] },
         "citation": { "type": ["string", "null"] }
       }
+    },
+    "population": {
+      "type": "object",
+      "description": "Population-of-models spec: per-conductance coefficient of variation used to sample a population of virtual myocytes. HYPOTHESIS-TIER (Tier D) — illustrative inter-individual variability, NOT calibrated to real human data, NOT for prediction.",
+      "additionalProperties": false,
+      "required": ["name", "conductance_cv"],
+      "properties": {
+        "name": { "type": "string" },
+        "n_default": { "type": "integer", "minimum": 1 },
+        "conductance_cv": {
+          "type": "object",
+          "additionalProperties": { "type": "number", "minimum": 0 },
+          "description": "channel/conductance -> coefficient of variation (lognormal) for the population"
+        },
+        "predictive": { "const": false }
+      }
     }
   },
 
@@ -222,6 +238,10 @@
     {
       "if": { "properties": { "kind": { "const": "drug_reference" } } },
       "then": { "required": ["drug", "cipa_set", "expert_risk_label", "eftpc_nm"] }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "population" } } },
+      "then": { "required": ["population"], "properties": { "tier": { "const": "D" } } }
     }
   ]
 }

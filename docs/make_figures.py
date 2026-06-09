@@ -19,7 +19,8 @@ from harmonia.export.reference import (KernelParams, simulate_beats, HERGDynamic
                                        hill_block_factor)
 from harmonia.simulate import (assess, assess_combination, THRESH_LOW_PCT,
                                THRESH_HIGH_PCT, QNET_THRESH_LOW, QNET_THRESH_HIGH,
-                               REFERENCE_EXPOSURE_MULTIPLE)
+                               REFERENCE_EXPOSURE_MULTIPLE, RISK_LABELS)
+from harmonia.populations import assess_population
 from harmonia.performance import score
 
 IMG = pathlib.Path(__file__).resolve().parent / "img"
@@ -211,11 +212,55 @@ def fig_combination():
     plt.close(fig)
 
 
+def fig_population():
+    """Population-of-models (Phase E, HYPOTHESIS-TIER): inter-individual conductance
+    variability spreads a drug's risk across a population of virtual myocytes."""
+    N = 80
+    cmap = {"high": RED, "intermediate": "#e69b00", "low": GREEN}
+    fig, (axL, axR) = plt.subplots(1, 2, figsize=(11, 4.6))
+
+    # left: population qNet distribution for a high vs a low drug
+    for drug, color in [("dofetilide", RED), ("verapamil", GREEN)]:
+        r = assess_population(ds, drug, n_models=N)
+        axL.hist(r.qnet_distribution, bins=22, alpha=0.6, color=color,
+                 label=f"{drug} (susceptible {r.susceptible_fraction:.0%})")
+    axL.axvline(QNET_THRESH_HIGH, color=RED, ls="--", lw=1)
+    axL.axvline(QNET_THRESH_LOW, color=GREEN, ls="--", lw=1)
+    axL.set_xlabel("qNet across the population (µC/µF)")
+    axL.set_ylabel("virtual myocytes")
+    axL.set_title("Same drug, a population of hearts → a spread of risk", fontsize=10)
+    axL.legend(fontsize=8, frameon=False)
+    axL.spines[["top", "right"]].set_visible(False)
+
+    # right: stacked class fractions per drug (incl. a single-cell 'miss', sotalol)
+    drugs = ["dofetilide", "quinidine", "sotalol", "ondansetron", "verapamil", "diltiazem"]
+    fracs = {lab: [] for lab in RISK_LABELS}
+    for d in drugs:
+        r = assess_population(ds, d, n_models=N)
+        for lab in RISK_LABELS:
+            fracs[lab].append(r.classification_distribution.get(lab, 0.0))
+    left = np.zeros(len(drugs))
+    for lab in ["high", "intermediate", "low"]:
+        axR.barh(drugs, fracs[lab], left=left, color=cmap[lab], label=lab)
+        left += np.array(fracs[lab])
+    axR.set_xlabel("fraction of the population")
+    axR.set_title("Class mix across the population (left=high risk)", fontsize=10)
+    axR.invert_yaxis()
+    axR.legend(fontsize=8, frameon=False, loc="lower right")
+    axR.spines[["top", "right"]].set_visible(False)
+
+    fig.suptitle("Population-of-models — HYPOTHESIS-TIER, NOT FOR PREDICTION "
+                 "(illustrative, uncalibrated)", fontsize=10.5)
+    fig.tight_layout(); fig.savefig(IMG / "population.png", dpi=130)
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     fig_ap_traces()
     fig_flip_distribution()
     fig_qnet_cipa()        # qNet across all 28 compounds (supersedes the per-set bar charts)
     fig_dynamic_binding()
     fig_combination()
+    fig_population()
     # fig_training_set() / fig_validation_set() remain available for the APD90 metric
     print(f"wrote figures to {IMG}")

@@ -75,6 +75,21 @@ class KernelParams:
         p.gNaL *= scales.get("INaL", 1.0)
         return p
 
+    # channel name -> KernelParams conductance attribute (for general scaling)
+    _COND_ATTR = {"INa": "gNa", "INaL": "gNaL", "Ito": "gto", "ICaL": "gCaL",
+                  "IKr": "gKr", "IKs": "gKs", "IK1": "gK1", "INaCa": "gNaCa"}
+
+    def with_conductance_multipliers(self, mult: Dict[str, float]) -> "KernelParams":
+        """Scale every named conductance by a per-channel multiplier (default 1).
+        Used to build a population of virtual myocytes (Phase E)."""
+        p = KernelParams(self.gNa, self.gNaL, self.gto, self.gCaL, self.gKr,
+                         self.gKs, self.gK1, self.gNaCa, dict(self.block))
+        for ch, attr in self._COND_ATTR.items():
+            f = mult.get(ch)
+            if f is not None:
+                setattr(p, attr, getattr(p, attr) * f)
+        return p
+
 
 def _sig(V, V0, k):
     return 1.0 / (1.0 + np.exp(-(V - V0) / k))

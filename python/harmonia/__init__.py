@@ -18,6 +18,7 @@ from . import filter, records
 # are hard dependencies, so a plain ``import harmonia`` already needs them.
 from .simulate import (assess, assess_combination, flip_view, RiskAssessment,
                        CombinationAssessment, FlipView)
+from .populations import assess_population, PopulationAssessment
 from .exposure import free_from_total, total_from_free
 
 CLINICAL_USE = (
@@ -36,9 +37,11 @@ __all__ = [
     "records",
     "assess",
     "assess_combination",
+    "assess_population",
     "flip_view",
     "RiskAssessment",
     "CombinationAssessment",
+    "PopulationAssessment",
     "FlipView",
     "free_from_total",
     "total_from_free",
