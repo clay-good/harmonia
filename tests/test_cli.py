@@ -28,6 +28,19 @@ def test_flip(capsys):
     assert "flip-view" in capsys.readouterr().out
 
 
+def test_combo(capsys):
+    assert main(["combo", "terfenadine", "ondansetron", "--mc", "12"]) == 0
+    out = capsys.readouterr().out
+    assert "combination = terfenadine + ondansetron" in out
+    assert "classification-flip frequency" in out
+
+
+def test_population(capsys):
+    assert main(["population", "sotalol", "--n", "20"]) == 0
+    out = capsys.readouterr().out
+    assert "NOT FOR PREDICTION" in out or "hypothesis" in out.lower()
+
+
 def test_performance(capsys):
     assert main(["performance", "--set", "training"]) == 0
     assert "accuracy" in capsys.readouterr().out

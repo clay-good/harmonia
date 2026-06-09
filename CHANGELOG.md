@@ -6,6 +6,16 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — test coverage for the previously-unguarded headline surfaces
+- **Dashboard data contract** (`tests/test_dashboard.py`): byte-compiles
+  `dashboard/app.py` and exercises the exact simulate/load API the dashboard
+  consumes (every attribute and dict key it reads, at tiny Monte-Carlo), so
+  API drift fails in CI instead of silently breaking the spec's headline feature
+  (§6). A full headless `AppTest` run is impractical (minutes per render), so the
+  contract test is the robust guard.
+- **CLI coverage** for the `combo` (drug-combination) and `population`
+  subcommands, which had none.
+
 ### Added — export integrity (closes a spec/implementation gap)
 - **ODE round-trip validation** (`registry.roundtrip_ode`): the model AST that
   every CellML/SBML/Myokit export is rendered from now carries a pure-Python
