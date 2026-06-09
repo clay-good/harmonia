@@ -1,0 +1,49 @@
+# Changelog
+
+All notable changes to Harmonia are recorded here. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to
+follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added — Phase F (release hardening)
+- **Executable reference notebook** [`notebooks/01_flip_frequency.ipynb`](notebooks/01_flip_frequency.ipynb)
+  reproducing the headline input-variability → classification-flip analysis from
+  the dataset + reference kernel. It is **executed in CI under `nbmake`** (the
+  family convention) and carries inline assertions, so a clean run is a test, not
+  just a demo.
+- **Declaration-level CellML-2.0 unit-conformance check**
+  (`harmonia.export.cellml.conformance_violations`): every exported model is
+  verified in CI to declare units on every variable and `<cn>` literal, with no
+  dangling unit references. (Full dimensional validation and the Myokit/OpenCOR
+  cross-check against the canonical ORd CellML remain an optional local step.)
+- **`.zenodo.json`** release metadata for archival + DOI minting on publish.
+- **`CHANGELOG.md`** (this file).
+
+### Changed
+- CI installs the `notebooks` extra and runs `pytest --nbmake notebooks/`.
+- `cellml.py` docstring sharpened to separate the now-machine-checked
+  declaration-level conformance from full dimensional/OpenCOR validation.
+
+## [0.1.0] — 2026-06-08
+
+First tagged development release. The CiPA-spine proarrhythmia pipeline, end to
+end, covering roadmap phases A–E:
+
+- **A — CiPA spine:** channel-block records + the reduced O'Hara-Rudy-lineage AP
+  kernel + the risk metric for the 12 CiPA training drugs, with CellML / Myokit /
+  SBML / SED-ML / CiPA-input / COMBINE `.omex` export, round-trip validation, and
+  the risk-uncertainty (flip) view.
+- **B — Dynamic hERG + validation:** Langmuir `kon`/`koff` hERG binding with
+  trapping; the 16 CiPA validation drugs (28 compounds total); recorded
+  classification performance with the full confusion matrix.
+- **C (start) — Discriminating qNet:** a shape-dependent Na-Ca exchanger
+  (excluded from the qNet sum) makes qNet sensitive; qNet is the default metric.
+- **D — Exposure layer:** free ↔ total plasma conversion via protein binding
+  (composable with a Hypnos PK trajectory); drug-combination (polypharmacy)
+  assessment.
+- **E — Populations (hypothesis-tier):** population-of-models risk spread,
+  shipped non-predictive (Tier D, "NOT FOR PREDICTION").
+
+[Unreleased]: https://github.com/clay-good/harmonia/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/clay-good/harmonia/releases/tag/v0.1.0

@@ -1,0 +1,32 @@
+{
+  "title": "Harmonia: a curated, variability-aware dataset of cardiac ion-channel drug-block parameters and in-silico proarrhythmia models",
+  "description": "<p>Harmonia is a curated, citation-backed, machine-readable dataset of the cardiac ion-channel drug-block parameters and the in-silico ventricular action-potential models that the CiPA proarrhythmia paradigm depends on. Every record carries an explicit confidence tier, full assay context (including whether enough block was observed to identify the IC50 at all), and the multiple source measurements with their inter-laboratory variability. It exports into CellML, Myokit, SBML, SED-ML, and the CiPA pipeline, and reports a torsade-risk-metric distribution and a classification-flip frequency rather than a bare safety verdict.</p><p><strong>NOT a clinical tool and NOT a regulatory safety determination.</strong> It is research, method development, and education, and support for &mdash; never replacement of &mdash; the CiPA paradigm.</p>",
+  "upload_type": "software",
+  "license": "MIT",
+  "access_right": "open",
+  "version": "0.1.0",
+  "creators": [
+    { "name": "Good, Clay" }
+  ],
+  "keywords": [
+    "cardiac electrophysiology",
+    "ion channel",
+    "hERG",
+    "CiPA",
+    "proarrhythmia",
+    "torsade de pointes",
+    "qNet",
+    "uncertainty quantification",
+    "CellML",
+    "Myokit",
+    "SBML"
+  ],
+  "related_identifiers": [
+    {
+      "relation": "isSupplementTo",
+      "identifier": "https://github.com/clay-good/harmonia",
+      "scheme": "url"
+    }
+  ],
+  "notes": "Code is MIT-licensed; the dataset is released under CC-BY-4.0 (see LICENSE-DATASET). When you use a record, cite Harmonia AND the primary source(s) named in that record (record.primary_citation.doi)."
+}

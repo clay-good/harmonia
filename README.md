@@ -116,7 +116,7 @@ pop.tier                                      # "D"  (always; non-predictive)
 
 ---
 
-## What's in the box (Phases A + B + C-start + D + E)
+## What's in the box (Phases A + B + C-start + D + E + F-start)
 
 | Layer | Status |
 | --- | --- |
@@ -132,7 +132,8 @@ pop.tier                                      # "D"  (always; non-predictive)
 | **Recorded classification performance** (Phase B) — `harmonia performance` scores either metric vs CiPA expert labels on training / validation / all, with the full confusion matrix | ✅ |
 | **Exports** — CellML 2.0, Myokit `.mmt`, SBML L3v2, SED-ML, CiPA inputs (CSV/JSON), CSV, BibTeX, COMBINE `.omex` — all carrying `clinicalUse = PROHIBITED`, tier, and DOI RDF | ✅ |
 | **CLI · Streamlit dashboard · CI** | ✅ |
-| Full CiPA Markov hERG + published optimized kinetics, ToR-ORd reformulation, broader multi-source aggregation, experimentally-calibrated populations, release hardening | Phase C/F (roadmap below) |
+| **Release hardening** (Phase F) — declaration-level CellML unit-conformance check, an executable `nbmake` notebook, `.zenodo.json`, `CHANGELOG.md` | ✅ |
+| Full CiPA Markov hERG + published optimized kinetics, ToR-ORd reformulation, broader multi-source aggregation, experimentally-calibrated populations, full dimensional/OpenCOR cross-check | Phase C/E/F (roadmap below) |
 
 ---
 
@@ -345,7 +346,10 @@ is capped at **Tier D** and stamped **NOT FOR PREDICTION**. It is a
 hypothesis-generating methodology view, never a per-patient or population safety
 claim. Experimentally-calibrated populations are deferred to a later phase.
 
-Figures regenerate from the dataset with `python docs/make_figures.py`.
+Figures regenerate from the dataset with `python docs/make_figures.py`, and the
+headline analysis is reproduced (and asserted) in the executable notebook
+[`notebooks/01_flip_frequency.ipynb`](notebooks/01_flip_frequency.ipynb), run in
+CI under `nbmake`.
 
 ---
 
@@ -367,7 +371,13 @@ only; not a regulatory determination"` annotation, plus the propagated tier and
 `bqbiol:isDescribedBy` DOI links as MIRIAM-style RDF. **Exports are generated,
 never hand-edited** (CI regenerates and round-trip-validates on every push). The
 CiPA-input export has a true numeric round trip (parse back ⇒ dataset values);
-the kernel constants are verified to survive the CellML/SBML/Myokit text.
+the kernel constants are verified to survive the CellML/SBML/Myokit text; and
+every exported CellML model is checked in CI for **declaration-level unit
+conformance** (`cellml.conformance_violations` — every variable and `<cn>`
+literal carries a defined or built-in unit, no dangling references). Full
+dimensional validation and the Myokit/OpenCOR cross-check against the *canonical*
+ORd CellML remain an optional local step (they need a heavy engine, so are not
+run in CI).
 
 ---
 
@@ -409,8 +419,10 @@ harmonia/
 │       ├── cellml.py · myokit.py · sbml.py · sedml.py · cipa_inputs.py
 │       ├── csv_bibtex.py · annotate.py · combine.py · registry.py
 ├── dashboard/app.py             # Streamlit: browse + risk-uncertainty (flip) view
-├── tests/                       # 76 tests: dataset, kernel, qNet, simulate, dynamic binding, exposure, combinations, populations, performance, exports, CLI
+├── notebooks/                   # executable analyses, run in CI under nbmake
+├── tests/                       # dataset, kernel, qNet, simulate, dynamic binding, exposure, combinations, populations, performance, exports (+ unit conformance), CLI
 ├── docs/                        # essay, figures, make_figures.py
+├── CHANGELOG.md · .zenodo.json  # release metadata
 └── exports/                     # sample generated artifacts (regenerated in CI)
 ```
 
@@ -445,7 +457,7 @@ feature does not get built.
 | **C — Variability layer** | **Discriminating qNet via a shape-dependent Na-Ca exchanger ✅.** Remaining: full CiPA Markov hERG + published optimized kinetics; broader multi-source aggregation; ToR-ORd reformulation | ◧ |
 | **D — Exposure layer** | Free ↔ total plasma conc + protein binding (composable with Hypnos); drug-combination assessment | ✅ **this release** |
 | **E — Populations** | **Population-of-models risk spread, shipped non-predictive (Tier D) ✅ (this release).** Remaining: experimentally-calibrated populations; disease & genetic backgrounds | ◧ |
-| **F — Hardening** | CellML unit conformance + OpenCOR cross-check; Zenodo DOI; perf | ◻ |
+| **F — Hardening** | **Declaration-level CellML unit-conformance check (in CI) ✅; executable `nbmake` notebook ✅; `.zenodo.json` + `CHANGELOG.md` ✅.** Remaining: full dimensional validation + the Myokit/OpenCOR cross-check against the *canonical* ORd CellML (optional local step); minted Zenodo DOI on first tagged release | ◧ |
 
 ---
 
@@ -454,7 +466,9 @@ feature does not get built.
 - **Code:** MIT ([LICENSE](LICENSE)). **Dataset:** CC-BY-4.0 ([LICENSE-DATASET](LICENSE-DATASET)).
 - When you use a record, cite **Harmonia** *and* the primary source(s) named in
   that record (`record.primary_citation.doi`). Machine-readable metadata in
-  [CITATION.cff](CITATION.cff).
+  [CITATION.cff](CITATION.cff) and [`.zenodo.json`](.zenodo.json); a concept DOI
+  is minted on the first tagged release. Changes are tracked in
+  [CHANGELOG.md](CHANGELOG.md).
 
 Harmonia shares **CellML** with Nidus (the Physiome lineage) and **composes with
 Hypnos**: a drug's free-plasma-concentration trajectory (Hypnos PK) can scale

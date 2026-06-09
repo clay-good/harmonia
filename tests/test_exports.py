@@ -27,6 +27,21 @@ def test_cellml_has_tier_and_doi(ds):
     assert "doi.org/10.1371/journal.pcbi.1002061" in text  # ORd DOI
 
 
+@pytest.mark.parametrize("ap", ["ord", "cipaordv1.0", "tor_ord"])
+def test_cellml_declaration_level_unit_conformance(ds, ap):
+    """Every exported CellML model is declaration-level unit-conformant: no
+    variable or <cn> literal references a unit the model never defines."""
+    assert cellml.conformance_violations(cellml.build(ds, ap)) == []
+
+
+def test_cellml_conformance_check_catches_a_dangling_unit(ds):
+    """The checker must actually flag a unit that isn't built-in or defined —
+    otherwise it would be a no-op that silently passes everything."""
+    broken = cellml.build(ds, "ord").replace('units="mV"', 'units="furlong"', 1)
+    violations = cellml.conformance_violations(broken)
+    assert any("furlong" in v for v in violations)
+
+
 def test_myokit_structure(ds):
     text = myokit.build(ds, "ord")
     assert "[[model]]" in text
