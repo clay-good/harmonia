@@ -1,0 +1,37 @@
+Creative Commons Attribution 4.0 International (CC BY 4.0)
+
+The CONTENTS OF THE dataset/ DIRECTORY (the curated channel-block and AP-model
+records, citation records, JSON Schema, and JSON-LD context) are licensed under
+the Creative Commons Attribution 4.0 International License.
+
+You are free to:
+  - Share — copy and redistribute the material in any medium or format
+  - Adapt — remix, transform, and build upon the material for any purpose,
+    even commercially.
+
+Under the following terms:
+  - Attribution — You must give appropriate credit, provide a link to the
+    license, and indicate if changes were made. You may do so in any reasonable
+    manner, but not in any way that suggests the licensor endorses you or your
+    use.
+
+Full legal text: https://creativecommons.org/licenses/by/4.0/legalcode
+Human-readable summary: https://creativecommons.org/licenses/by/4.0/
+
+ATTRIBUTION NOTICE
+------------------
+Each record aggregates parameters from primary literature. The Harmonia dataset
+records the curation, tier annotation, assay context, and inter-source
+variability; it does NOT relicense the underlying primary measurements. When you
+use a record, cite BOTH Harmonia AND the original source(s) named in the
+record's `primary_citation` / `source_values` fields (each carries a DOI/PMID).
+
+The Python code (everything under python/, dashboard/, notebooks/, tests/) is
+licensed separately under the MIT License — see LICENSE.
+
+SCOPE NOTICE
+------------
+The dataset is research / safety-methodology / education infrastructure. It is
+NOT a regulatory safety determination and NOT a clinical tool. No record
+constitutes a verdict that any drug is safe or unsafe. See README §Safety and
+spec.md §10.

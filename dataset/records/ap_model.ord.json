@@ -1,0 +1,52 @@
+{
+  "id": "ap_model.ord",
+  "kind": "ap_model",
+  "subsystem": "ap_models",
+  "tier": "C",
+  "primary_citation": "ohara-2011",
+  "model": {
+    "name": "O'Hara-Rudy (ORd) — reduced reference kernel",
+    "lineage": "O'Hara-Rudy",
+    "formulation": "human ventricular endocardial AP; Hodgkin-Huxley + algebraic IK1",
+    "currents": [
+      "INa",
+      "INaL",
+      "Ito",
+      "ICaL",
+      "IKr",
+      "IKs",
+      "IK1"
+    ]
+  },
+  "model_parameters": [
+    {
+      "symbol": "g_scale_IKr",
+      "label": "IKr conductance scale",
+      "value": 1.0,
+      "units": "dimensionless"
+    },
+    {
+      "symbol": "g_scale_ICaL",
+      "label": "ICaL conductance scale",
+      "value": 1.0,
+      "units": "dimensionless"
+    },
+    {
+      "symbol": "g_scale_INaL",
+      "label": "INaL conductance scale",
+      "value": 1.0,
+      "units": "dimensionless"
+    }
+  ],
+  "validation": {
+    "training_set_reproduced": null,
+    "validation_set_accuracy": null,
+    "notes": "Bundled kernel is a REDUCED reference implementation of the ORd lineage — structurally faithful (7 named currents, Hill block) and numerically stable, but not bit-exact to the published CellML. Tier C until cross-checked vs canonical CellML (Phase F)."
+  },
+  "extraction": {
+    "review_status": "unverified",
+    "method": "reduced kernel implemented from the ORd lineage",
+    "verified_by": [],
+    "notes": "Equations not yet cross-checked vs canonical CellML."
+  }
+}

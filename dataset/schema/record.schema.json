@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/clay-good/harmonia/dataset/schema/record.schema.json",
+  "title": "Harmonia record",
+  "description": "A single channel-block, ap-model, or drug-reference record. The dataset is the source of truth; everything else is a deterministic projection.",
+  "type": "object",
+  "required": ["id", "kind", "subsystem", "tier", "extraction"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]+\\.[a-z0-9_.-]+$",
+      "description": "Stable dotted id, e.g. channel_block.dofetilide.ikr"
+    },
+    "kind": { "enum": ["channel_block", "ap_model", "drug_reference"] },
+    "subsystem": {
+      "enum": [
+        "ion_channels",
+        "channel_block",
+        "ap_models",
+        "risk_metrics",
+        "drug_reference_sets",
+        "exposure",
+        "populations"
+      ]
+    },
+    "tier": { "enum": ["A", "B", "C", "D"] },
+    "primary_citation": { "type": "string" },
+    "notes": { "type": "string" },
+    "extraction": {
+      "type": "object",
+      "required": ["review_status"],
+      "additionalProperties": false,
+      "properties": {
+        "review_status": { "enum": ["verified", "unverified", "contested"] },
+        "method": { "type": "string" },
+        "verified_by": { "type": "array", "items": { "type": "string" } },
+        "notes": { "type": "string" }
+      }
+    },
+
+    "drug": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "unii": { "type": ["string", "null"] },
+        "chembl": { "type": ["string", "null"] }
+      }
+    },
+    "channel": { "enum": ["IKr", "IKs", "ICaL", "INaL", "INa", "Ito", "IK1"] },
+    "block_model": { "enum": ["hill", "dynamic_binding"] },
+    "parameters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["symbol", "value"],
+        "additionalProperties": false,
+        "properties": {
+          "symbol": { "type": "string" },
+          "label": { "type": "string" },
+          "value": {
+            "type": "object",
+            "required": ["central", "units"],
+            "additionalProperties": false,
+            "properties": {
+              "central": { "type": "number" },
+              "low": { "type": ["number", "null"] },
+              "high": { "type": ["number", "null"] },
+              "units": { "type": "string" }
+            }
+          },
+          "tier": { "enum": ["A", "B", "C", "D"] },
+          "primary_citation": { "type": "string" }
+        }
+      }
+    },
+    "assay_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "platform": {
+          "enum": ["manual_patch_clamp", "automated_patch_clamp", "mixed", "unknown"]
+        },
+        "temperature_c": { "type": ["number", "null"] },
+        "expression_system": { "type": ["string", "null"] },
+        "max_block_observed_percent": { "type": ["number", "null"] },
+        "holding_protocol": { "type": ["string", "null"] }
+      }
+    },
+    "source_values": {
+      "type": "array",
+      "description": "Multiple labs'/assays' measurements of the same IC50 — the variability made first-class.",
+      "items": {
+        "type": "object",
+        "required": ["ic50_nm", "citation"],
+        "additionalProperties": false,
+        "properties": {
+          "ic50_nm": { "type": "number", "exclusiveMinimum": 0 },
+          "hill": { "type": ["number", "null"] },
+          "platform": {
+            "enum": ["manual", "automated", "mixed", "unknown"]
+          },
+          "temperature_c": { "type": ["number", "null"] },
+          "max_block_observed_percent": { "type": ["number", "null"] },
+          "citation": { "type": "string" }
+        }
+      }
+    },
+    "variability": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fold_range": { "type": ["number", "null"] },
+        "n_sources": { "type": "integer", "minimum": 0 },
+        "iqr_nm": {
+          "type": ["array", "null"],
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "geomean_nm": { "type": ["number", "null"] }
+      }
+    },
+    "known_failure_modes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["condition", "behavior", "action"],
+        "additionalProperties": false,
+        "properties": {
+          "condition": { "type": "string" },
+          "behavior": { "type": "string" },
+          "action": { "type": "string" },
+          "citation": { "type": ["string", "null"] }
+        }
+      }
+    },
+
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "lineage": { "type": "string" },
+        "formulation": { "type": "string" },
+        "currents": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "model_parameters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["symbol", "value", "units"],
+        "additionalProperties": false,
+        "properties": {
+          "symbol": { "type": "string" },
+          "label": { "type": "string" },
+          "value": { "type": "number" },
+          "units": { "type": "string" }
+        }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "training_set_reproduced": { "type": ["boolean", "null"] },
+        "validation_set_accuracy": { "type": ["number", "null"] },
+        "notes": { "type": "string" }
+      }
+    },
+
+    "cipa_set": { "enum": ["training", "validation", "none"] },
+    "expert_risk_label": { "enum": ["high", "intermediate", "low"] },
+    "eftpc_nm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["central", "units"],
+      "properties": {
+        "central": { "type": "number" },
+        "units": { "type": "string" },
+        "kind": { "enum": ["free", "total"] },
+        "citation": { "type": "string" }
+      }
+    }
+  },
+
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "const": "channel_block" } } },
+      "then": { "required": ["drug", "channel", "block_model", "parameters", "assay_context"] }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "ap_model" } } },
+      "then": { "required": ["model"] }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "drug_reference" } } },
+      "then": { "required": ["drug", "cipa_set", "expert_risk_label", "eftpc_nm"] }
+    }
+  ]
+}

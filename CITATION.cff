@@ -1,0 +1,36 @@
+cff-version: 1.2.0
+message: >-
+  If you use Harmonia, please cite this software AND the primary source(s)
+  named in each record you rely on (every record carries a primary_citation
+  with a DOI/PMID).
+title: "Harmonia: a curated, variability-aware dataset of cardiac ion-channel drug-block parameters and in-silico proarrhythmia models"
+abstract: >-
+  Harmonia is a curated, citation-backed, machine-readable dataset of the
+  cardiac ion-channel drug-block parameters and the in-silico ventricular
+  action-potential models that the CiPA proarrhythmia paradigm depends on.
+  Every record carries an explicit confidence tier, full assay context
+  (including whether enough block was observed to identify the IC50 at all),
+  and the multiple source measurements with their inter-laboratory variability.
+  It exports into CellML, Myokit, SBML, SED-ML, and the CiPA pipeline, and
+  reports a torsade-risk-metric distribution and a classification-flip frequency
+  rather than a bare safety verdict.
+type: software
+authors:
+  - family-names: Good
+    given-names: Clay
+repository-code: "https://github.com/clay-good/harmonia"
+url: "https://github.com/clay-good/harmonia"
+license: MIT
+version: 0.1.0
+date-released: "2026-06-08"
+keywords:
+  - cardiac electrophysiology
+  - ion channel
+  - hERG
+  - CiPA
+  - proarrhythmia
+  - torsade de pointes
+  - qNet
+  - uncertainty quantification
+  - CellML
+  - Myokit

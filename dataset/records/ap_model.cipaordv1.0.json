@@ -1,0 +1,52 @@
+{
+  "id": "ap_model.cipaordv1.0",
+  "kind": "ap_model",
+  "subsystem": "ap_models",
+  "tier": "C",
+  "primary_citation": "dutta-2017",
+  "model": {
+    "name": "IKr-dynamic CiPAORd v1.0 — reduced reference variant",
+    "lineage": "O'Hara-Rudy",
+    "formulation": "ORd re-optimized for CiPA; IKr re-scaled; dynamic hERG binding (Phase B). v0.1 kernel approximates it with a rescaled-IKr Hill variant.",
+    "currents": [
+      "INa",
+      "INaL",
+      "Ito",
+      "ICaL",
+      "IKr",
+      "IKs",
+      "IK1"
+    ]
+  },
+  "model_parameters": [
+    {
+      "symbol": "g_scale_IKr",
+      "label": "IKr conductance scale",
+      "value": 1.2,
+      "units": "dimensionless"
+    },
+    {
+      "symbol": "g_scale_ICaL",
+      "label": "ICaL conductance scale",
+      "value": 1.0,
+      "units": "dimensionless"
+    },
+    {
+      "symbol": "g_scale_INaL",
+      "label": "INaL conductance scale",
+      "value": 1.3,
+      "units": "dimensionless"
+    }
+  ],
+  "validation": {
+    "training_set_reproduced": null,
+    "validation_set_accuracy": null,
+    "notes": "Dynamic-hERG binding is the Phase-B deliverable; the v0.1 kernel uses a rescaled-IKr Hill approximation labelled accordingly."
+  },
+  "extraction": {
+    "review_status": "unverified",
+    "method": "reduced CiPAORd variant",
+    "verified_by": [],
+    "notes": "Dynamic binding pending Phase B."
+  }
+}

@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Validate dataset (schema + semantic rules)
+        run: harmonia validate
+
+      - name: Dataset is reproducible from the build tool
+        run: |
+          python dataset/tools/build_records.py
+          git diff --exit-code dataset/records dataset/citations \
+            || (echo "::error::dataset/ is out of sync with build_records.py — re-run it and commit" && exit 1)
+
+      - name: Run tests
+        run: pytest -q
+
+      - name: Exports regenerate cleanly
+        run: |
+          harmonia export --all --output /tmp/exports
+          test -f /tmp/exports/tables/cipa_inputs.csv
+          test -f /tmp/exports/omex/ord.omex
+
+      - name: Info (smoke)
+        run: harmonia info

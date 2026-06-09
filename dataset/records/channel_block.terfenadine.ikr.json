@@ -1,0 +1,93 @@
+{
+  "id": "channel_block.terfenadine.ikr",
+  "kind": "channel_block",
+  "subsystem": "channel_block",
+  "tier": "B",
+  "primary_citation": "crumb-2016",
+  "drug": {
+    "name": "terfenadine",
+    "unii": "73334008C7",
+    "chembl": null
+  },
+  "channel": "IKr",
+  "block_model": "hill",
+  "parameters": [
+    {
+      "symbol": "IC50",
+      "label": "half-maximal inhibitory concentration",
+      "value": {
+        "central": 21.194,
+        "low": 8.5,
+        "high": 56.0,
+        "units": "nM"
+      },
+      "tier": "B",
+      "primary_citation": "crumb-2016"
+    },
+    {
+      "symbol": "h",
+      "label": "Hill coefficient",
+      "value": {
+        "central": 0.8,
+        "low": null,
+        "high": null,
+        "units": "dimensionless"
+      },
+      "tier": "B",
+      "primary_citation": "crumb-2016"
+    }
+  ],
+  "assay_context": {
+    "platform": "mixed",
+    "temperature_c": 37,
+    "expression_system": "HEK293 / CHO (heterologous)",
+    "max_block_observed_percent": 91,
+    "holding_protocol": "depolarizing step protocol per source assay"
+  },
+  "source_values": [
+    {
+      "ic50_nm": 8.5,
+      "platform": "manual",
+      "citation": "crumb-2016",
+      "hill": 0.8,
+      "temperature_c": 37
+    },
+    {
+      "ic50_nm": 56.0,
+      "platform": "automated",
+      "citation": "kramer-2013",
+      "hill": 0.8,
+      "temperature_c": 37
+    },
+    {
+      "ic50_nm": 20.0,
+      "platform": "manual",
+      "citation": "li-2017",
+      "hill": 0.8,
+      "temperature_c": 37
+    }
+  ],
+  "variability": {
+    "fold_range": 6.588,
+    "n_sources": 3,
+    "iqr_nm": [
+      14.25,
+      38.0
+    ],
+    "geomean_nm": 21.194
+  },
+  "known_failure_modes": [
+    {
+      "condition": "inter-source IC50 fold-range > 5",
+      "behavior": "platform/lab-dependent block potency; risk classification can flip with the source chosen",
+      "action": "propagate the full source distribution (Monte-Carlo), never a single value",
+      "citation": "chang-2017"
+    }
+  ],
+  "extraction": {
+    "review_status": "unverified",
+    "method": "literature table transcribed by maintainer; values from CiPA-era patch-clamp datasets",
+    "verified_by": [],
+    "notes": "Values are literature-derived (see primary_citation / source_values). No source PDF has been confirmed inside Harmonia; review_status stays unverified per spec §9."
+  }
+}

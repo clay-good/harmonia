@@ -1,0 +1,72 @@
+{
+  "id": "channel_block.chlorpromazine.ina",
+  "kind": "channel_block",
+  "subsystem": "channel_block",
+  "tier": "C",
+  "primary_citation": "crumb-2016",
+  "drug": {
+    "name": "chlorpromazine",
+    "unii": "U42B7VYA4P",
+    "chembl": null
+  },
+  "channel": "INa",
+  "block_model": "hill",
+  "parameters": [
+    {
+      "symbol": "IC50",
+      "label": "half-maximal inhibitory concentration",
+      "value": {
+        "central": 4710.0,
+        "low": 4710.0,
+        "high": 4710.0,
+        "units": "nM"
+      },
+      "tier": "C",
+      "primary_citation": "crumb-2016"
+    },
+    {
+      "symbol": "h",
+      "label": "Hill coefficient",
+      "value": {
+        "central": 2.0,
+        "low": null,
+        "high": null,
+        "units": "dimensionless"
+      },
+      "tier": "C",
+      "primary_citation": "crumb-2016"
+    }
+  ],
+  "assay_context": {
+    "platform": "manual_patch_clamp",
+    "temperature_c": 37,
+    "expression_system": "HEK293 / CHO (heterologous)",
+    "max_block_observed_percent": 68,
+    "holding_protocol": "depolarizing step protocol per source assay"
+  },
+  "source_values": [
+    {
+      "ic50_nm": 4710.0,
+      "platform": "manual",
+      "citation": "crumb-2016",
+      "hill": 2.0,
+      "temperature_c": 37
+    }
+  ],
+  "variability": {
+    "fold_range": 1.0,
+    "n_sources": 1,
+    "iqr_nm": [
+      4710.0,
+      4710.0
+    ],
+    "geomean_nm": 4710.0
+  },
+  "known_failure_modes": [],
+  "extraction": {
+    "review_status": "unverified",
+    "method": "literature table transcribed by maintainer; values from CiPA-era patch-clamp datasets",
+    "verified_by": [],
+    "notes": "Values are literature-derived (see primary_citation / source_values). No source PDF has been confirmed inside Harmonia; review_status stays unverified per spec §9."
+  }
+}

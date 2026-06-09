@@ -1,0 +1,27 @@
+{
+  "id": "drug_reference.verapamil",
+  "kind": "drug_reference",
+  "subsystem": "drug_reference_sets",
+  "tier": "B",
+  "primary_citation": "li-2017",
+  "drug": {
+    "name": "verapamil",
+    "unii": "CJ0O37KU29",
+    "chembl": null
+  },
+  "cipa_set": "training",
+  "expert_risk_label": "low",
+  "eftpc_nm": {
+    "central": 81.0,
+    "units": "nM",
+    "kind": "free",
+    "citation": "li-2017"
+  },
+  "extraction": {
+    "review_status": "unverified",
+    "method": "CiPA working-group training set + free Cmax (EFTPC) from CiPA references",
+    "verified_by": [],
+    "notes": "Expert risk label and EFTPC from the CiPA training-set literature; unverified."
+  },
+  "notes": "Expert consensus risk label is GROUND TRUTH for classifier calibration only — it is NOT a Harmonia output and NOT a clinical determination."
+}

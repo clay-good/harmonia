@@ -1,0 +1,86 @@
+{
+  "id": "channel_block.quinidine.ikr",
+  "kind": "channel_block",
+  "subsystem": "channel_block",
+  "tier": "A",
+  "primary_citation": "crumb-2016",
+  "drug": {
+    "name": "quinidine",
+    "unii": "ITX08688JL",
+    "chembl": null
+  },
+  "channel": "IKr",
+  "block_model": "hill",
+  "parameters": [
+    {
+      "symbol": "IC50",
+      "label": "half-maximal inhibitory concentration",
+      "value": {
+        "central": 451.5404,
+        "low": 320.0,
+        "high": 700.0,
+        "units": "nM"
+      },
+      "tier": "A",
+      "primary_citation": "crumb-2016"
+    },
+    {
+      "symbol": "h",
+      "label": "Hill coefficient",
+      "value": {
+        "central": 0.8,
+        "low": null,
+        "high": null,
+        "units": "dimensionless"
+      },
+      "tier": "A",
+      "primary_citation": "crumb-2016"
+    }
+  ],
+  "assay_context": {
+    "platform": "mixed",
+    "temperature_c": 37,
+    "expression_system": "HEK293 / CHO (heterologous)",
+    "max_block_observed_percent": 90,
+    "holding_protocol": "depolarizing step protocol per source assay"
+  },
+  "source_values": [
+    {
+      "ic50_nm": 411.0,
+      "platform": "manual",
+      "citation": "crumb-2016",
+      "hill": 0.8,
+      "temperature_c": 37
+    },
+    {
+      "ic50_nm": 700.0,
+      "platform": "automated",
+      "citation": "kramer-2013",
+      "hill": 0.8,
+      "temperature_c": 37
+    },
+    {
+      "ic50_nm": 320.0,
+      "platform": "manual",
+      "citation": "li-2017",
+      "hill": 0.8,
+      "temperature_c": 37
+    }
+  ],
+  "variability": {
+    "fold_range": 2.188,
+    "n_sources": 3,
+    "iqr_nm": [
+      365.5,
+      555.5
+    ],
+    "geomean_nm": 451.5404
+  },
+  "known_failure_modes": [],
+  "extraction": {
+    "review_status": "unverified",
+    "method": "literature table transcribed by maintainer; values from CiPA-era patch-clamp datasets",
+    "verified_by": [],
+    "notes": "Values are literature-derived (see primary_citation / source_values). No source PDF has been confirmed inside Harmonia; review_status stays unverified per spec §9."
+  }
+}

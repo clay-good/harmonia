@@ -1,0 +1,52 @@
+{
+  "id": "ap_model.tor_ord",
+  "kind": "ap_model",
+  "subsystem": "ap_models",
+  "tier": "C",
+  "primary_citation": "tomek-2019",
+  "model": {
+    "name": "Tomek-O'Hara-Rudy (ToR-ORd) — reduced reference variant",
+    "lineage": "O'Hara-Rudy",
+    "formulation": "updated ORd (reformulated INaL, ICaL, IKr, Ca handling). v0.1 kernel approximates it with a rebalanced-conductance variant.",
+    "currents": [
+      "INa",
+      "INaL",
+      "Ito",
+      "ICaL",
+      "IKr",
+      "IKs",
+      "IK1"
+    ]
+  },
+  "model_parameters": [
+    {
+      "symbol": "g_scale_IKr",
+      "label": "IKr conductance scale",
+      "value": 0.9,
+      "units": "dimensionless"
+    },
+    {
+      "symbol": "g_scale_ICaL",
+      "label": "ICaL conductance scale",
+      "value": 1.1,
+      "units": "dimensionless"
+    },
+    {
+      "symbol": "g_scale_INaL",
+      "label": "INaL conductance scale",
+      "value": 0.85,
+      "units": "dimensionless"
+    }
+  ],
+  "validation": {
+    "training_set_reproduced": null,
+    "validation_set_accuracy": null,
+    "notes": "ToR-ORd reformulation is the Phase-C deliverable."
+  },
+  "extraction": {
+    "review_status": "unverified",
+    "method": "reduced ToR-ORd variant",
+    "verified_by": [],
+    "notes": "Full reformulation pending Phase C."
+  }
+}

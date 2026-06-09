@@ -1,0 +1,40 @@
+{
+  "@context": {
+    "harmonia": "https://github.com/clay-good/harmonia/ns#",
+    "bqbiol": "http://biomodels.net/biology-qualifiers/",
+    "bqmodel": "http://biomodels.net/model-qualifiers/",
+    "dcterms": "http://purl.org/dc/terms/",
+    "edam": "http://edamontology.org/",
+    "schema": "http://schema.org/",
+
+    "id": "@id",
+    "kind": "@type",
+
+    "confidenceTier": "harmonia:confidenceTier",
+    "reviewStatus": "harmonia:reviewStatus",
+    "clinicalUse": "harmonia:clinicalUse",
+
+    "drug": { "@id": "harmonia:drug" },
+    "name": "schema:name",
+    "unii": "harmonia:unii",
+    "channel": "harmonia:channel",
+    "blockModel": "harmonia:blockModel",
+
+    "ic50": { "@id": "harmonia:ic50", "@type": "xsd:double" },
+    "hill": { "@id": "harmonia:hillCoefficient", "@type": "xsd:double" },
+    "maxBlockObservedPercent": "harmonia:maxBlockObservedPercent",
+    "foldRange": "harmonia:foldRange",
+    "nSources": "harmonia:nSources",
+
+    "eftpc": "harmonia:eftpcFreeNM",
+    "expertRiskLabel": "harmonia:expertRiskLabel",
+    "cipaSet": "harmonia:cipaSet",
+
+    "isDescribedBy": "bqbiol:isDescribedBy",
+    "isDerivedFrom": "bqmodel:isDerivedFrom",
+    "citation": "dcterms:source",
+    "doi": { "@id": "harmonia:doi", "@type": "@id" },
+    "pmid": "harmonia:pmid"
+  },
+  "harmonia:clinicalUse": "PROHIBITED — research / safety-methodology / education only; not a regulatory determination"
+}

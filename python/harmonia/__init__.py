@@ -1,0 +1,40 @@
+"""Harmonia — curated, variability-aware cardiac ion-channel drug-block data and
+the in-silico ventricular AP models that turn it into a torsade-de-pointes
+(proarrhythmia) risk *distribution*.
+
+NOT a clinical tool and NOT a regulatory safety determination. Harmonia reports
+a risk-metric distribution and a classification-flip frequency with full input
+uncertainty; it never issues a bare "safe/unsafe" verdict. See spec.md §10.
+"""
+from __future__ import annotations
+
+__version__ = "0.1.0"
+
+from .load import Dataset, load, find_dataset_dir
+from .validate import validate_dataset, ValidationReport
+from . import filter, records
+
+# The headline API. Imported lazily-safe: simulate pulls in numpy/scipy, which
+# are hard dependencies, so a plain ``import harmonia`` already needs them.
+from .simulate import assess, flip_view, RiskAssessment, FlipView
+
+CLINICAL_USE = (
+    "PROHIBITED — research / safety-methodology / education only; "
+    "not a regulatory determination"
+)
+
+__all__ = [
+    "__version__",
+    "Dataset",
+    "load",
+    "find_dataset_dir",
+    "validate_dataset",
+    "ValidationReport",
+    "filter",
+    "records",
+    "assess",
+    "flip_view",
+    "RiskAssessment",
+    "FlipView",
+    "CLINICAL_USE",
+]
