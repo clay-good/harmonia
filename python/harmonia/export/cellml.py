@@ -6,18 +6,27 @@ is a typed <variable>, every current / gate law is MathML, and the model carries
 the MIRIAM RDF annotation (clinicalUse, tier, DOIs).
 
 CONFORMANCE (Phase F). ``conformance_violations`` machine-checks the
-*declaration-level* CellML-2.0 unit requirements in CI (every variable and every
-<cn> literal carries a units name that is either a CellML-2.0 built-in unit or is
-defined by a <units> block in the model — no dangling unit references). What this
-does NOT yet do is full dimensional-consistency checking of every <apply>: <cn>
-literals are tagged ``cellml:units="dimensionless"`` rather than carrying the
-dimension implied by their additive/relational context. Full dimensional
-validation, plus the Myokit/OpenCOR cross-check against the *canonical* ORd
-CellML, remains an optional local step — it needs a heavy engine (Myokit/OpenCOR)
-and so is deliberately not run in CI.
+*declaration-level* CellML-2.0 unit requirements with no external dependency
+(every variable and every <cn> literal carries a units name that is either a
+CellML-2.0 built-in unit or is defined by a <units> block in the model — no
+dangling unit references).
+
+VALIDATION. ``validity_violations`` runs the *canonical* CellML 2.0 library
+(libCellML's Parser + Validator) over the exported model, checking the full
+ruleset — MathML correctness, variable/units references, interface consistency,
+duplicate/cyclic definitions — well beyond the declaration-level check, and the
+lightweight (no-simulation-engine) part of the spec §6 "cross-check against the
+canonical CellML." It is wired into ``export --all`` and CI alongside the SBML
+``consistency_violations`` gate. What remains an optional local step is full
+dimensional-consistency checking and the Myokit/OpenCOR cross-check against the
+*canonical* ORd CellML — they need a heavy simulation engine and are not run in
+CI. (<cn> literals are tagged ``cellml:units="dimensionless"`` rather than
+carrying the dimension implied by their additive context — the same
+declaration-level limitation the SBML export documents.)
 """
 from __future__ import annotations
 
+import re
 import xml.etree.ElementTree as ET
 from typing import Dict, List, Optional
 
@@ -135,6 +144,45 @@ def conformance_violations(text: str) -> List[str]:
         elif u not in known:
             violations.append(f"<cn> references undefined units '{u}'")
     return violations
+
+
+def validity_violations(text: str) -> List[str]:
+    """Validate the exported CellML *model* with libCellML (the canonical CellML
+    2.0 library) — the strong analog of the declaration-level
+    ``conformance_violations`` and of the SBML export's ``consistency_violations``.
+
+    libCellML's Parser + Validator check the full CellML 2.0 ruleset (MathML
+    correctness, variable/units references, interface consistency, duplicate and
+    cyclic definitions), so this catches model errors the hand-rolled
+    declaration check cannot (e.g. a MathML ``<ci>`` naming no declared variable).
+
+    The embedded ``<rdf:RDF>`` MIRIAM annotation (clinicalUse / tier / DOIs,
+    spec §7) is a foreign-namespace metadata *island*: CellML 2.0 has no blessed
+    annotation wrapper (unlike SBML's ``<annotation>``), so libCellML's parser
+    reports it as foreign content. It is stripped before validation here — the
+    identical RDF also travels in the COMBINE archive's ``metadata.rdf`` and
+    inside the SBML ``<annotation>`` — so this gate validates the model proper.
+
+    Returns ERROR-level issues (empty == valid). Skips (returns ``[]``) if
+    libCellML is absent; CI installs it via the ``dev`` extra.
+    """
+    try:
+        import libcellml
+    except ImportError:
+        return []
+    model_only = re.sub(r"\s*<rdf:RDF.*?</rdf:RDF>", "", text, flags=re.DOTALL)
+    parser = libcellml.Parser()
+    model = parser.parseModel(model_only)
+    validator = libcellml.Validator()
+    validator.validateModel(model)
+    err = int(libcellml.Issue.Level.ERROR)
+    out: List[str] = []
+    for src, label in ((parser, "parser"), (validator, "validator")):
+        for i in range(src.issueCount()):
+            issue = src.issue(i)
+            if int(issue.level()) == err:
+                out.append(f"CellML {label}: {issue.description()}")
+    return out
 
 
 def build(ds: Dataset, ap_model: str = "cipaordv1.0",

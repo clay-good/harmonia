@@ -152,6 +152,7 @@ def cmd_export(args) -> int:
             errors += registry.roundtrip_parameters(ds, ap)
             errors += registry.roundtrip_ode(ds, ap)
             errors += cellml.conformance_violations(cellml.build(ds, ap))
+            errors += cellml.validity_violations(cellml.build(ds, ap))
             errors += sbml.consistency_violations(sbml.build(ds, ap))
             errors += sedml.reference_violations(
                 registry.build_text(ds, "sedml", ap_model=ap))
@@ -161,9 +162,9 @@ def cmd_export(args) -> int:
             for e in errors:
                 print(f"  - {e}", file=sys.stderr)
             return 1
-        print(f"validated: CiPA + parameters + ODE round trips, CellML units, "
-              f"SBML validity, SED-ML refs, OMEX manifests across "
-              f"{len(registry.list_ap_models(ds))} AP models")
+        print(f"validated: CiPA + parameters + ODE round trips, CellML units + "
+              f"libCellML validity, SBML validity, SED-ML refs, OMEX manifests "
+              f"across {len(registry.list_ap_models(ds))} AP models")
         return 0
 
     fmt = args.format

@@ -6,6 +6,25 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — CellML validated against the canonical CellML 2.0 library (libCellML)
+- **`cellml.validity_violations`** runs **libCellML's Parser + Validator** (the
+  canonical CellML 2.0 library) over every exported model, checking the full
+  ruleset — MathML correctness, variable/units references, interface consistency,
+  duplicate/cyclic definitions — well beyond the existing declaration-level
+  `conformance_violations`. It catches errors the hand-rolled check cannot (e.g. a
+  MathML `<ci>` naming an undeclared variable), and is the lightweight,
+  no-simulation-engine part of the spec-§6 "cross-check against the canonical
+  CellML." Wired into `harmonia export --all` and CI next to the SBML gate;
+  `libcellml` added to the `dev` extra (skips gracefully if absent). Tested across
+  all three AP models with a negative test (an undeclared math variable is
+  caught).
+- The exported CellML **model** is valid CellML 2.0 (0 issues). The embedded
+  `<rdf:RDF>` MIRIAM annotation (clinicalUse / tier / DOIs, spec §7) is a
+  foreign-namespace metadata *island* — CellML 2.0 has no blessed annotation
+  wrapper, unlike SBML's `<annotation>` — so it is set aside before validation
+  (the identical RDF also travels in the COMBINE archive's `metadata.rdf` and the
+  SBML `<annotation>`). Documented in the builder and the README.
+
 ### Added — SBML validated against the canonical validator + units declared
 - **`sbml.consistency_violations`** runs **libSBML's `checkConsistency`** (the
   canonical SBML validator) over every exported model and returns any

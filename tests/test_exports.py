@@ -15,6 +15,13 @@ except ImportError:
     _HAVE_LIBSBML = False
 needs_libsbml = pytest.mark.skipif(not _HAVE_LIBSBML, reason="python-libsbml not installed")
 
+try:
+    import libcellml  # noqa: F401
+    _HAVE_LIBCELLML = True
+except ImportError:
+    _HAVE_LIBCELLML = False
+needs_libcellml = pytest.mark.skipif(not _HAVE_LIBCELLML, reason="libcellml not installed")
+
 
 @pytest.mark.parametrize("fmt", ["cellml", "sbml", "sedml"])
 def test_xml_well_formed(ds, fmt):
@@ -47,6 +54,24 @@ def test_cellml_conformance_check_catches_a_dangling_unit(ds):
     broken = cellml.build(ds, "ord").replace('units="mV"', 'units="furlong"', 1)
     violations = cellml.conformance_violations(broken)
     assert any("furlong" in v for v in violations)
+
+
+@needs_libcellml
+@pytest.mark.parametrize("ap", ["ord", "cipaordv1.0", "tor_ord"])
+def test_cellml_passes_libcellml_validator(ds, ap):
+    """Every exported CellML model is valid CellML 2.0 per the canonical library
+    (libCellML Parser + Validator), with the spec-§7 RDF annotation island set
+    aside. The lightweight part of the spec-§6 canonical-CellML cross-check."""
+    assert cellml.validity_violations(cellml.build(ds, ap)) == []
+
+
+@needs_libcellml
+def test_cellml_validator_catches_a_math_error(ds):
+    """libCellML must flag a model error the declaration-level check can't see —
+    a MathML <ci> referencing a variable that isn't declared. Otherwise the gate
+    would be a no-op."""
+    broken = cellml.build(ds, "ord").replace("<ci>gNa</ci>", "<ci>gNa_TYPO</ci>", 1)
+    assert cellml.validity_violations(broken) != []
 
 
 @needs_libsbml
