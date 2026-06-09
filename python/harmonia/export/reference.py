@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Dict
 
 import numpy as np
 from scipy.integrate import solve_ivp, trapezoid

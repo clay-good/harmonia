@@ -69,8 +69,8 @@ def _render(spec: ModelSpec, tier: str, dataset_version: str, dois: List[str]) -
         if u in _UNIT_DEFS:
             L.append(f'  <units name="{u}">{_UNIT_DEFS[u]}</units>')
 
-    L.append(f'  <component name="cell">')
-    L.append(f'    <variable name="time" units="ms"/>')
+    L.append('  <component name="cell">')
+    L.append('    <variable name="time" units="ms"/>')
     for p in spec.parameters:
         L.append(f'    <variable name="{p.name}" units="{p.units}" '
                  f'initial_value="{p.value!r}"/>')

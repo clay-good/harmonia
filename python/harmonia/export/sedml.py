@@ -69,7 +69,10 @@ def reference_violations(text: str) -> List[str]:
     """
     ns = f"{{{SEDML_NS}}}"
     root = ET.fromstring(text)
-    ids = lambda tag: {e.get("id") for e in root.iter(f"{ns}{tag}")}
+
+    def ids(tag):
+        return {e.get("id") for e in root.iter(f"{ns}{tag}")}
+
     models = ids("model")
     sims = ids("uniformTimeCourse") | ids("oneStep") | ids("steadyState")
     tasks = ids("task") | ids("repeatedTask")

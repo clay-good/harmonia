@@ -399,6 +399,7 @@ suite (106 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 
 | Guard | What it proves | Where |
 | --- | --- | --- |
+| **Lint** | no dead imports, undefined names, or unused variables (Pyflakes + pycodestyle) | `ruff check` |
 | **Dataset reproducibility** | `dataset/records` regenerates byte-identically from `build_records.py` (the provenance log) — the curated table *is* the dataset | CI `git diff --exit-code` |
 | **Schema + semantic validation** | every record satisfies the JSON Schema; the reliability gate (block < 60% ⟺ Tier D ⟺ failure-mode) and variability bookkeeping hold | `harmonia validate` |
 | **CiPA numeric round trip** | export the CiPA CSV, parse it back, every IC50/Hill equals the dataset value | `registry.roundtrip_cipa` |

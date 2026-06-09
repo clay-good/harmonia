@@ -53,7 +53,6 @@ def validate_dataset(path: Optional[str] = None) -> ValidationReport:
 
     # ---- schema layer ----------------------------------------------------- #
     try:
-        import jsonschema
         from jsonschema import Draft202012Validator
         schema = _load_schema(root)
         validator = Draft202012Validator(schema)

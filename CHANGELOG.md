@@ -6,6 +6,14 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — lint gate (housekeeping)
+- **Ruff** is now a CI gate (`ruff check .`, config in `pyproject.toml`; added to
+  the `dev` extra). Selects Pyflakes + pycodestyle (E/F/W); does not enforce hard
+  line length or forbid the deliberate one-line setup style in the figure/test
+  scripts. Fixed all findings it surfaced — 12 dead imports across the package,
+  2 placeholder-less f-strings, a lambda-assignment, and unused imports in the
+  notebook and tests.
+
 ### Fixed
 - **Standalone SED-ML model source.** `exports/sedml/<model>.sedml` referenced
   `source="model.cellml"`, but in the export layout the CellML model lives in a

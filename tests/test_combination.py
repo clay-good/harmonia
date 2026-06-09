@@ -2,7 +2,6 @@
 import numpy as np
 import pytest
 
-import harmonia
 from harmonia.simulate import assess_combination, assess
 
 

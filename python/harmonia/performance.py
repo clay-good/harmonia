@@ -13,8 +13,8 @@ APD) are visible rather than hidden behind a single accuracy figure.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Dict, List, Tuple
 
 from .load import Dataset
 from .simulate import assess, RISK_LABELS, DEFAULT_METRIC

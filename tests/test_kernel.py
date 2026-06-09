@@ -1,5 +1,4 @@
 """The reference AP kernel: physiologic baseline, monotone pharmacology, EADs."""
-import numpy as np
 
 from harmonia.export.reference import (KernelParams, simulate_beats,
                                        hill_block_factor)

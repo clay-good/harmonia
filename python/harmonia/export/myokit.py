@@ -12,7 +12,7 @@ from typing import Dict, List, Optional
 
 from ..load import Dataset
 from . import annotate
-from .model_spec import ModelSpec, build_model_spec, Var
+from .model_spec import ModelSpec, build_model_spec
 
 
 def _render(spec: ModelSpec, tier: str, dataset_version: str,

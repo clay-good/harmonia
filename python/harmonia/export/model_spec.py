@@ -8,8 +8,7 @@ equations is a change in one place.
 """
 from __future__ import annotations
 
-import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, List, Tuple, Union
 
 import numpy as np

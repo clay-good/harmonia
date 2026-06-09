@@ -19,7 +19,7 @@ from harmonia.export.reference import (KernelParams, simulate_beats, HERGDynamic
                                        hill_block_factor)
 from harmonia.simulate import (assess, assess_combination, THRESH_LOW_PCT,
                                THRESH_HIGH_PCT, QNET_THRESH_LOW, QNET_THRESH_HIGH,
-                               REFERENCE_EXPOSURE_MULTIPLE, RISK_LABELS)
+                               RISK_LABELS)
 from harmonia.populations import assess_population
 from harmonia.performance import score
 

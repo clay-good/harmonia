@@ -27,6 +27,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev,notebooks]"
 
+      - name: Lint (ruff)
+        run: ruff check .
+
       - name: Validate dataset (schema + semantic rules)
         run: harmonia validate
 

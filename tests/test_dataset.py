@@ -1,5 +1,4 @@
 """Dataset integrity: schema + semantic validation, citations, tier rules."""
-import harmonia
 from harmonia.records import ChannelBlock
 from harmonia.validate import validate_dataset
 

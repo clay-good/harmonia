@@ -2,7 +2,6 @@
 import numpy as np
 import pytest
 
-import harmonia
 from harmonia.populations import assess_population
 
 

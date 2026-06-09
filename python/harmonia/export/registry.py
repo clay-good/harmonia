@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pathlib
 import re
-from typing import Callable, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from ..load import Dataset
 from . import cellml, cipa_inputs, combine, csv_bibtex, myokit, sbml, sedml

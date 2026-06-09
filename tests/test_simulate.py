@@ -2,7 +2,6 @@
 import numpy as np
 import pytest
 
-import harmonia
 from harmonia.simulate import (assess, flip_view, classify, classify_qnet,
                                dose_response, THRESH_LOW_PCT, THRESH_HIGH_PCT,
                                QNET_THRESH_LOW, QNET_THRESH_HIGH, DEFAULT_METRIC)

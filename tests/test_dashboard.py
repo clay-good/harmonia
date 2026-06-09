@@ -14,7 +14,6 @@ import py_compile
 import pathlib
 
 import numpy as np
-import pytest
 
 from harmonia.simulate import (assess, flip_view, dose_response, assess_combination,
                                THRESH_LOW_PCT, THRESH_HIGH_PCT, RISK_LABELS,

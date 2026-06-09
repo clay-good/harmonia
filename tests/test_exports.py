@@ -5,7 +5,7 @@ import zipfile
 
 import pytest
 
-from harmonia.export import (registry, cellml, sbml, sedml, myokit, combine,
+from harmonia.export import (registry, cellml, sedml, myokit, combine,
                              cipa_inputs, csv_bibtex)
 
 
