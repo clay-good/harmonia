@@ -102,7 +102,7 @@ CITATIONS_TABLE = [
 NaN = None
 DRUGS = {
     # ----- HIGH risk -----
-    "dofetilide": dict(category="high", unii="R4Z9X1N42Q", eftpc=2.0, channels={
+    "dofetilide": dict(category="high", unii="R4Z9X1N42Q", eftpc=2.0, fu=0.36, channels={
         "IKr": dict(hill=0.9, max_block=95, primary="crumb-2016",
                     sources=[(4.9, "manual", "crumb-2016"),
                              (6.6, "automated", "kramer-2013"),
@@ -113,7 +113,7 @@ DRUGS = {
                     dynamic=dict(kon=1.0e-5, koff=5.0e-5, trapping=True,
                                  citation="li-2017")),
     }),
-    "bepridil": dict(category="high", unii="VWA7N2DT4P", eftpc=33.0, channels={
+    "bepridil": dict(category="high", unii="VWA7N2DT4P", eftpc=33.0, fu=0.01, channels={
         "IKr": dict(hill=0.9, max_block=92, primary="crumb-2016",
                     sources=[(55.0, "manual", "crumb-2016"),
                              (92.0, "automated", "kramer-2013")]),
@@ -123,7 +123,7 @@ DRUGS = {
         "IKs":  dict(ic50=28628.0, hill=1.0, max_block=65, primary="crumb-2016"),
         "Ito":  dict(ic50=8594.0, hill=3.5, max_block=70, primary="crumb-2016"),
     }),
-    "quinidine": dict(category="high", unii="ITX08688JL", eftpc=3237.0, channels={
+    "quinidine": dict(category="high", unii="ITX08688JL", eftpc=3237.0, fu=0.13, channels={
         "IKr": dict(hill=0.8, max_block=90, primary="crumb-2016",
                     sources=[(411.0, "manual", "crumb-2016"),
                              (700.0, "automated", "kramer-2013"),
@@ -134,14 +134,14 @@ DRUGS = {
         "Ito":  dict(ic50=3487.0, hill=1.3, max_block=85, primary="crumb-2016"),
         "IKs":  dict(ic50=4937.0, hill=1.2, max_block=70, primary="crumb-2016"),
     }),
-    "sotalol": dict(category="high", unii="A6D97U294I", eftpc=14690.0, channels={
+    "sotalol": dict(category="high", unii="A6D97U294I", eftpc=14690.0, fu=1.0, channels={
         "IKr": dict(ic50=110600.0, hill=0.8, max_block=80, primary="crumb-2016",
                     sources=[(110600.0, "manual", "crumb-2016"),
                              (319000.0, "automated", "kramer-2013")]),
     }),
 
     # ----- INTERMEDIATE risk -----
-    "cisapride": dict(category="intermediate", unii="UVL329170W", eftpc=2.6, channels={
+    "cisapride": dict(category="intermediate", unii="UVL329170W", eftpc=2.6, fu=0.025, channels={
         "IKr": dict(hill=0.9, max_block=93, primary="crumb-2016",
                     sources=[(6.5, "manual", "crumb-2016"),
                              (20.0, "automated", "kramer-2013"),
@@ -149,7 +149,7 @@ DRUGS = {
         "ICaL": dict(ic50=9258.0, hill=0.6, max_block=62, primary="crumb-2016"),
         "INa":  dict(ic50=15000.0, hill=1.0, max_block=60, primary="crumb-2016"),
     }),
-    "terfenadine": dict(category="intermediate", unii="73334008C7", eftpc=9.0, channels={
+    "terfenadine": dict(category="intermediate", unii="73334008C7", eftpc=9.0, fu=0.03, channels={
         "IKr": dict(hill=0.8, max_block=91, primary="crumb-2016",
                     sources=[(8.5, "manual", "crumb-2016"),
                              (56.0, "automated", "kramer-2013"),
@@ -158,7 +158,7 @@ DRUGS = {
         "INaL": dict(ic50=2000.0, hill=0.6, max_block=78, primary="crumb-2016"),
         "INa":  dict(ic50=1303.0, hill=0.9, max_block=80, primary="crumb-2016"),
     }),
-    "ondansetron": dict(category="intermediate", unii="4AF302ESOS", eftpc=139.0, channels={
+    "ondansetron": dict(category="intermediate", unii="4AF302ESOS", eftpc=139.0, fu=0.27, channels={
         "IKr": dict(hill=0.9, max_block=86, primary="crumb-2016",
                     sources=[(1320.0, "manual", "crumb-2016"),
                              (900.0, "manual", "li-2017")]),
@@ -166,7 +166,7 @@ DRUGS = {
         "INa":  dict(ic50=19444.0, hill=1.0, max_block=62, primary="crumb-2016"),
         "INaL": dict(ic50=19000.0, hill=1.0, max_block=60, primary="crumb-2016"),
     }),
-    "chlorpromazine": dict(category="intermediate", unii="U42B7VYA4P", eftpc=38.0, channels={
+    "chlorpromazine": dict(category="intermediate", unii="U42B7VYA4P", eftpc=38.0, fu=0.04, channels={
         "IKr": dict(hill=0.8, max_block=82, primary="crumb-2016",
                     sources=[(1470.0, "manual", "crumb-2016"),
                              (1000.0, "manual", "li-2017")]),
@@ -176,25 +176,25 @@ DRUGS = {
     }),
 
     # ----- LOW risk -----
-    "diltiazem": dict(category="low", unii="EE92BBP03H", eftpc=122.0, channels={
+    "diltiazem": dict(category="low", unii="EE92BBP03H", eftpc=122.0, fu=0.2, channels={
         "IKr": dict(ic50=13150.0, hill=0.9, max_block=70, primary="crumb-2016"),
         "ICaL": dict(ic50=112.0, hill=0.7, max_block=90, primary="crumb-2016"),  # strong CaL → protective
         "INaL": dict(ic50=21000.0, hill=0.7, max_block=62, primary="crumb-2016"),
     }),
-    "mexiletine": dict(category="low", unii="1U511HHV4Z", eftpc=4129.0, channels={
+    "mexiletine": dict(category="low", unii="1U511HHV4Z", eftpc=4129.0, fu=0.55, channels={
         # Borderline IKr block: max ~60% -> identifiable but only just; Tier C.
         "IKr": dict(ic50=28900.0, hill=0.9, max_block=60, primary="crumb-2016"),
         "INaL": dict(ic50=8957.0, hill=1.4, max_block=80, primary="crumb-2016"),  # late-Na block → protective
         "INa":  dict(ic50=30329.0, hill=1.2, max_block=62, primary="crumb-2016"),
     }),
-    "ranolazine": dict(category="low", unii="A6IEZ5M406", eftpc=1948.0, channels={
+    "ranolazine": dict(category="low", unii="A6IEZ5M406", eftpc=1948.0, fu=0.38, channels={
         "IKr": dict(ic50=12000.0, hill=0.9, max_block=70, primary="crumb-2016"),
         "INaL": dict(ic50=7884.0, hill=0.9, max_block=78, primary="crumb-2016"),  # late-Na block → protective
         # Deliberate Tier-D example: ranolazine is a weak L-type Ca blocker; the
         # maximum block observed is below ~60%, so the IC50 is UNIDENTIFIABLE.
         "ICaL": dict(ic50=296000.0, hill=1.0, max_block=35, primary="crumb-2016"),
     }),
-    "verapamil": dict(category="low", unii="CJ0O37KU29", eftpc=81.0, channels={
+    "verapamil": dict(category="low", unii="CJ0O37KU29", eftpc=81.0, fu=0.1, channels={
         "IKr": dict(hill=1.0, max_block=85, primary="crumb-2016",
                     sources=[(250.0, "manual", "crumb-2016"),
                              (143.0, "automated", "kramer-2013"),
@@ -413,7 +413,7 @@ def build_channel_block(drug, dmeta, channel, cmeta):
 def build_drug_reference(drug, dmeta):
     cipa_set = dmeta.get("cipa_set", "training")
     cit = "li-2017" if cipa_set == "training" else "li-2019"
-    return {
+    rec = {
         "id": f"drug_reference.{drug}",
         "kind": "drug_reference",
         "subsystem": "drug_reference_sets",
@@ -433,6 +433,15 @@ def build_drug_reference(drug, dmeta):
         "notes": "Expert consensus risk label is GROUND TRUTH for classifier calibration/scoring only — "
                  "it is NOT a Harmonia output and NOT a clinical determination.",
     }
+    fu = dmeta.get("fu")
+    if fu is not None:
+        # free = fraction_unbound * total; store total derived from the free EFTPC
+        rec["protein_binding"] = {
+            "fraction_unbound": fu,
+            "total_cmax_nm": round(dmeta["eftpc"] / fu, 3),
+            "citation": cit,
+        }
+    return rec
 
 
 def build_ap_models():

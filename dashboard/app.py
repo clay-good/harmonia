@@ -48,8 +48,9 @@ st.caption("Cardiac ion-channel drug-block data → in-silico proarrhythmia risk
            "**distribution**. NOT a clinical tool, NOT a regulatory determination, "
            "NOT a safety verdict — a risk distribution with its full input uncertainty.")
 
-tab_flip, tab_browse, tab_about = st.tabs(
-    ["Risk-uncertainty (flip) view", "Browse dataset", "About / safety"])
+tab_flip, tab_combo, tab_browse, tab_about = st.tabs(
+    ["Risk-uncertainty (flip) view", "Drug combinations", "Browse dataset",
+     "About / safety"])
 
 # --------------------------------------------------------------------------- #
 with tab_flip:
@@ -112,6 +113,42 @@ with tab_flip:
     dr = dose_response(ds, drug, concs, ap_model=ap_model)
     st.line_chart(pd.DataFrame({"APD90 (ms)": dr["apd90"]},
                                index=np.round(dr["concentration_nM"], 1)))
+
+# --------------------------------------------------------------------------- #
+with tab_combo:
+    import pandas as pd
+    from harmonia.simulate import assess_combination
+    st.caption("Polypharmacy: independent block multiplies per channel, and every "
+               "drug's IC50 variability is propagated jointly. Two 'intermediate' "
+               "drugs can combine into 'high'.")
+    cc1, cc2, cc3 = st.columns([3, 1, 1])
+    sel = cc1.multiselect("Drugs (pick 2+)", ds.drugs(),
+                          default=["terfenadine", "ondansetron"])
+    cmetric = cc2.selectbox("Metric", ["qnet", "apd90"], index=0, key="cmetric")
+    cmc = cc3.slider("MC draws", 20, 300, 100, step=20, key="cmc")
+    if len(sel) < 2:
+        st.info("Select at least two drugs.")
+    else:
+        combo = assess_combination(ds, sel, n_mc=cmc, metric=cmetric)
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("Combined classification", combo.classification.upper())
+        k2.metric("Flip frequency", f"{combo.classification_flip_frequency:.0%}")
+        k3.metric("Interaction (extra ΔAPD90)", f"{combo.interaction_dapd90_pct:+.1f}%")
+        k4.metric("Propagated tier", combo.tier)
+        # single agents vs combination
+        rows = [{"agent": d, "class": assess(ds, d, n_mc=0, metric=cmetric,
+                 exposure_nM=combo.exposures_nM[d]).classification,
+                 "free nM": round(combo.exposures_nM[d], 1)} for d in sel]
+        rows.append({"agent": "COMBINATION", "class": combo.classification.upper(),
+                     "free nM": ""})
+        st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+        if combo.excluded_channels:
+            st.error("Excluded (unidentifiable IC50): " + ", ".join(combo.excluded_channels))
+        data = combo.qnet_distribution if cmetric == "qnet" else combo.dapd90_distribution
+        hist = np.histogram(data, bins=24)
+        centers = 0.5 * (hist[1][:-1] + hist[1][1:])
+        st.bar_chart(pd.DataFrame({"count": hist[0]},
+                                  index=np.round(centers, 4 if cmetric == "qnet" else 1)))
 
 # --------------------------------------------------------------------------- #
 with tab_browse:

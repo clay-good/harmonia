@@ -16,7 +16,9 @@ from . import filter, records
 
 # The headline API. Imported lazily-safe: simulate pulls in numpy/scipy, which
 # are hard dependencies, so a plain ``import harmonia`` already needs them.
-from .simulate import assess, flip_view, RiskAssessment, FlipView
+from .simulate import (assess, assess_combination, flip_view, RiskAssessment,
+                       CombinationAssessment, FlipView)
+from .exposure import free_from_total, total_from_free
 
 CLINICAL_USE = (
     "PROHIBITED — research / safety-methodology / education only; "
@@ -33,8 +35,12 @@ __all__ = [
     "filter",
     "records",
     "assess",
+    "assess_combination",
     "flip_view",
     "RiskAssessment",
+    "CombinationAssessment",
     "FlipView",
+    "free_from_total",
+    "total_from_free",
     "CLINICAL_USE",
 ]

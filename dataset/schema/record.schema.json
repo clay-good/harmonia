@@ -196,6 +196,17 @@
         "kind": { "enum": ["free", "total"] },
         "citation": { "type": "string" }
       }
+    },
+    "protein_binding": {
+      "type": "object",
+      "description": "Plasma protein binding used to scale total <-> free exposure. free = fraction_unbound * total.",
+      "additionalProperties": false,
+      "required": ["fraction_unbound"],
+      "properties": {
+        "fraction_unbound": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "total_cmax_nm": { "type": ["number", "null"] },
+        "citation": { "type": ["string", "null"] }
+      }
     }
   },
 

@@ -17,8 +17,8 @@ import matplotlib.pyplot as plt
 import harmonia
 from harmonia.export.reference import (KernelParams, simulate_beats, HERGDynamic,
                                        hill_block_factor)
-from harmonia.simulate import (assess, THRESH_LOW_PCT, THRESH_HIGH_PCT,
-                               QNET_THRESH_LOW, QNET_THRESH_HIGH,
+from harmonia.simulate import (assess, assess_combination, THRESH_LOW_PCT,
+                               THRESH_HIGH_PCT, QNET_THRESH_LOW, QNET_THRESH_HIGH,
                                REFERENCE_EXPOSURE_MULTIPLE)
 from harmonia.performance import score
 
@@ -171,10 +171,51 @@ def fig_validation_set():
     plt.close(fig)
 
 
+def fig_combination():
+    """Polypharmacy (Phase D): two intermediate drugs combine into high risk.
+    qNet AP traces and the qNet bars for each single agent vs the combination."""
+    pair = ["terfenadine", "ondansetron"]
+    combo = assess_combination(ds, pair, n_mc=300)
+    singles = {d: assess(ds, d, n_mc=0, exposure_nM=combo.exposures_nM[d]) for d in pair}
+
+    fig, (axL, axR) = plt.subplots(1, 2, figsize=(11, 4.4))
+    # left: qNet bars, single agents vs combination, with thresholds
+    labels = [pair[0], pair[1], "combination"]
+    qnets = [singles[pair[0]].qnet, singles[pair[1]].qnet, combo.qnet]
+    classes = [singles[pair[0]].classification, singles[pair[1]].classification, combo.classification]
+    cmap = {"high": RED, "intermediate": "#e69b00", "low": GREEN}
+    axL.bar(labels, qnets, color=[cmap[c] for c in classes])
+    axL.axhline(QNET_THRESH_HIGH, color=RED, ls="--", lw=1)
+    axL.axhline(QNET_THRESH_LOW, color=GREEN, ls="--", lw=1)
+    axL.set_ylabel("qNet (µC/µF)   (lower = higher risk)")
+    axL.set_title("Two intermediate drugs → HIGH combined\n"
+                  f"interaction {combo.interaction_dapd90_pct:+.0f}% APD, "
+                  f"flip {combo.classification_flip_frequency:.0%}", fontsize=10)
+    for x, (q, c) in enumerate(zip(qnets, classes)):
+        axL.text(x, q + 0.004, c.upper(), ha="center", fontsize=8)
+    axL.spines[["top", "right"]].set_visible(False)
+
+    # right: the combination qNet distribution under joint IC50 variability
+    axR.hist(combo.qnet_distribution, bins=26, color=BLUE, alpha=0.85)
+    axR.axvline(QNET_THRESH_HIGH, color=RED, ls="--", lw=1.2)
+    axR.axvline(QNET_THRESH_LOW, color=GREEN, ls="--", lw=1.2)
+    axR.axvline(combo.qnet, color="black", lw=1.6)
+    axR.set_xlabel("combination qNet (µC/µF)")
+    axR.set_ylabel("Monte-Carlo draws")
+    axR.set_title("Joint input variability → classification flips", fontsize=10)
+    axR.spines[["top", "right"]].set_visible(False)
+
+    fig.suptitle("Polypharmacy: independent block multiplies, uncertainty compounds",
+                 fontsize=11)
+    fig.tight_layout(); fig.savefig(IMG / "combination.png", dpi=130)
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     fig_ap_traces()
     fig_flip_distribution()
     fig_qnet_cipa()        # qNet across all 28 compounds (supersedes the per-set bar charts)
     fig_dynamic_binding()
+    fig_combination()
     # fig_training_set() / fig_validation_set() remain available for the APD90 metric
     print(f"wrote figures to {IMG}")

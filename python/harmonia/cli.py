@@ -89,6 +89,16 @@ def cmd_flip(args) -> int:
     return 0
 
 
+def cmd_combo(args) -> int:
+    from .simulate import assess_combination
+    ds = _load(args)
+    res = assess_combination(ds, args.drugs, ap_model=args.ap_model, n_mc=args.mc,
+                             metric=args.metric, exposure_multiple=args.exposure_multiple,
+                             seed=args.seed)
+    print(res.summary())
+    return 0
+
+
 def cmd_performance(args) -> int:
     from .performance import score
     ds = _load(args)
@@ -164,6 +174,15 @@ def build_parser() -> argparse.ArgumentParser:
     f.add_argument("--mc", type=int, default=200)
     f.add_argument("--seed", type=int, default=0)
     f.set_defaults(func=cmd_flip)
+
+    cb = sub.add_parser("combo", help="assess a DRUG COMBINATION (polypharmacy proarrhythmia)")
+    cb.add_argument("drugs", nargs="+", help="two or more drug names")
+    cb.add_argument("--ap-model", default="cipaordv1.0", dest="ap_model")
+    cb.add_argument("--metric", default="qnet", choices=["qnet", "apd90"])
+    cb.add_argument("--mc", type=int, default=200, help="Monte-Carlo draws")
+    cb.add_argument("--exposure-multiple", type=float, default=4.0, dest="exposure_multiple")
+    cb.add_argument("--seed", type=int, default=0)
+    cb.set_defaults(func=cmd_combo)
 
     pf = sub.add_parser("performance", help="score the kernel's classification vs CiPA expert labels")
     pf.add_argument("--ap-model", default="cipaordv1.0", dest="ap_model")

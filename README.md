@@ -67,6 +67,7 @@ harmonia validate            # JSON-Schema- + semantically validate the dataset
 harmonia info                # counts by subsystem / tier / review status
 harmonia simulate dofetilide --mc 200          # qNet metric (default); --metric apd90 to switch
 harmonia flip verapamil      # classification stability across AP-model variants
+harmonia combo terfenadine ondansetron         # drug-combination (polypharmacy) assessment
 harmonia performance         # score qNet vs CiPA expert labels (train/val/all); --metric apd90
 harmonia export --all --output exports/
 ```
@@ -95,24 +96,36 @@ cmp.stable_across_models                      # False
 
 # Dynamic (CiPA-style) hERG binding with trapping, where kinetics are recorded
 res = harmonia.assess(ds, "dofetilide", herg_dynamic=True)   # trapped blocker -> extra prolongation
+
+# Exposure layer: drive block from a TOTAL plasma concentration via protein binding
+res = harmonia.assess(ds, "verapamil", exposure_nM=3200, exposure_kind="total")  # free = fu * total
+harmonia.free_from_total(3200, 0.10)          # 320.0 nM free
+
+# Drug combination (polypharmacy): joint variability, the interaction, the flip
+combo = harmonia.assess_combination(ds, ["terfenadine", "ondansetron"], n_mc=200)
+combo.classification                          # "high"  (two intermediates -> high together)
+combo.interaction_dapd90_pct                  # extra prolongation beyond the worst single agent
+combo.classification_flip_frequency           # joint-uncertainty flip frequency
 ```
 
 ---
 
-## What's in the box (Phases A + B + C-start)
+## What's in the box (Phases A + B + C-start + D)
 
 | Layer | Status |
 | --- | --- |
-| **Dataset** — 68 channel-block records across the **28 CiPA compounds** (12 training + 16 validation), 28 drug-reference records (expert risk label + free Cmax), 3 AP-model records, 10 Crossref-checked citations | ✅ |
+| **Dataset** — 68 channel-block records across the **28 CiPA compounds** (12 training + 16 validation), 28 drug-reference records (expert risk label + free Cmax + protein binding), 3 AP-model records, 10 Crossref-checked citations | ✅ |
 | **Variability is first-class** — multi-source IC50s with computed fold-range / IQR; the reliability gate (max block < 60% ⇒ Tier D, unidentifiable) machine-enforced | ✅ |
 | **Reference kernel** — a SciPy reduced O'Hara-Rudy-lineage ventricular AP (7 currents + Na-Ca exchanger) with Hill block per current; APD90 / qNet / triangulation / EAD biomarkers | ✅ |
 | **Discriminating qNet** (Phase C) — adding a shape-dependent Na-Ca exchanger (excluded from the qNet sum) makes qNet sensitive; **qNet is now the default metric** (10/12 training, zero two-category errors over all 28 compounds); APD90 selectable | ✅ |
 | **Dynamic hERG binding** (Phase B) — Langmuir kon/koff with **trapping**; reduces to the static Hill block at steady state, captures use-dependent block (`assess(..., herg_dynamic=True)`) | ✅ |
+| **Exposure layer** (Phase D) — free ↔ total plasma conversion via protein binding (`fraction_unbound`); assess from a free or total concentration (composable with a Hypnos PK trajectory) | ✅ |
+| **Drug combinations** (Phase D) — `assess_combination` propagates *joint* IC50 variability; independent block multiplies per channel; reports the interaction and how often the combined class flips | ✅ |
 | **Risk distribution + flip frequency** — Monte-Carlo over source variability; classification-flip frequency; worst-tier propagation | ✅ |
 | **Recorded classification performance** (Phase B) — `harmonia performance` scores either metric vs CiPA expert labels on training / validation / all, with the full confusion matrix | ✅ |
 | **Exports** — CellML 2.0, Myokit `.mmt`, SBML L3v2, SED-ML, CiPA inputs (CSV/JSON), CSV, BibTeX, COMBINE `.omex` — all carrying `clinicalUse = PROHIBITED`, tier, and DOI RDF | ✅ |
 | **CLI · Streamlit dashboard · CI** | ✅ |
-| Full CiPA Markov hERG + published optimized kinetics, ToR-ORd reformulation, broader multi-source aggregation, exposure (Hypnos) coupling + drug combinations, populations | Phase C–F (roadmap below) |
+| Full CiPA Markov hERG + published optimized kinetics, ToR-ORd reformulation, broader multi-source aggregation, populations | Phase C/E–F (roadmap below) |
 
 ---
 
@@ -127,7 +140,7 @@ flowchart TD
     DS -->|"build_records.py (provenance log)"| REC["records/*.json"]
     REC --> LOAD["harmonia.load → Dataset"]
     LOAD --> VAL["validate.py<br/>schema + reliability-gate + citation rules"]
-    LOAD --> SIM["simulate.py<br/>Monte-Carlo variability → risk distribution + flip freq<br/>+ dynamic hERG binding"]
+    LOAD --> SIM["simulate.py<br/>Monte-Carlo variability → risk distribution + flip freq<br/>dynamic hERG · exposure scaling · drug combinations"]
     LOAD --> EXP["harmonia.export<br/>format builders"]
     SIM --> PERF["performance.py<br/>score vs CiPA expert labels"]
     SIM --> REF["reference.py<br/>SciPy ORd-lineage AP kernel (+ INaCa)<br/>qNet (default) / APD90 / EAD biomarkers"]
@@ -274,6 +287,31 @@ prolongs the AP further than the static estimate.
 
 ![Dynamic hERG binding with trapping](docs/img/dynamic_binding.png)
 
+### Exposure layer & drug combinations (Phase D)
+
+Block is driven by the **free** (unbound) drug concentration, but clinical PK
+usually reports the **total** plasma Cmax; the two differ by the fraction unbound
+(`fu`), often by one to two orders of magnitude. Drug-reference records carry
+`protein_binding.fraction_unbound`, and `assess(..., exposure_kind="total")`
+converts a total concentration to free (`free = fu × total`) before scaling block
+— so a total-concentration PK trajectory, including a Hypnos output, can drive a
+Harmonia assessment.
+
+`assess_combination` extends the thesis to **polypharmacy**. Block from
+independent agents multiplies per channel (the fraction of a current remaining is
+the product of each drug's remaining fraction), and the IC50 variability of
+*every* drug is propagated jointly by Monte-Carlo. The result: two drugs that are
+each "intermediate" alone can combine into a **high** classification, and the
+combined call carries its own flip frequency.
+
+![Drug combination — two intermediates become high](docs/img/combination.png)
+
+`terfenadine + ondansetron` at therapeutic exposures cross into HIGH (qNet 0.21),
+with ~+22% extra APD prolongation beyond the worst single agent and a ~34%
+classification-flip frequency under joint input variability. The combined safety
+call is only as trustworthy as its least-identifiable input — the single-drug
+principle, extended to the combination.
+
 Figures regenerate from the dataset with `python docs/make_figures.py`.
 
 ---
@@ -327,7 +365,8 @@ harmonia/
 │   └── tools/build_records.py   # provenance log: the curated table → records (CI checks reproducibility)
 ├── python/harmonia/
 │   ├── load.py · validate.py · filter.py · records.py
-│   ├── simulate.py              # Monte-Carlo variability → risk distribution + flip view; dynamic hERG
+│   ├── simulate.py              # Monte-Carlo variability → risk distribution + flip view; dynamic hERG; combinations
+│   ├── exposure.py              # free ↔ total plasma concentration (protein binding)
 │   ├── performance.py           # score the kernel vs CiPA expert labels (confusion matrix)
 │   ├── cli.py
 │   └── export/
@@ -336,7 +375,7 @@ harmonia/
 │       ├── cellml.py · myokit.py · sbml.py · sedml.py · cipa_inputs.py
 │       ├── csv_bibtex.py · annotate.py · combine.py · registry.py
 ├── dashboard/app.py             # Streamlit: browse + risk-uncertainty (flip) view
-├── tests/                       # 55 tests: dataset, kernel, qNet, simulate, dynamic binding, performance, exports, CLI
+├── tests/                       # 68 tests: dataset, kernel, qNet, simulate, dynamic binding, exposure, combinations, performance, exports, CLI
 ├── docs/                        # essay, figures, make_figures.py
 └── exports/                     # sample generated artifacts (regenerated in CI)
 ```
@@ -369,8 +408,8 @@ feature does not get built.
 | --- | --- | --- |
 | **A — CiPA spine** | Channel block + ORd kernel + risk metric for the 12 training drugs, end to end, with exports, validation, and the flip view | ✅ |
 | **B — Dynamic hERG + validation** | Dynamic (Langmuir + trapping) hERG binding; the 16 validation drugs (28 CiPA compounds total); recorded classification performance | ✅ |
-| **C — Variability layer** | **Discriminating qNet via a shape-dependent Na-Ca exchanger ✅ (this release).** Remaining: full CiPA Markov hERG + published optimized kinetics; broader multi-source aggregation; ToR-ORd reformulation | ◧ |
-| **D — Exposure layer** | Free plasma conc + protein binding (composable with Hypnos); drug combinations | ◻ |
+| **C — Variability layer** | **Discriminating qNet via a shape-dependent Na-Ca exchanger ✅.** Remaining: full CiPA Markov hERG + published optimized kinetics; broader multi-source aggregation; ToR-ORd reformulation | ◧ |
+| **D — Exposure layer** | Free ↔ total plasma conc + protein binding (composable with Hypnos); drug-combination assessment | ✅ **this release** |
 | **E — Populations** | Population-of-models / disease backgrounds, shipped non-predictive | ◻ |
 | **F — Hardening** | CellML unit conformance + OpenCOR cross-check; Zenodo DOI; perf | ◻ |
 

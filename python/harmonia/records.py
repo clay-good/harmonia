@@ -241,7 +241,28 @@ class DrugReference(Record):
 
     @property
     def eftpc_nm(self) -> float:
+        """Free (unbound) therapeutic Cmax, nM."""
         return self.raw["eftpc_nm"]["central"]
+
+    @property
+    def protein_binding(self) -> Optional[Dict[str, Any]]:
+        return self.raw.get("protein_binding")
+
+    @property
+    def fraction_unbound(self) -> Optional[float]:
+        pb = self.raw.get("protein_binding")
+        return pb.get("fraction_unbound") if pb else None
+
+    @property
+    def total_cmax_nm(self) -> Optional[float]:
+        """Total (bound + free) Cmax, nM, if protein binding is recorded."""
+        pb = self.raw.get("protein_binding")
+        if not pb:
+            return None
+        if pb.get("total_cmax_nm") is not None:
+            return pb["total_cmax_nm"]
+        fu = pb.get("fraction_unbound")
+        return self.eftpc_nm / fu if fu else None
 
 
 def wrap(record_dict: Dict[str, Any]) -> Record:

@@ -36,6 +36,7 @@ import numpy as np
 
 from .load import Dataset
 from .records import APModel, ChannelBlock
+from .exposure import resolve_free_exposure
 from .export.reference import (BLOCKABLE, KernelParams, simulate_beats,
                                hill_block_factor, HERGDynamic)
 
@@ -220,7 +221,7 @@ class RiskAssessment:
 
 
 def assess(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
-           exposure_nM: Optional[float] = None,
+           exposure_nM: Optional[float] = None, exposure_kind: str = "free",
            exposure_multiple: float = REFERENCE_EXPOSURE_MULTIPLE,
            metric: str = DEFAULT_METRIC, n_mc: int = 200, seed: int = 0,
            n_beats: int = 3, herg_dynamic: bool = False,
@@ -249,12 +250,11 @@ def assess(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
         n_beats = n_beats_dynamic
 
     ref = ds.drug_reference(drug_l)
-    if exposure_nM is not None:
-        reference_exposure = float(exposure_nM)
-    elif ref is not None:
-        reference_exposure = ref.eftpc_nm * exposure_multiple
-    else:
+    if exposure_nM is None and ref is None:
         raise ValueError(f"no EFTPC for '{drug}'; pass exposure_nM explicitly")
+    reference_exposure = resolve_free_exposure(
+        ref, exposure_nM=exposure_nM, exposure_kind=exposure_kind,
+        exposure_multiple=exposure_multiple)
 
     ap_rec = _resolve_ap_model(ds, ap_model)
     scales = ap_rec.conductance_scales
@@ -344,6 +344,161 @@ def assess(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
         classification_distribution=counts, classification_flip_frequency=flip_freq,
         tier=tier, warnings=warnings, excluded_channels=excluded,
         channels_used=channels_used, herg_dynamic=use_dynamic,
+    )
+
+
+@dataclass
+class CombinationAssessment:
+    """Proarrhythmia assessment of a DRUG COMBINATION (polypharmacy). Same honest
+    posture as a single-drug assessment: a metric distribution and a
+    classification-flip frequency, never a verdict."""
+    drugs: List[str]
+    ap_model: str
+    exposures_nM: Dict[str, float]
+    metric: str
+    qnet: float
+    apd90: float
+    baseline_apd90: float
+    dapd90_pct: float
+    classification: str
+    n_mc: int
+    qnet_distribution: np.ndarray
+    dapd90_distribution: np.ndarray
+    classification_distribution: Dict[str, float]
+    classification_flip_frequency: float
+    tier: str
+    # the extra prolongation of the combination beyond the worst single agent
+    interaction_dapd90_pct: float = float("nan")
+    warnings: List[str] = field(default_factory=list)
+    excluded_channels: List[str] = field(default_factory=list)
+    clinical_use: str = ("PROHIBITED — research / safety-methodology / education only; "
+                         "not a regulatory determination")
+
+    def summary(self) -> str:
+        dist = ", ".join(f"{k} {self.classification_distribution.get(k, 0):.0%}"
+                         for k in RISK_LABELS)
+        expo = ", ".join(f"{d}={self.exposures_nM[d]:g}nM" for d in self.drugs)
+        lines = [
+            f"combination = {' + '.join(self.drugs)}   ap_model={self.ap_model}  tier={self.tier}",
+            f"free exposures: {expo}",
+            f"point: APD90 {self.apd90:.0f} ms (dAPD90 {self.dapd90_pct:+.1f}%), "
+            f"qNet {self.qnet:.4f}  -> [{self.metric}] point class: {self.classification.upper()}",
+            f"interaction (extra dAPD90 beyond the worst single agent): "
+            f"{self.interaction_dapd90_pct:+.1f}%",
+            f"variability ({self.n_mc} MC draws): {dist}",
+            f"classification-flip frequency: {self.classification_flip_frequency:.0%}",
+        ]
+        if self.excluded_channels:
+            lines.append(f"EXCLUDED (unidentifiable IC50): {', '.join(self.excluded_channels)}")
+        for w in self.warnings:
+            lines.append(f"  warn: {w}")
+        lines.append("NOTE: a risk distribution, not a safety verdict. " + self.clinical_use)
+        return "\n".join(lines)
+
+
+def assess_combination(ds: Dataset, drugs: Sequence[str], ap_model: str = "cipaordv1.0",
+                       exposures_nM: Optional[Sequence[float]] = None,
+                       exposure_multiple: float = REFERENCE_EXPOSURE_MULTIPLE,
+                       exposure_kind: str = "free", metric: str = DEFAULT_METRIC,
+                       n_mc: int = 200, seed: int = 0,
+                       n_beats: int = 3) -> CombinationAssessment:
+    """Assess a COMBINATION of drugs given together (polypharmacy proarrhythmia).
+
+    Block from independent agents combines multiplicatively per channel: the
+    fraction of a current REMAINING is the product of each drug's remaining
+    fraction (the standard non-interacting / additive-occupancy assumption). IC50
+    variability is propagated for every drug independently by Monte-Carlo, so the
+    combination's classification-flip frequency reflects the *joint* input
+    uncertainty. This is the polypharmacy analog of Harmonia's single-drug thesis:
+    a combined safety call is only as trustworthy as its least-identifiable input.
+    """
+    if metric not in ("qnet", "apd90"):
+        raise ValueError(f"metric must be 'qnet' or 'apd90', got {metric!r}")
+    drugs = [d.lower() for d in drugs]
+    if len(drugs) < 2:
+        raise ValueError("assess_combination needs at least two drugs")
+    if exposures_nM is not None and len(exposures_nM) != len(drugs):
+        raise ValueError("exposures_nM must align with drugs")
+
+    ap_rec = _resolve_ap_model(ds, ap_model)
+    scales = ap_rec.conductance_scales
+    baseline = _cached_baseline_apd90(tuple(sorted(scales.items())), n_beats)
+
+    tiers = [ap_rec.tier]
+    excluded, warnings = [], []
+    per_drug = []   # (drug, draws, exposure, hill_by)
+    exposures_map: Dict[str, float] = {}
+    for i, drug in enumerate(drugs):
+        blocks = [b for b in ds.blocks_for(drug) if isinstance(b, ChannelBlock)]
+        if not blocks:
+            raise KeyError(f"no channel-block records for drug '{drug}'")
+        ref = ds.drug_reference(drug)
+        exp_nm = exposures_nM[i] if exposures_nM is not None else None
+        exposure = resolve_free_exposure(ref, exposure_nM=exp_nm,
+                                         exposure_kind=exposure_kind,
+                                         exposure_multiple=exposure_multiple)
+        exposures_map[drug] = exposure
+        tiers.append(_worst_tier([b.tier for b in blocks]))
+        for b in blocks:
+            if not b.identifiable:
+                excluded.append(f"{drug}:{b.channel}")
+                warnings.append(f"{drug} {b.channel}: IC50 unidentifiable — excluded; caps at Tier D")
+        draws = _channel_draws(blocks)
+        per_drug.append((drug, draws, exposure, {d.channel: d.hill for d in draws}))
+    tier = _worst_tier(tiers)
+
+    def combined_block(rng=None):
+        bf = {c: 1.0 for c in BLOCKABLE}
+        for drug, draws, exposure, hill_by in per_drug:
+            for d in draws:
+                ic50 = 10 ** (rng.normal(d.mu_log10, d.sigma_log10) if rng is not None
+                              else d.mu_log10)
+                if d.channel in bf:
+                    bf[d.channel] *= hill_block_factor(exposure, ic50, hill_by[d.channel])
+        return bf
+
+    def run(bf):
+        p = KernelParams().with_scales(scales)
+        p.block.update(bf)
+        return simulate_beats(p, n_beats=n_beats)
+
+    # point estimate (geomean IC50 per drug/channel)
+    pt = run(combined_block(None))
+    dapd_point = 100.0 * (pt.apd90 - baseline) / baseline if baseline else float("nan")
+    point_class = classify_metric(metric, dapd_point, pt.qnet)
+
+    # interaction: how much the combination prolongs beyond the worst single agent
+    worst_single = 0.0
+    for drug in drugs:
+        a = assess(ds, drug, ap_model=ap_model, n_mc=0, metric=metric, n_beats=n_beats,
+                   exposure_nM=exposures_map[drug], exposure_kind="free")
+        worst_single = max(worst_single, a.dapd90_pct)
+    interaction = dapd_point - worst_single
+
+    # Monte-Carlo over every drug's IC50 variability jointly
+    rng = np.random.default_rng(seed)
+    dapd = np.empty(n_mc)
+    qn = np.empty(n_mc)
+    classes: List[str] = []
+    for k in range(n_mc):
+        r = run(combined_block(rng))
+        dapd[k] = 100.0 * (r.apd90 - baseline) / baseline if baseline else float("nan")
+        qn[k] = r.qnet
+        classes.append(classify_metric(metric, dapd[k], qn[k]))
+    if n_mc:
+        counts = {lab: classes.count(lab) / n_mc for lab in RISK_LABELS}
+        flip = float(np.mean([c != point_class for c in classes]))
+    else:
+        counts = {lab: (1.0 if lab == point_class else 0.0) for lab in RISK_LABELS}
+        flip = 0.0
+
+    return CombinationAssessment(
+        drugs=drugs, ap_model=ap_rec.id, exposures_nM=exposures_map, metric=metric,
+        qnet=pt.qnet, apd90=pt.apd90, baseline_apd90=baseline, dapd90_pct=dapd_point,
+        classification=point_class, n_mc=n_mc, qnet_distribution=qn,
+        dapd90_distribution=dapd, classification_distribution=counts,
+        classification_flip_frequency=flip, tier=tier,
+        interaction_dapd90_pct=interaction, warnings=warnings, excluded_channels=excluded,
     )
 
 
