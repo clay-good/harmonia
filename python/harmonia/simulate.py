@@ -8,26 +8,28 @@ and (2) how often the high / intermediate / low classification *flips* depending
 on which sources you believe. Channels whose IC50 is unidentifiable (max block
 < 60%) are flagged and excluded, never silently point-estimated.
 
-Risk metric, v0.1. The classification metric is **ΔAPD90% at a reference
-exposure** (default 4x the free therapeutic Cmax, EFTPC). APD/QT prolongation is
-the established proarrhythmia surrogate; qNet — the CiPA metric the reduced,
-pump-free kernel cannot make sensitive (see reference.py) — is reported for
-transparency but is NOT used to classify in v0.1. The two thresholds below were
-calibrated on the 12 CiPA training drugs under the default AP model (cipaordv1.0);
-the resulting reduced-kernel classifier recovers 10/12 training labels. The two
-misses are sotalol (very weak hERG block but high exposure — its risk only emerges
-well above 4x EFTPC) and chlorpromazine (borderline) — the kind of cases that
-motivated CiPA to replace APD with qNet. On the 16-compound CiPA *validation* set
-the reduced kernel is weaker (~7/16 exact, ~80% within-one-category): many
-validation drugs have very low free Cmax, so block at 4x EFTPC is sub-IC50 and the
-APD surrogate underreads them. This is reported honestly by ``harmonia
-performance``. It is a *methodology demonstrator*, not a qualified classifier. The
-durable contribution is the flip-frequency-under-variability machinery, which is
-correct regardless of the absolute classifier accuracy.
+Risk metric (Phase C). The DEFAULT classification metric is **qNet** — the CiPA
+net-charge biomarker (integral of INaL + ICaL + IKr + IKs + IK1 + Ito over the
+beat), where LOWER qNet = HIGHER TdP risk. Once the reduced kernel gained a
+shape-dependent Na-Ca exchanger excluded from that sum (see reference.py), qNet
+stopped being charge-conserved and became genuinely discriminating. **ΔAPD90% at a
+reference exposure** (default 4x free Cmax, EFTPC) remains available via
+``metric="apd90"`` as the classic QT surrogate.
+
+Both metrics' thresholds were calibrated on the 12 CiPA training drugs under the
+default AP model (cipaordv1.0): qNet recovers 10/12 training labels (vs 8/12 for
+APD90 under this kernel), missing cisapride and sotalol. On the 16-compound CiPA
+*validation* set the reduced kernel is honestly weaker (many validation drugs have
+very low free Cmax, so block at 4x EFTPC is sub-IC50). ``harmonia performance``
+reports the live confusion matrix for either metric. It is a *methodology
+demonstrator*, not a qualified classifier; the durable contribution is the
+flip-frequency-under-variability machinery, correct regardless of absolute
+accuracy.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Dict, List, Optional, Sequence
 
 import numpy as np
@@ -39,11 +41,21 @@ from .export.reference import (BLOCKABLE, KernelParams, simulate_beats,
 
 # --- classifier calibration (reduced kernel; see module docstring) ---------- #
 REFERENCE_EXPOSURE_MULTIPLE = 4.0     # x EFTPC (free Cmax)
+DEFAULT_METRIC = "qnet"               # qNet is the CiPA-canonical metric (Phase C)
+
 # Thresholds calibrated on the 12 CiPA training drugs under the DEFAULT AP model
 # (cipaordv1.0). They are model-specific: the flip view applies the same rule to
 # the ord / tor_ord variants to expose how the structural choice moves the call.
-THRESH_LOW_PCT = 17.0                 # dAPD90% below -> "low"
-THRESH_HIGH_PCT = 35.0                # dAPD90% at/above -> "high"
+#
+# qNet (default): LOWER qNet = HIGHER TdP risk (the CiPA convention). With the
+# Na-Ca exchanger excluded from the six-current sum, qNet now discriminates;
+# the reduced-kernel qNet classifier recovers 10/12 training labels.
+QNET_THRESH_HIGH = 0.220              # qNet below -> "high" risk
+QNET_THRESH_LOW = 0.285               # qNet above -> "low" risk
+# APD90 (secondary): higher dAPD90% = higher risk.
+THRESH_LOW_PCT = 39.0                 # dAPD90% below -> "low"
+THRESH_HIGH_PCT = 51.0                # dAPD90% at/above -> "high"
+
 DEFAULT_SINGLE_SOURCE_SIGMA = 0.25    # log10 SD assumed for a single-source IC50
 RISK_LABELS = ("low", "intermediate", "high")
 
@@ -51,7 +63,7 @@ RISK_LABELS = ("low", "intermediate", "high")
 _TIER_ORDER = {"A": 0, "B": 1, "C": 2, "D": 3}
 
 
-def classify(dapd90_pct: float) -> str:
+def classify_apd90(dapd90_pct: float) -> str:
     if np.isnan(dapd90_pct):
         return "intermediate"
     if dapd90_pct >= THRESH_HIGH_PCT:
@@ -59,6 +71,34 @@ def classify(dapd90_pct: float) -> str:
     if dapd90_pct < THRESH_LOW_PCT:
         return "low"
     return "intermediate"
+
+
+def classify_qnet(qnet: float) -> str:
+    if np.isnan(qnet):
+        return "intermediate"
+    if qnet < QNET_THRESH_HIGH:
+        return "high"
+    if qnet > QNET_THRESH_LOW:
+        return "low"
+    return "intermediate"
+
+
+def classify_metric(metric: str, dapd90_pct: float, qnet: float) -> str:
+    return classify_qnet(qnet) if metric == "qnet" else classify_apd90(dapd90_pct)
+
+
+# Backwards-compatible alias (APD90 classifier).
+def classify(dapd90_pct: float) -> str:
+    return classify_apd90(dapd90_pct)
+
+
+@lru_cache(maxsize=128)
+def _cached_baseline_apd90(scales_items: tuple, n_beats: int) -> float:
+    """Drug-free baseline APD90 for an AP-model variant. Deterministic and
+    independent of the drug, so it is memoised across the many assess() calls a
+    performance sweep or flip view makes."""
+    scales = dict(scales_items)
+    return simulate_beats(KernelParams().with_scales(scales), n_beats=n_beats).apd90
 
 
 def _worst_tier(tiers: Sequence[str]) -> str:
@@ -165,8 +205,8 @@ class RiskAssessment:
             f"drug={self.drug}  ap_model={self.ap_model}  tier={self.tier}",
             f"reference exposure = {self.reference_exposure_nM:g} nM "
             f"({REFERENCE_EXPOSURE_MULTIPLE:g}x EFTPC)",
-            f"point: APD90 {self.apd90:.0f} ms  (dAPD90 {self.dapd90_pct:+.1f}% vs "
-            f"drug-free {self.baseline_apd90:.0f} ms)  -> point class: {self.classification.upper()}",
+            f"point: APD90 {self.apd90:.0f} ms (dAPD90 {self.dapd90_pct:+.1f}%), "
+            f"qNet {self.qnet:.4f}  -> [{self.metric}] point class: {self.classification.upper()}",
             f"variability ({self.n_mc} MC draws): {dist}",
             f"classification-flip frequency: {self.classification_flip_frequency:.0%}",
         ]
@@ -182,7 +222,7 @@ class RiskAssessment:
 def assess(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
            exposure_nM: Optional[float] = None,
            exposure_multiple: float = REFERENCE_EXPOSURE_MULTIPLE,
-           metric: str = "apd90", n_mc: int = 200, seed: int = 0,
+           metric: str = DEFAULT_METRIC, n_mc: int = 200, seed: int = 0,
            n_beats: int = 3, herg_dynamic: bool = False,
            n_beats_dynamic: int = 10) -> RiskAssessment:
     """Assess a drug's proarrhythmia-metric *distribution* under input variability.
@@ -219,8 +259,11 @@ def assess(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
     ap_rec = _resolve_ap_model(ds, ap_model)
     scales = ap_rec.conductance_scales
 
-    # drug-free baseline for this model
-    baseline = simulate_beats(KernelParams().with_scales(scales), n_beats=n_beats).apd90
+    # drug-free baseline for this model (memoised; deterministic & drug-free)
+    baseline = _cached_baseline_apd90(tuple(sorted(scales.items())), n_beats)
+
+    if metric not in ("qnet", "apd90"):
+        raise ValueError(f"metric must be 'qnet' or 'apd90', got {metric!r}")
 
     # ---- honesty: tier propagation + flags (over ALL channel records) ------- #
     excluded, warnings = [], []
@@ -265,7 +308,7 @@ def assess(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
     p.block.update(bf)
     pt = simulate_beats(p, n_beats=n_beats, herg=_herg_for(ic50_point.get("IKr", 1e9)))
     dapd_point = 100.0 * (pt.apd90 - baseline) / baseline if baseline else float("nan")
-    point_class = classify(dapd_point)
+    point_class = classify_metric(metric, dapd_point, pt.qnet)
 
     # ---- Monte-Carlo over source variability -------------------------------- #
     rng = np.random.default_rng(seed)
@@ -282,7 +325,7 @@ def assess(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
         apd[i] = r.apd90
         dapd[i] = 100.0 * (r.apd90 - baseline) / baseline if baseline else float("nan")
         qn[i] = r.qnet
-        classes.append(classify(dapd[i]))
+        classes.append(classify_metric(metric, dapd[i], qn[i]))
 
     # n_mc == 0 means "point estimate only" (used by performance scoring); the
     # distribution collapses to the point classification.

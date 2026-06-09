@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
 from .load import Dataset
-from .simulate import assess, RISK_LABELS
+from .simulate import assess, RISK_LABELS, DEFAULT_METRIC
 
 
 @dataclass
@@ -40,6 +40,7 @@ class PerformanceReport:
     cipa_set: str
     scores: List[DrugScore]
     herg_dynamic: bool = False
+    metric: str = DEFAULT_METRIC
 
     @property
     def n(self) -> int:
@@ -73,7 +74,7 @@ class PerformanceReport:
     def summary(self) -> str:
         lines = [
             f"classification performance — ap_model={self.ap_model}  "
-            f"set={self.cipa_set}  dynamic_hERG={self.herg_dynamic}",
+            f"set={self.cipa_set}  metric={self.metric}  dynamic_hERG={self.herg_dynamic}",
             f"  accuracy: {self.n_correct}/{self.n} = {self.accuracy:.0%}   "
             f"(within-one-category: {self.adjacent_accuracy():.0%})",
             "  confusion (rows=expert, cols=predicted):",
@@ -96,7 +97,8 @@ class PerformanceReport:
 
 
 def score(ds: Dataset, ap_model: str = "cipaordv1.0", cipa_set: str = "all",
-          herg_dynamic: bool = False, exposure_multiple: float = 4.0) -> PerformanceReport:
+          herg_dynamic: bool = False, exposure_multiple: float = 4.0,
+          metric: str = DEFAULT_METRIC) -> PerformanceReport:
     """Classify every drug in the requested CiPA set and compare to the expert
     label. ``cipa_set`` is 'training', 'validation', or 'all'."""
     scores: List[DrugScore] = []
@@ -106,11 +108,11 @@ def score(ds: Dataset, ap_model: str = "cipaordv1.0", cipa_set: str = "all",
         drug = ref.drug  # type: ignore[attr-defined]
         if not ds.blocks_for(drug):
             continue
-        a = assess(ds, drug, ap_model=ap_model, n_mc=0,
+        a = assess(ds, drug, ap_model=ap_model, n_mc=0, metric=metric,
                    exposure_multiple=exposure_multiple, herg_dynamic=herg_dynamic)
         scores.append(DrugScore(
             drug=drug, cipa_set=ref.cipa_set, expert=ref.expert_risk_label,  # type: ignore[attr-defined]
             predicted=a.classification, dapd90_pct=a.dapd90_pct, tier=a.tier))
     scores.sort(key=lambda s: ({"high": 0, "intermediate": 1, "low": 2}[s.expert], s.drug))
     return PerformanceReport(ap_model=ap_model, cipa_set=cipa_set, scores=scores,
-                             herg_dynamic=herg_dynamic)
+                             herg_dynamic=herg_dynamic, metric=metric)

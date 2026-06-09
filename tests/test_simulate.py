@@ -3,14 +3,37 @@ import numpy as np
 import pytest
 
 import harmonia
-from harmonia.simulate import (assess, flip_view, classify, dose_response,
-                               THRESH_LOW_PCT, THRESH_HIGH_PCT)
+from harmonia.simulate import (assess, flip_view, classify, classify_qnet,
+                               dose_response, THRESH_LOW_PCT, THRESH_HIGH_PCT,
+                               QNET_THRESH_LOW, QNET_THRESH_HIGH, DEFAULT_METRIC)
 
 
 def test_classify_thresholds():
     assert classify(THRESH_HIGH_PCT + 1) == "high"
     assert classify(THRESH_LOW_PCT - 1) == "low"
     assert classify((THRESH_LOW_PCT + THRESH_HIGH_PCT) / 2) == "intermediate"
+
+
+def test_qnet_classifier_direction():
+    """Lower qNet = higher risk (CiPA convention)."""
+    assert DEFAULT_METRIC == "qnet"
+    assert classify_qnet(QNET_THRESH_HIGH - 0.01) == "high"
+    assert classify_qnet(QNET_THRESH_LOW + 0.01) == "low"
+    assert classify_qnet((QNET_THRESH_LOW + QNET_THRESH_HIGH) / 2) == "intermediate"
+
+
+def test_metric_selectable(ds):
+    a_q = assess(ds, "dofetilide", n_mc=0, metric="qnet")
+    a_a = assess(ds, "dofetilide", n_mc=0, metric="apd90")
+    assert a_q.metric == "qnet" and a_a.metric == "apd90"
+    # the AP itself is identical; only the classification rule differs
+    assert a_q.qnet == a_a.qnet
+    assert a_q.classification == "high"  # dofetilide low qNet -> high risk
+
+
+def test_verapamil_low_under_qnet(ds):
+    """The balanced blocker lands low under the default qNet metric."""
+    assert assess(ds, "verapamil", n_mc=0).classification == "low"
 
 
 def test_assess_returns_distribution_not_verdict(ds):

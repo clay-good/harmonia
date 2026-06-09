@@ -45,13 +45,14 @@ by Monte-Carlo, and shows how often the high/intermediate/low classification
 
 ![Input variability flips the classification](docs/img/flip_distribution.png)
 
-A near-pure hERG blocker like **dofetilide** lands tightly in HIGH (10% flip). A
-balanced multichannel blocker like **verapamil** straddles the low/intermediate
-boundary — its classification flips on **55%** of draws. The same drug, different
-believed sources, different safety call. That is the finding the
-uncertainty-quantification literature
+A near-pure hERG blocker like **dofetilide** lands tightly in HIGH (2% flip under
+qNet). A balanced multichannel blocker like **verapamil** straddles the
+low/intermediate boundary — its classification flips on **~36%** of draws. The
+same drug, different believed sources, different safety call. That is the finding
+the uncertainty-quantification literature
 ([Chang et al. 2017](https://doi.org/10.3389/fphys.2017.00917)) demonstrated and
-that no dataset operationalized — until this one.
+that no dataset operationalized — until this one. (The metric is **qNet**, the
+CiPA net-charge biomarker; lower qNet means higher risk.)
 
 ---
 
@@ -64,9 +65,9 @@ pip install -e ".[dev]"      # numpy, scipy, jsonschema
 
 harmonia validate            # JSON-Schema- + semantically validate the dataset
 harmonia info                # counts by subsystem / tier / review status
-harmonia simulate dofetilide --mc 200
+harmonia simulate dofetilide --mc 200          # qNet metric (default); --metric apd90 to switch
 harmonia flip verapamil      # classification stability across AP-model variants
-harmonia performance         # score the kernel vs CiPA expert labels (train/val/all)
+harmonia performance         # score qNet vs CiPA expert labels (train/val/all); --metric apd90
 harmonia export --all --output exports/
 ```
 
@@ -81,10 +82,11 @@ b.variability.fold_range                     # 1.65  -> inter-source spread is f
 b.source_values                              # the individual lab measurements
 
 # Simulate an action potential + risk-metric DISTRIBUTION (never a bare verdict)
-res = harmonia.assess(ds, "dofetilide", ap_model="cipaordv1.0", n_mc=200)
-res.dapd90_distribution                       # distribution, not a point value
+res = harmonia.assess(ds, "dofetilide", ap_model="cipaordv1.0", n_mc=200)  # metric="qnet" (default)
+res.qnet_distribution                         # distribution, not a point value
 res.classification_flip_frequency             # how often the class flips
 res.tier, res.warnings, res.excluded_channels # propagated tier + unidentifiable-channel flags
+harmonia.assess(ds, "dofetilide", metric="apd90")   # the classic QT/APD surrogate instead
 
 # Headline comparison across AP-model variants
 cmp = harmonia.flip_view(ds, "verapamil", ap_models=["ord", "cipaordv1.0", "tor_ord"])
@@ -97,19 +99,20 @@ res = harmonia.assess(ds, "dofetilide", herg_dynamic=True)   # trapped blocker -
 
 ---
 
-## What's in the box (Phases A + B)
+## What's in the box (Phases A + B + C-start)
 
 | Layer | Status |
 | --- | --- |
 | **Dataset** — 68 channel-block records across the **28 CiPA compounds** (12 training + 16 validation), 28 drug-reference records (expert risk label + free Cmax), 3 AP-model records, 10 Crossref-checked citations | ✅ |
 | **Variability is first-class** — multi-source IC50s with computed fold-range / IQR; the reliability gate (max block < 60% ⇒ Tier D, unidentifiable) machine-enforced | ✅ |
-| **Reference kernel** — a SciPy reduced O'Hara-Rudy-lineage ventricular AP with Hill block per current; APD90 / qNet / triangulation / EAD biomarkers | ✅ |
+| **Reference kernel** — a SciPy reduced O'Hara-Rudy-lineage ventricular AP (7 currents + Na-Ca exchanger) with Hill block per current; APD90 / qNet / triangulation / EAD biomarkers | ✅ |
+| **Discriminating qNet** (Phase C) — adding a shape-dependent Na-Ca exchanger (excluded from the qNet sum) makes qNet sensitive; **qNet is now the default metric** (10/12 training, zero two-category errors over all 28 compounds); APD90 selectable | ✅ |
 | **Dynamic hERG binding** (Phase B) — Langmuir kon/koff with **trapping**; reduces to the static Hill block at steady state, captures use-dependent block (`assess(..., herg_dynamic=True)`) | ✅ |
 | **Risk distribution + flip frequency** — Monte-Carlo over source variability; classification-flip frequency; worst-tier propagation | ✅ |
-| **Recorded classification performance** (Phase B) — `harmonia performance` scores the kernel vs CiPA expert labels on training / validation / all, with the full confusion matrix | ✅ |
+| **Recorded classification performance** (Phase B) — `harmonia performance` scores either metric vs CiPA expert labels on training / validation / all, with the full confusion matrix | ✅ |
 | **Exports** — CellML 2.0, Myokit `.mmt`, SBML L3v2, SED-ML, CiPA inputs (CSV/JSON), CSV, BibTeX, COMBINE `.omex` — all carrying `clinicalUse = PROHIBITED`, tier, and DOI RDF | ✅ |
 | **CLI · Streamlit dashboard · CI** | ✅ |
-| Full CiPA Markov hERG + published optimized kinetics, ToR-ORd reformulation, pump/exchanger qNet, exposure (Hypnos) coupling, populations | Phase C–F (roadmap below) |
+| Full CiPA Markov hERG + published optimized kinetics, ToR-ORd reformulation, broader multi-source aggregation, exposure (Hypnos) coupling + drug combinations, populations | Phase C–F (roadmap below) |
 
 ---
 
@@ -127,7 +130,7 @@ flowchart TD
     LOAD --> SIM["simulate.py<br/>Monte-Carlo variability → risk distribution + flip freq<br/>+ dynamic hERG binding"]
     LOAD --> EXP["harmonia.export<br/>format builders"]
     SIM --> PERF["performance.py<br/>score vs CiPA expert labels"]
-    SIM --> REF["reference.py<br/>SciPy ORd-lineage AP kernel + risk metrics"]
+    SIM --> REF["reference.py<br/>SciPy ORd-lineage AP kernel (+ INaCa)<br/>qNet (default) / APD90 / EAD biomarkers"]
     EXP --> SPEC["model_spec.py<br/>one AST → Myokit / CellML / SBML"]
     SPEC --> CELLML["CellML 2.0"]
     SPEC --> MYOKIT["Myokit .mmt"]
@@ -211,51 +214,54 @@ The two load-bearing fields:
 ## The reference kernel — what it is, and what it is honestly not
 
 The bundled kernel is a **reduced** O'Hara-Rudy-lineage human ventricular AP:
-seven named currents (INa, INaL, Ito, ICaL, IKr, IKs, IK1) with Hodgkin-Huxley
-gating and an algebraic inward rectifier, fixed ionic concentrations, paced at
-0.5 Hz. It is structurally faithful, numerically stable (steady state in ~3
-beats), and reproduces the qualitative pharmacology CiPA rests on:
+seven named currents (INa, INaL, Ito, ICaL, IKr, IKs, IK1) plus a phenomenological
+Na-Ca exchanger (INaCa), with Hodgkin-Huxley gating, an algebraic inward
+rectifier, and fixed ionic concentrations, paced at 0.5 Hz. It is structurally
+faithful, numerically stable (steady state in ~3 beats), and reproduces the
+qualitative pharmacology CiPA rests on:
 
 ![hERG block prolongs the AP](docs/img/ap_traces.png)
 
 It is **not** bit-exact to the published ORd CellML, so AP-model records ship at
-**Tier C**. Two deliberate, documented design facts follow from "reduced":
+**Tier C**. Two design facts are worth stating plainly:
 
-- **The risk metric is ΔAPD90% at 4× EFTPC**, not qNet. APD/QT prolongation is
-  the established proarrhythmia surrogate. A pump-free kernel conserves charge
-  over the paced cycle, so its qNet is dominated by the fast-Na upstroke and is
-  structurally insensitive to repolarization-current block — a qNet that
-  discriminates risk needs the pump/exchanger currents of the full ORd (Phase
-  C). qNet is still computed and exported, flagged as not-for-classification.
+- **qNet is the default metric, and it works (Phase C).** CiPA replaced APD with
+  *qNet* — the integral of the six currents INaL + ICaL + IKr + IKs + IK1 + Ito
+  over the beat (lower qNet = higher risk). In a pump-free kernel that sum is
+  charge-conserved and so insensitive to block. Adding the **Na-Ca exchanger and
+  excluding it from the qNet sum** breaks that conservation and makes qNet
+  genuinely discriminate. ΔAPD90% remains selectable (`metric="apd90"`).
 - **The classifier is a methodology demonstrator, not a qualified classifier.**
-  Calibrated on the 12 CiPA training drugs under the default model (thresholds:
-  low < 17%, high ≥ 35%), the reduced kernel recovers **10/12** expert labels:
+  Calibrated on the 12 CiPA training drugs under the default model (qNet
+  thresholds: high < 0.220, low > 0.285), the reduced kernel recovers **10/12**
+  training labels — and across the full 28-compound set it makes **zero
+  two-category errors** (it never calls a high-risk drug low, or vice versa):
 
-![CiPA training set](docs/img/training_set.png)
+![qNet across the 28 CiPA compounds](docs/img/qnet_cipa.png)
 
-The two misses are **sotalol** (very weak hERG block but high exposure — its risk
-only emerges well above 4× EFTPC) and **chlorpromazine** (borderline) — the kind
-of case that motivated CiPA to replace APD with qNet. The kernel correctly
-captures the *protective* multichannel mechanism: **diltiazem and verapamil's ICaL
-block shortens the AP** (diltiazem is the bar left of zero), via an L-type window
-current.
+High-risk drugs (red) sit left of the red line, low-risk (green) right of the
+green line; the asterisked drugs are the 16-compound validation set. The kernel
+also captures the *protective* multichannel mechanism: **diltiazem and verapamil's
+ICaL block** raises their qNet (lowers risk), via an L-type window current.
 
-### Recorded classification performance (Phase B)
+### Recorded classification performance (Phase B/C)
 
-`harmonia performance` scores the kernel against the CiPA expert labels and prints
-the full confusion matrix. On the 16-compound **validation** set the reduced
-kernel is honestly weaker — exact 3-way accuracy ≈ 6/16, but ≈ 81%
-*within-one-category*:
+`harmonia performance` scores either metric against the CiPA expert labels and
+prints the full confusion matrix. Honest numbers under the default qNet metric:
 
-![CiPA validation set](docs/img/validation_set.png)
+| Set | Exact accuracy | Within-one-category |
+| --- | --- | --- |
+| Training (12) | 10/12 (83%) | 12/12 (100%) |
+| Validation (16) | 7/16 (44%) | 16/16 (100%) |
+| All 28 | 17/28 (61%) | 28/28 (100%) |
 
-Most validation misses are high/intermediate drugs with very low free Cmax
-(ibutilide, azimilide, the antipsychotics), where block at 4× EFTPC is sub-IC50
-and an APD surrogate underreads them — exactly the regime where the full CiPA
-qNet model is needed. The low-risk dihydropyridines (nifedipine, nitrendipine) are
-correctly protective via ICaL block. The durable contribution is the
-**flip-frequency-under-variability machinery**, correct regardless of absolute
-accuracy.
+qNet beats the APD90 surrogate (8/12 training, ~82% within-one) on both counts.
+The validation set is honestly harder on exact 3-way accuracy: many validation
+drugs have very low free Cmax, so block at 4× EFTPC is sub-IC50 and *both* metrics
+underread them. But qNet never makes a catastrophic (two-category) error on any of
+the 28 compounds — the property that matters most for a safety screen. The durable
+contribution remains the **flip-frequency-under-variability machinery**, correct
+regardless of absolute accuracy.
 
 ### Dynamic hERG binding (Phase B)
 
@@ -304,7 +310,7 @@ the kernel constants are verified to survive the CellML/SBML/Myokit text.
 | **Output is a risk *distribution* + flip frequency, never a bare class** | A single high/intermediate/low label hides exactly the uncertainty that matters. |
 | **Worst input wins; unidentifiable IC50 caps at D** | A safety call is only as trustworthy as its least-identifiable channel. |
 | **One AST → all model exports** | Myokit/CellML/SBML provably cannot drift from each other or the kernel. |
-| **Reduced kernel ⇒ APD90 metric, honestly labeled Tier C** | A qNet-grade claim requires the full ORd; over-claiming would cross the safety line. |
+| **qNet default (via a shape-dependent INaCa), APD90 selectable; kernel honestly Tier C** | qNet is the CiPA-canonical metric and now discriminates; the reduced kernel is not the qualified ORd, so it stays Tier C and over-claims nothing. |
 | **Methodology only; never a regulatory or clinical determination** | The line is making (or appearing to make) a safety verdict. |
 
 ---
@@ -330,7 +336,7 @@ harmonia/
 │       ├── cellml.py · myokit.py · sbml.py · sedml.py · cipa_inputs.py
 │       ├── csv_bibtex.py · annotate.py · combine.py · registry.py
 ├── dashboard/app.py             # Streamlit: browse + risk-uncertainty (flip) view
-├── tests/                       # 49 tests: dataset, kernel, simulate, dynamic binding, performance, exports, CLI
+├── tests/                       # 55 tests: dataset, kernel, qNet, simulate, dynamic binding, performance, exports, CLI
 ├── docs/                        # essay, figures, make_figures.py
 └── exports/                     # sample generated artifacts (regenerated in CI)
 ```
@@ -362,8 +368,8 @@ feature does not get built.
 | Phase | Content | Status |
 | --- | --- | --- |
 | **A — CiPA spine** | Channel block + ORd kernel + risk metric for the 12 training drugs, end to end, with exports, validation, and the flip view | ✅ |
-| **B — Dynamic hERG + validation** | Dynamic (Langmuir + trapping) hERG binding; the 16 validation drugs (28 CiPA compounds total); recorded classification performance | ✅ **this release** |
-| **C — Variability layer** | Full CiPA Markov hERG + published optimized kinetics; broader multi-source aggregation; ToR-ORd reformulation; pump/exchanger currents → a discriminating qNet; SED-ML + COMBINE depth | ◻ |
+| **B — Dynamic hERG + validation** | Dynamic (Langmuir + trapping) hERG binding; the 16 validation drugs (28 CiPA compounds total); recorded classification performance | ✅ |
+| **C — Variability layer** | **Discriminating qNet via a shape-dependent Na-Ca exchanger ✅ (this release).** Remaining: full CiPA Markov hERG + published optimized kinetics; broader multi-source aggregation; ToR-ORd reformulation | ◧ |
 | **D — Exposure layer** | Free plasma conc + protein binding (composable with Hypnos); drug combinations | ◻ |
 | **E — Populations** | Population-of-models / disease backgrounds, shipped non-predictive | ◻ |
 | **F — Hardening** | CellML unit conformance + OpenCOR cross-check; Zenodo DOI; perf | ◻ |

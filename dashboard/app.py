@@ -14,7 +14,8 @@ import streamlit as st
 
 import harmonia
 from harmonia.simulate import (assess, flip_view, dose_response,
-                               THRESH_LOW_PCT, THRESH_HIGH_PCT, RISK_LABELS)
+                               THRESH_LOW_PCT, THRESH_HIGH_PCT, RISK_LABELS,
+                               QNET_THRESH_LOW, QNET_THRESH_HIGH)
 
 st.set_page_config(page_title="Harmonia — proarrhythmia risk uncertainty", layout="wide")
 
@@ -25,16 +26,18 @@ def get_dataset():
 
 
 @st.cache_data
-def run_assess(drug, ap_model, mc, mult, seed):
+def run_assess(drug, ap_model, mc, mult, seed, metric):
     ds = get_dataset()
-    a = assess(ds, drug, ap_model=ap_model, n_mc=mc, exposure_multiple=mult, seed=seed)
+    a = assess(ds, drug, ap_model=ap_model, n_mc=mc, exposure_multiple=mult,
+               seed=seed, metric=metric)
     return {
-        "dapd90": a.dapd90_distribution, "point": a.dapd90_pct,
+        "dapd90": a.dapd90_distribution, "qnet_dist": a.qnet_distribution,
+        "point": a.dapd90_pct, "qnet": a.qnet,
         "classification": a.classification, "dist": a.classification_distribution,
         "flip": a.classification_flip_frequency, "tier": a.tier,
         "warnings": a.warnings, "excluded": a.excluded_channels,
         "exposure": a.reference_exposure_nM, "baseline": a.baseline_apd90,
-        "apd90": a.apd90,
+        "apd90": a.apd90, "metric": a.metric,
     }
 
 
@@ -50,20 +53,23 @@ tab_flip, tab_browse, tab_about = st.tabs(
 
 # --------------------------------------------------------------------------- #
 with tab_flip:
-    c1, c2, c3, c4 = st.columns(4)
+    import pandas as pd
+    c1, c2, c3, c4, c5 = st.columns(5)
     drug = c1.selectbox("Drug", ds.drugs(), index=ds.drugs().index("dofetilide"))
     ap_models = [m.id.split(".", 1)[1] for m in ds.ap_models]
     ap_model = c2.selectbox("AP model", ap_models, index=ap_models.index("cipaordv1.0"))
-    mc = c3.slider("Monte-Carlo draws", 20, 400, 120, step=20)
-    mult = c4.slider("Exposure (× EFTPC)", 1.0, 25.0, 4.0, step=1.0)
+    metric = c3.selectbox("Risk metric", ["qnet", "apd90"], index=0)
+    mc = c4.slider("Monte-Carlo draws", 20, 400, 120, step=20)
+    mult = c5.slider("Exposure (× EFTPC)", 1.0, 25.0, 4.0, step=1.0)
 
-    res = run_assess(drug, ap_model, mc, mult, 0)
+    res = run_assess(drug, ap_model, mc, mult, 0, metric)
 
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Point classification", res["classification"].upper())
     m2.metric("Classification-flip frequency", f"{res['flip']:.0%}")
     m3.metric("Propagated tier", res["tier"])
-    m4.metric("ΔAPD90 (point)", f"{res['point']:+.1f}%")
+    m4.metric("qNet (point)" if metric == "qnet" else "ΔAPD90 (point)",
+              f"{res['qnet']:.4f}" if metric == "qnet" else f"{res['point']:+.1f}%")
 
     if res["excluded"]:
         st.error("Excluded channels (unidentifiable IC50, max block < 60% → caps at "
@@ -71,17 +77,26 @@ with tab_flip:
     for w in res["warnings"]:
         st.warning(w)
 
-    st.subheader("Distribution of ΔAPD90% under input (IC50) variability")
-    hist = np.histogram(res["dapd90"], bins=24)
-    import pandas as pd
+    if metric == "qnet":
+        st.subheader("Distribution of qNet under input (IC50) variability")
+        data = res["qnet_dist"]
+        cap = ("qNet thresholds: high risk < {:.3f} | low risk > {:.3f} "
+               "(lower qNet = higher risk). ".format(QNET_THRESH_HIGH, QNET_THRESH_LOW))
+        rnd = 4
+    else:
+        st.subheader("Distribution of ΔAPD90% under input (IC50) variability")
+        data = res["dapd90"]
+        cap = ("APD90 thresholds: low < {:g}% ≤ intermediate < {:g}% ≤ high. "
+               .format(THRESH_LOW_PCT, THRESH_HIGH_PCT))
+        rnd = 1
+    hist = np.histogram(data, bins=24)
     centers = 0.5 * (hist[1][:-1] + hist[1][1:])
-    st.bar_chart(pd.DataFrame({"count": hist[0]}, index=np.round(centers, 1)))
-    st.caption(f"Thresholds: low < {THRESH_LOW_PCT:g}% ≤ intermediate < "
-               f"{THRESH_HIGH_PCT:g}% ≤ high. Classification mix: "
+    st.bar_chart(pd.DataFrame({"count": hist[0]}, index=np.round(centers, rnd)))
+    st.caption(cap + "Classification mix: "
                + ", ".join(f"{k} {res['dist'].get(k, 0):.0%}" for k in RISK_LABELS))
 
     st.subheader("Classification stability across AP-model variants")
-    fv = flip_view(ds, drug, n_mc=mc)
+    fv = flip_view(ds, drug, n_mc=mc, metric=metric)
     rows = []
     for m, a in fv.per_model.items():
         rows.append({"AP model": m, "point class": a.classification,
@@ -126,6 +141,9 @@ with tab_about:
         "- Channels whose IC50 is **unidentifiable** (max block < 60%) are flagged "
         "and excluded, never silently point-estimated.\n"
         "- The bundled AP kernel is a **reduced** O'Hara-Rudy-lineage reference "
-        "implementation (Tier C); the v0.1 classifier is an APD90 surrogate and a "
-        "methodology demonstrator, not a qualified regulatory classifier.\n\n"
+        "implementation (Tier C). The default metric is **qNet** (the CiPA "
+        "net-charge biomarker; lower = higher risk) which never makes a "
+        "two-category error on the 28 CiPA compounds; **ΔAPD90%** is also "
+        "selectable. It is a methodology demonstrator, not a qualified regulatory "
+        "classifier.\n\n"
         "**It is NOT a clinical tool and NOT a regulatory safety determination.**")

@@ -4,16 +4,21 @@ applied per current, plus the TdP-risk biomarkers (APD90, qNet, triangulation,
 EAD detection).
 
 HONESTY NOTE (spec.md §6). This is a *reduced* reference implementation of the
-ORd lineage: seven named currents (INa, INaL, Ito, ICaL, IKr, IKs, IK1) with
-Hodgkin-Huxley gating and an algebraic inward rectifier, fixed ionic
-concentrations, and a single-cell paced protocol. It is structurally faithful
-and numerically stable, and it reproduces the *qualitative* pharmacology the
-CiPA paradigm rests on (hERG/IKr block prolongs the AP and lowers qNet; balancing
-ICaL/INaL block shortens it again). It is NOT bit-exact to the published ORd
-CellML and its qNet is in kernel-specific units — so AP-model records ship at
-Tier C and qNet thresholds are calibrated to this kernel, not borrowed from the
-regulatory pipeline. Cross-checking against the canonical CellML (Myokit/OpenCOR)
-and earning Tier A is the Phase-F deliverable.
+ORd lineage: the seven named currents (INa, INaL, Ito, ICaL, IKr, IKs, IK1) plus
+a phenomenological Na-Ca exchanger (INaCa), with Hodgkin-Huxley gating, an
+algebraic inward rectifier, and fixed ionic concentrations, paced single-cell. It
+is structurally faithful and numerically stable, and it reproduces the
+*qualitative* pharmacology the CiPA paradigm rests on (hERG/IKr block prolongs the
+AP and lowers qNet; balancing ICaL/INaL block shortens it again).
+
+qNet (Phase C). INaCa is shape-dependent and is EXCLUDED from the qNet six-current
+sum, which breaks charge conservation and makes qNet genuinely sensitive to
+repolarization-current block — so the kernel now offers BOTH an APD90 and a qNet
+proarrhythmia metric. It is NOT bit-exact to the published ORd CellML and its qNet
+is in kernel-specific units, so AP-model records ship at Tier C and both metrics'
+thresholds are calibrated to this kernel, not borrowed from the regulatory
+pipeline. Cross-checking against the canonical CellML (Myokit/OpenCOR) and earning
+Tier A is the Phase-F deliverable.
 
 Everything here is deterministic; variability propagation lives in simulate.py.
 """
@@ -40,6 +45,7 @@ ENA = 70.0
 EK = -87.0
 EKS = -80.0
 ECAL = 45.0   # effective L-type Ca driving reversal (phenomenological)
+ENCX = -10.0  # effective Na-Ca exchanger reversal (phenomenological)
 
 # State vector layout.
 _STATE = ["V", "m", "h", "j", "mL", "hL", "a", "iF", "d", "f", "xr", "xs"]
@@ -58,11 +64,12 @@ class KernelParams:
     gKr: float = 0.300
     gKs: float = 0.045
     gK1: float = 0.34
+    gNaCa: float = 0.030    # Na-Ca exchanger (shape-dependent; EXCLUDED from qNet)
     block: Dict[str, float] = field(default_factory=lambda: {c: 1.0 for c in BLOCKABLE})
 
     def with_scales(self, scales: Dict[str, float]) -> "KernelParams":
         p = KernelParams(self.gNa, self.gNaL, self.gto, self.gCaL, self.gKr,
-                         self.gKs, self.gK1, dict(self.block))
+                         self.gKs, self.gK1, self.gNaCa, dict(self.block))
         p.gKr *= scales.get("IKr", 1.0)
         p.gCaL *= scales.get("ICaL", 1.0)
         p.gNaL *= scales.get("INaL", 1.0)
@@ -121,8 +128,17 @@ def gating_targets(V):
     )
 
 
+# Currents that make up the CiPA qNet integral (the net-current biomarker). INa
+# (fast upstroke) and INaCa (exchanger) are deliberately EXCLUDED — and because
+# INaCa is shape-dependent and excluded, qNet stops being charge-conserved and
+# becomes sensitive to repolarization-current block (the whole point).
+QNET_CURRENTS = ["INaL", "ICaL", "IKr", "IKs", "IK1", "Ito"]
+CURRENT_NAMES = ["INa", "INaL", "Ito", "ICaL", "IKr", "IKs", "IK1", "INaCa"]
+
+
 def currents(V, y, p: KernelParams, b_ikr=None):
-    """Return the seven ionic currents (µA/µF) at state ``y``.
+    """Return the eight ionic currents (µA/µF) at state ``y`` in ``CURRENT_NAMES``
+    order: INa, INaL, Ito, ICaL, IKr, IKs, IK1, INaCa.
 
     If ``b_ikr`` (the dynamically-bound hERG fraction) is given, IKr is scaled by
     ``(1 - b_ikr)`` instead of the static Hill block factor ``p.block['IKr']``."""
@@ -144,7 +160,11 @@ def currents(V, y, p: KernelParams, b_ikr=None):
     IKs = p.gKs * xs ** 2 * (V - EKS) * b["IKs"]
     xK1 = 1.0 / (1.0 + np.exp((V + 100.0) / 12.0))
     IK1 = p.gK1 * xK1 * (V - EK)
-    return INa, INaL, Ito, ICaL, IKr, IKs, IK1
+    # Na-Ca exchanger: phenomenological, V-dependent (fixed concentrations),
+    # weighted to act mainly during the plateau/repolarization.
+    wncx = 1.0 / (1.0 + np.exp(-(V + 30.0) / 20.0))
+    INaCa = p.gNaCa * wncx * (V - ENCX)
+    return INa, INaL, Ito, ICaL, IKr, IKs, IK1, INaCa
 
 
 def _stim(t, cl, duration=1.0, amp=-52.0):
@@ -188,16 +208,14 @@ class HERGDynamic:
 def _rhs(t, y, p: KernelParams, cl: float, herg: "HERGDynamic" = None):
     V = y[0]
     if herg is None:
-        INa, INaL, Ito, ICaL, IKr, IKs, IK1 = currents(V, y, p)
-        Iion = INa + INaL + Ito + ICaL + IKr + IKs + IK1
+        Iion = sum(currents(V, y, p))
         inf, tau = gating_targets(V)
         dy = (inf - y) / tau
         dy[0] = -(Iion + _stim(t, cl))
         return dy
     # dynamic-hERG path: y has one extra state, the bound fraction b (index 12)
     b = y[12]
-    INa, INaL, Ito, ICaL, IKr, IKs, IK1 = currents(V, y[:12], p, b_ikr=b)
-    Iion = INa + INaL + Ito + ICaL + IKr + IKs + IK1
+    Iion = sum(currents(V, y[:12], p, b_ikr=b))
     inf, tau = gating_targets(V)
     dy = np.empty_like(y)
     dy[:12] = (inf - y[:12]) / tau
@@ -267,10 +285,9 @@ def simulate_beats(p: KernelParams, cl: float = 2000.0, n_beats: int = 3,
     V = Y[0]
 
     # vectorised current evaluation over the whole trace
-    names = ["INa", "INaL", "Ito", "ICaL", "IKr", "IKs", "IK1"]
     b_ikr = Y[12] if herg is not None else None
     vals = currents(V, Y[:12] if herg is not None else Y, p, b_ikr=b_ikr)
-    cur_arrays = {name: np.asarray(val) for name, val in zip(names, vals)}
+    cur_arrays = {name: np.asarray(val) for name, val in zip(CURRENT_NAMES, vals)}
 
     res = _analyse(t, V, cur_arrays, cl)
     if herg is not None:
@@ -298,17 +315,16 @@ def _analyse(t, V, cur, cl) -> BeatResult:
     apd50 = apd_at(0.50)
     triangulation = apd90 - apd50 if not math.isnan(apd90) and not math.isnan(apd50) else float("nan")
 
-    # qNet = integral over the beat of the net of the six "CiPA" currents
+    # qNet = integral over the beat of the net of the six CiPA currents
     # (INaL + ICaL + IKr + IKs + IK1 + Ito), in (µA/µF)·s = µC/µF.
     #
-    # CAVEAT (documented in this module's header and in the ap_model record):
-    # this pump-free reduced kernel conserves charge over the paced cycle, so
-    # this qNet is dominated by the fast-INa upstroke charge and is only weakly
-    # sensitive to repolarization-current block. It is reported for transparency
-    # but is NOT the classification metric in v0.1 — APD90 is. A qNet that
-    # discriminates risk needs the pump/exchanger currents of the full ORd
-    # (Phase B/C). See simulate.RiskMetric.
-    inet = (cur["INaL"] + cur["ICaL"] + cur["IKr"] + cur["IKs"] + cur["IK1"] + cur["Ito"])
+    # The fast INa upstroke and the Na-Ca exchanger (INaCa) are EXCLUDED. Because
+    # INaCa is shape-dependent and excluded, this six-current sum is no longer
+    # charge-conserved over the paced cycle, so qNet becomes genuinely sensitive
+    # to repolarization-current block (Phase C): hERG block lowers qNet, matching
+    # the CiPA convention (lower qNet -> higher TdP risk). qNet here is in
+    # kernel-specific units; thresholds are calibrated to this kernel.
+    inet = sum(cur[name] for name in QNET_CURRENTS)
     qnet = float(trapezoid(inet, t) / 1000.0)
 
     ead = _detect_ead(t, V)

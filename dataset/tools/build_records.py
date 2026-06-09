@@ -483,10 +483,11 @@ def build_ap_models():
             {"symbol": "g_scale_INaL", "label": "INaL conductance scale", "value": 1.30, "units": "dimensionless"},
         ],
         "validation": {"training_set_reproduced": None, "validation_set_accuracy": None,
-                       "notes": "Default classification model. Reduced-kernel APD90 classifier recovers "
-                                "10/12 CiPA training labels and is weaker on the 16-drug validation set "
-                                "(~80% within-one-category); run `harmonia performance` for the live, honest "
-                                "confusion matrix. Not a qualified regulatory classifier (Tier C)."},
+                       "notes": "Default classification model. The reduced-kernel default metric is qNet "
+                                "(discriminating since the Na-Ca exchanger was added and excluded from the "
+                                "qNet sum, Phase C): 10/12 CiPA training labels and zero two-category errors "
+                                "across all 28 compounds; APD90 selectable. Run `harmonia performance` for the "
+                                "live, honest confusion matrix. Not a qualified regulatory classifier (Tier C)."},
         "extraction": {"review_status": "unverified", "method": "reduced CiPAORd variant with dynamic-hERG option",
                        "verified_by": [], "notes": "Dynamic Langmuir hERG binding implemented (Phase B); "
                        "full CiPA Markov hERG model + published optimized kinetics pending Phase C."},

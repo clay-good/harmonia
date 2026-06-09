@@ -18,6 +18,7 @@ import harmonia
 from harmonia.export.reference import (KernelParams, simulate_beats, HERGDynamic,
                                        hill_block_factor)
 from harmonia.simulate import (assess, THRESH_LOW_PCT, THRESH_HIGH_PCT,
+                               QNET_THRESH_LOW, QNET_THRESH_HIGH,
                                REFERENCE_EXPOSURE_MULTIPLE)
 from harmonia.performance import score
 
@@ -48,22 +49,51 @@ def fig_ap_traces():
 
 
 def fig_flip_distribution():
-    """The headline: ΔAPD90 distribution under IC50 variability for two drugs."""
+    """The headline: qNet distribution under IC50 variability for two drugs."""
     fig, axes = plt.subplots(1, 2, figsize=(10, 4), sharey=True)
     for ax, drug in zip(axes, ["dofetilide", "verapamil"]):
-        a = assess(ds, drug, ap_model="cipaordv1.0", n_mc=400)
-        ax.hist(a.dapd90_distribution, bins=28, color=BLUE, alpha=0.85)
-        ax.axvline(THRESH_LOW_PCT, color=GREEN, ls="--", lw=1.2)
-        ax.axvline(THRESH_HIGH_PCT, color=RED, ls="--", lw=1.2)
-        ax.axvline(a.dapd90_pct, color="black", lw=1.6)
+        a = assess(ds, drug, ap_model="cipaordv1.0", n_mc=400)  # metric=qnet (default)
+        ax.hist(a.qnet_distribution, bins=28, color=BLUE, alpha=0.85)
+        ax.axvline(QNET_THRESH_HIGH, color=RED, ls="--", lw=1.2)    # below -> high risk
+        ax.axvline(QNET_THRESH_LOW, color=GREEN, ls="--", lw=1.2)   # above -> low risk
+        ax.axvline(a.qnet, color="black", lw=1.6)
         ax.set_title(f"{drug}  (tier {a.tier})\npoint={a.classification.upper()}, "
                      f"flip={a.classification_flip_frequency:.0%}", fontsize=10)
-        ax.set_xlabel("ΔAPD90 (%) at 4× EFTPC")
+        ax.set_xlabel("qNet (µC/µF) at 4× EFTPC")
         ax.spines[["top", "right"]].set_visible(False)
     axes[0].set_ylabel("Monte-Carlo draws")
-    fig.suptitle("Input-variability → classification-flip: low<16% (green) | high≥33% (red)",
-                 fontsize=11)
+    fig.suptitle("Input-variability → classification-flip (qNet): "
+                 f"high<{QNET_THRESH_HIGH:g} (red) | low>{QNET_THRESH_LOW:g} (green); "
+                 "lower qNet = higher risk", fontsize=10.5)
     fig.tight_layout(); fig.savefig(IMG / "flip_distribution.png", dpi=130)
+    plt.close(fig)
+
+
+def fig_qnet_cipa():
+    """qNet at 4× EFTPC for ALL 28 CiPA compounds, colored by expert label — the
+    Phase-C headline: clean separation, zero two-category errors."""
+    cmap = {"high": RED, "intermediate": "#e69b00", "low": GREEN}
+    rows = []
+    for ref in ds.drug_references:
+        a = assess(ds, ref.drug, ap_model="cipaordv1.0", n_mc=0)  # qnet
+        rows.append((ref.expert_risk_label, ref.cipa_set, ref.drug, a.qnet))
+    order = {"high": 0, "intermediate": 1, "low": 2}
+    rows.sort(key=lambda r: (order[r[0]], r[3]))
+    names = [f"{r[2]}{'*' if r[1]=='validation' else ''}" for r in rows]
+    vals = [r[3] for r in rows]
+    colors = [cmap[r[0]] for r in rows]
+    fig, ax = plt.subplots(figsize=(8.5, 8.0))
+    ax.barh(names, vals, color=colors)
+    ax.axvline(QNET_THRESH_HIGH, color=RED, ls="--", lw=1)
+    ax.axvline(QNET_THRESH_LOW, color=GREEN, ls="--", lw=1)
+    ax.set_xlabel("qNet (µC/µF) at 4× EFTPC   (lower = higher risk; * = validation drug)")
+    ax.set_title("qNet across all 28 CiPA compounds — expert label = bar color\n"
+                 "high-risk drugs left of the red line, low-risk right of the green line")
+    ax.invert_yaxis()
+    handles = [plt.Rectangle((0, 0), 1, 1, color=cmap[k]) for k in ["high", "intermediate", "low"]]
+    ax.legend(handles, ["high", "intermediate", "low"], fontsize=8, frameon=False, loc="lower right")
+    ax.spines[["top", "right"]].set_visible(False)
+    fig.tight_layout(); fig.savefig(IMG / "qnet_cipa.png", dpi=130)
     plt.close(fig)
 
 
@@ -144,7 +174,7 @@ def fig_validation_set():
 if __name__ == "__main__":
     fig_ap_traces()
     fig_flip_distribution()
-    fig_training_set()
+    fig_qnet_cipa()        # qNet across all 28 compounds (supersedes the per-set bar charts)
     fig_dynamic_binding()
-    fig_validation_set()
+    # fig_training_set() / fig_validation_set() remain available for the APD90 metric
     print(f"wrote figures to {IMG}")

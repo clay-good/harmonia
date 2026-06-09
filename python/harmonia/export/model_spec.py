@@ -241,6 +241,7 @@ def build_model_spec(name: str = "harmonia_ord_reduced",
         Parameter("EK", ref.EK, "mV", "K reversal potential"),
         Parameter("EKs", ref.EKS, "mV", "IKs reversal potential"),
         Parameter("ECaL", ref.ECAL, "mV", "effective L-type Ca reversal"),
+        Parameter("ENCX", ref.ENCX, "mV", "effective Na-Ca exchanger reversal"),
         Parameter("gNa", base.gNa, "mS_per_uF", "fast Na conductance"),
         Parameter("gNaL", base.gNaL, "mS_per_uF", "late Na conductance"),
         Parameter("gto", base.gto, "mS_per_uF", "transient outward conductance"),
@@ -248,6 +249,7 @@ def build_model_spec(name: str = "harmonia_ord_reduced",
         Parameter("gKr", base.gKr, "mS_per_uF", "rapid delayed rectifier conductance"),
         Parameter("gKs", base.gKs, "mS_per_uF", "slow delayed rectifier conductance"),
         Parameter("gK1", base.gK1, "mS_per_uF", "inward rectifier conductance"),
+        Parameter("gNaCa", base.gNaCa, "mS_per_uF", "Na-Ca exchanger scale (excluded from qNet)"),
         Parameter("stim_amplitude", -52.0, "uA_per_uF", "stimulus amplitude"),
         Parameter("stim_duration", 1.0, "ms", "stimulus duration"),
         Parameter("stim_period", cl, "ms", "pacing cycle length"),
@@ -264,8 +266,10 @@ def build_model_spec(name: str = "harmonia_ord_reduced",
 
     Rkr = Num(1.0) / (Num(1.0) + exp((V() + Num(70.0)) / Num(25.0)))
     xK1 = Num(1.0) / (Num(1.0) + exp((V() + Num(100.0)) / Num(12.0)))
+    wncx = Num(1.0) / (Num(1.0) + exp(-(V() + Num(30.0)) / Num(20.0)))
     assigns.append(Assignment("Rkr", Rkr, "dimensionless"))
     assigns.append(Assignment("xK1_inf", xK1, "dimensionless"))
+    assigns.append(Assignment("wncx", wncx, "dimensionless"))
 
     g = Var
     INa = g("gNa") * g("m") ** Num(3) * g("h") * g("j") * (V() - g("ENa")) * g("block_INa")
@@ -275,11 +279,13 @@ def build_model_spec(name: str = "harmonia_ord_reduced",
     IKr = g("gKr") * g("xr") * g("Rkr") * (V() - g("EK")) * g("block_IKr")
     IKs = g("gKs") * g("xs") ** Num(2) * (V() - g("EKs")) * g("block_IKs")
     IK1 = g("gK1") * g("xK1_inf") * (V() - g("EK"))
+    INaCa = g("gNaCa") * g("wncx") * (V() - g("ENCX"))
     for nm, ex in [("INa", INa), ("INaL", INaL), ("Ito", Ito), ("ICaL", ICaL),
-                   ("IKr", IKr), ("IKs", IKs), ("IK1", IK1)]:
+                   ("IKr", IKr), ("IKs", IKs), ("IK1", IK1), ("INaCa", INaCa)]:
         assigns.append(Assignment(nm, ex, "uA_per_uF"))
 
-    Iion = (g("INa") + g("INaL") + g("Ito") + g("ICaL") + g("IKr") + g("IKs") + g("IK1"))
+    Iion = (g("INa") + g("INaL") + g("Ito") + g("ICaL") + g("IKr") + g("IKs")
+            + g("IK1") + g("INaCa"))
     assigns.append(Assignment("i_ion", Iion, "uA_per_uF"))
 
     # periodic stimulus via floor(): phase = t - floor(t/period)*period

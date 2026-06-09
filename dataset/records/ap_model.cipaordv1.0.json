@@ -41,7 +41,7 @@
   "validation": {
     "training_set_reproduced": null,
     "validation_set_accuracy": null,
-    "notes": "Default classification model. Reduced-kernel APD90 classifier recovers 10/12 CiPA training labels and is weaker on the 16-drug validation set (~80% within-one-category); run `harmonia performance` for the live, honest confusion matrix. Not a qualified regulatory classifier (Tier C)."
+    "notes": "Default classification model. The reduced-kernel default metric is qNet (discriminating since the Na-Ca exchanger was added and excluded from the qNet sum, Phase C): 10/12 CiPA training labels and zero two-category errors across all 28 compounds; APD90 selectable. Run `harmonia performance` for the live, honest confusion matrix. Not a qualified regulatory classifier (Tier C)."
   },
   "extraction": {
     "review_status": "unverified",

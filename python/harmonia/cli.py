@@ -72,8 +72,9 @@ def cmd_info(args) -> int:
 def cmd_simulate(args) -> int:
     from .simulate import assess
     ds = _load(args)
-    res = assess(ds, args.drug, ap_model=args.ap_model, n_mc=args.mc,
-                 exposure_multiple=args.exposure_multiple, seed=args.seed)
+    res = assess(ds, args.drug, ap_model=args.ap_model, n_mc=args.mc, metric=args.metric,
+                 exposure_multiple=args.exposure_multiple, seed=args.seed,
+                 herg_dynamic=args.dynamic)
     print(res.summary())
     return 0
 
@@ -92,7 +93,7 @@ def cmd_performance(args) -> int:
     from .performance import score
     ds = _load(args)
     for cipa_set in (["training", "validation", "all"] if args.set == "report" else [args.set]):
-        rep = score(ds, ap_model=args.ap_model, cipa_set=cipa_set,
+        rep = score(ds, ap_model=args.ap_model, cipa_set=cipa_set, metric=args.metric,
                     herg_dynamic=args.dynamic, exposure_multiple=args.exposure_multiple)
         print(rep.summary())
         print()
@@ -150,8 +151,10 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("simulate", help="risk-metric distribution for one drug")
     s.add_argument("drug")
     s.add_argument("--ap-model", default="cipaordv1.0", dest="ap_model")
+    s.add_argument("--metric", default="qnet", choices=["qnet", "apd90"])
     s.add_argument("--mc", type=int, default=200, help="Monte-Carlo draws")
     s.add_argument("--exposure-multiple", type=float, default=4.0, dest="exposure_multiple")
+    s.add_argument("--dynamic", action="store_true", help="use dynamic hERG binding where available")
     s.add_argument("--seed", type=int, default=0)
     s.set_defaults(func=cmd_simulate)
 
@@ -167,6 +170,7 @@ def build_parser() -> argparse.ArgumentParser:
     pf.add_argument("--set", default="report",
                     choices=["training", "validation", "all", "report"],
                     help="'report' prints training, validation, and all")
+    pf.add_argument("--metric", default="qnet", choices=["qnet", "apd90"])
     pf.add_argument("--dynamic", action="store_true", help="use dynamic hERG binding where available")
     pf.add_argument("--exposure-multiple", type=float, default=4.0, dest="exposure_multiple")
     pf.set_defaults(func=cmd_performance)

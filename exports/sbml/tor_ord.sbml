@@ -14,6 +14,7 @@ Primary sources: https://doi.org/10.7554/eLife.48890
       <parameter id="EK" value="-87.0" constant="true"/>
       <parameter id="EKs" value="-80.0" constant="true"/>
       <parameter id="ECaL" value="45.0" constant="true"/>
+      <parameter id="ENCX" value="-10.0" constant="true"/>
       <parameter id="gNa" value="11.0" constant="true"/>
       <parameter id="gNaL" value="0.051" constant="true"/>
       <parameter id="gto" value="0.18" constant="true"/>
@@ -21,6 +22,7 @@ Primary sources: https://doi.org/10.7554/eLife.48890
       <parameter id="gKr" value="0.27" constant="true"/>
       <parameter id="gKs" value="0.045" constant="true"/>
       <parameter id="gK1" value="0.34" constant="true"/>
+      <parameter id="gNaCa" value="0.03" constant="true"/>
       <parameter id="stim_amplitude" value="-52.0" constant="true"/>
       <parameter id="stim_duration" value="1.0" constant="true"/>
       <parameter id="stim_period" value="2000.0" constant="true"/>
@@ -66,6 +68,7 @@ Primary sources: https://doi.org/10.7554/eLife.48890
       <parameter id="xs_tau" constant="false"/>
       <parameter id="Rkr" constant="false"/>
       <parameter id="xK1_inf" constant="false"/>
+      <parameter id="wncx" constant="false"/>
       <parameter id="INa" constant="false"/>
       <parameter id="INaL" constant="false"/>
       <parameter id="Ito" constant="false"/>
@@ -73,6 +76,7 @@ Primary sources: https://doi.org/10.7554/eLife.48890
       <parameter id="IKr" constant="false"/>
       <parameter id="IKs" constant="false"/>
       <parameter id="IK1" constant="false"/>
+      <parameter id="INaCa" constant="false"/>
       <parameter id="i_ion" constant="false"/>
       <parameter id="i_stim" constant="false"/>
     </listOfParameters>
@@ -101,6 +105,7 @@ Primary sources: https://doi.org/10.7554/eLife.48890
       <assignmentRule variable="xs_tau"><math xmlns="http://www.w3.org/1998/Math/MathML"><apply><plus/><cn>80</cn><apply><times/><cn>350</cn><apply><exp/><apply><minus/><apply><power/><apply><divide/><apply><minus/><ci>V</ci><cn>10</cn></apply><cn>40</cn></apply><cn>2</cn></apply></apply></apply></apply></apply></math></assignmentRule>
       <assignmentRule variable="Rkr"><math xmlns="http://www.w3.org/1998/Math/MathML"><apply><divide/><cn>1</cn><apply><plus/><cn>1</cn><apply><exp/><apply><divide/><apply><plus/><ci>V</ci><cn>70</cn></apply><cn>25</cn></apply></apply></apply></apply></math></assignmentRule>
       <assignmentRule variable="xK1_inf"><math xmlns="http://www.w3.org/1998/Math/MathML"><apply><divide/><cn>1</cn><apply><plus/><cn>1</cn><apply><exp/><apply><divide/><apply><plus/><ci>V</ci><cn>100</cn></apply><cn>12</cn></apply></apply></apply></apply></math></assignmentRule>
+      <assignmentRule variable="wncx"><math xmlns="http://www.w3.org/1998/Math/MathML"><apply><divide/><cn>1</cn><apply><plus/><cn>1</cn><apply><exp/><apply><divide/><apply><minus/><apply><plus/><ci>V</ci><cn>30</cn></apply></apply><cn>20</cn></apply></apply></apply></apply></math></assignmentRule>
       <assignmentRule variable="INa"><math xmlns="http://www.w3.org/1998/Math/MathML"><apply><times/><apply><times/><apply><times/><apply><times/><apply><times/><ci>gNa</ci><apply><power/><ci>m</ci><cn>3</cn></apply></apply><ci>h</ci></apply><ci>j</ci></apply><apply><minus/><ci>V</ci><ci>ENa</ci></apply></apply><ci>block_INa</ci></apply></math></assignmentRule>
       <assignmentRule variable="INaL"><math xmlns="http://www.w3.org/1998/Math/MathML"><apply><times/><apply><times/><apply><times/><apply><times/><ci>gNaL</ci><ci>mL</ci></apply><ci>hL</ci></apply><apply><minus/><ci>V</ci><ci>ENa</ci></apply></apply><ci>block_INaL</ci></apply></math></assignmentRule>
       <assignmentRule variable="Ito"><math xmlns="http://www.w3.org/1998/Math/MathML"><apply><times/><apply><times/><apply><times/><apply><times/><ci>gto</ci><ci>a</ci></apply><ci>iF</ci></apply><apply><minus/><ci>V</ci><ci>EK</ci></apply></apply><ci>block_Ito</ci></apply></math></assignmentRule>
@@ -108,7 +113,8 @@ Primary sources: https://doi.org/10.7554/eLife.48890
       <assignmentRule variable="IKr"><math xmlns="http://www.w3.org/1998/Math/MathML"><apply><times/><apply><times/><apply><times/><apply><times/><ci>gKr</ci><ci>xr</ci></apply><ci>Rkr</ci></apply><apply><minus/><ci>V</ci><ci>EK</ci></apply></apply><ci>block_IKr</ci></apply></math></assignmentRule>
       <assignmentRule variable="IKs"><math xmlns="http://www.w3.org/1998/Math/MathML"><apply><times/><apply><times/><apply><times/><ci>gKs</ci><apply><power/><ci>xs</ci><cn>2</cn></apply></apply><apply><minus/><ci>V</ci><ci>EKs</ci></apply></apply><ci>block_IKs</ci></apply></math></assignmentRule>
       <assignmentRule variable="IK1"><math xmlns="http://www.w3.org/1998/Math/MathML"><apply><times/><apply><times/><ci>gK1</ci><ci>xK1_inf</ci></apply><apply><minus/><ci>V</ci><ci>EK</ci></apply></apply></math></assignmentRule>
-      <assignmentRule variable="i_ion"><math xmlns="http://www.w3.org/1998/Math/MathML"><apply><plus/><apply><plus/><apply><plus/><apply><plus/><apply><plus/><apply><plus/><ci>INa</ci><ci>INaL</ci></apply><ci>Ito</ci></apply><ci>ICaL</ci></apply><ci>IKr</ci></apply><ci>IKs</ci></apply><ci>IK1</ci></apply></math></assignmentRule>
+      <assignmentRule variable="INaCa"><math xmlns="http://www.w3.org/1998/Math/MathML"><apply><times/><apply><times/><ci>gNaCa</ci><ci>wncx</ci></apply><apply><minus/><ci>V</ci><ci>ENCX</ci></apply></apply></math></assignmentRule>
+      <assignmentRule variable="i_ion"><math xmlns="http://www.w3.org/1998/Math/MathML"><apply><plus/><apply><plus/><apply><plus/><apply><plus/><apply><plus/><apply><plus/><apply><plus/><ci>INa</ci><ci>INaL</ci></apply><ci>Ito</ci></apply><ci>ICaL</ci></apply><ci>IKr</ci></apply><ci>IKs</ci></apply><ci>IK1</ci></apply><ci>INaCa</ci></apply></math></assignmentRule>
       <assignmentRule variable="i_stim"><math xmlns="http://www.w3.org/1998/Math/MathML"><piecewise><piece><ci>stim_amplitude</ci><apply><lt/><apply><minus/><csymbol encoding="text" definitionURL="http://www.sbml.org/sbml/symbols/time">time</csymbol><apply><times/><apply><floor/><apply><divide/><csymbol encoding="text" definitionURL="http://www.sbml.org/sbml/symbols/time">time</csymbol><ci>stim_period</ci></apply></apply><ci>stim_period</ci></apply></apply><ci>stim_duration</ci></apply></piece><otherwise><cn>0</cn></otherwise></piecewise></math></assignmentRule>
       <rateRule variable="V"><math xmlns="http://www.w3.org/1998/Math/MathML"><apply><divide/><apply><minus/><apply><plus/><ci>i_ion</ci><ci>i_stim</ci></apply></apply><ci>Cm</ci></apply></math></rateRule>
       <rateRule variable="m"><math xmlns="http://www.w3.org/1998/Math/MathML"><apply><divide/><apply><minus/><ci>m_inf</ci><ci>m</ci></apply><ci>m_tau</ci></apply></math></rateRule>

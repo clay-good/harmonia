@@ -42,3 +42,24 @@ def test_determinism():
     a = simulate_beats(KernelParams()).apd90
     b = simulate_beats(KernelParams()).apd90
     assert a == b
+
+
+def test_qnet_decreases_with_herg_block():
+    """Phase C: with INaCa excluded from the six-current sum, qNet is no longer
+    charge-conserved and DECREASES with hERG block (the CiPA convention:
+    lower qNet -> higher TdP risk)."""
+    last = simulate_beats(KernelParams()).qnet
+    for bf in [0.6, 0.4, 0.2]:
+        p = KernelParams()
+        p.block["IKr"] = bf
+        qn = simulate_beats(p).qnet
+        assert qn < last, f"qNet did not decrease at IKr bf={bf}"
+        last = qn
+
+
+def test_inaca_excluded_from_qnet():
+    """INaCa is computed but must not appear in the qNet current set."""
+    from harmonia.export.reference import QNET_CURRENTS, CURRENT_NAMES
+    assert "INaCa" in CURRENT_NAMES
+    assert "INaCa" not in QNET_CURRENTS
+    assert "INa" not in QNET_CURRENTS

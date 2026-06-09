@@ -101,19 +101,27 @@ hidden.
 
 ## The honest limits
 
-Harmonia's bundled heart-cell model is a reduced one. It has the right seven
-currents and the right qualitative behavior (block hERG and the heartbeat
-lengthens; block calcium and it shortens again), but it is not the bit-exact,
-regulatory-grade O'Hara-Rudy model. So it ships at Tier C, and it classifies risk
-by action-potential prolongation rather than by qNet, the integrated-charge metric
-CiPA prefers.
+Harmonia's bundled heart-cell model is a reduced one. It has the right currents
+and the right qualitative behavior (block hERG and the heartbeat lengthens; block
+calcium and it shortens again), but it is not the bit-exact, regulatory-grade
+O'Hara-Rudy model. So it ships at Tier C.
 
-That choice is deliberate and disclosed. A charge-conservation argument means a
-pump-free reduced model cannot make qNet sensitive to the currents that matter, so
-claiming a qNet-grade verdict would be a lie. On the twelve CiPA training drugs the
-reduced classifier recovers ten labels. It misses sotalol and chlorpromazine,
-which are exactly the awkward cases that pushed the field toward qNet in the first
-place.
+Its default risk metric is qNet, the integrated-charge measure CiPA prefers, and
+getting qNet to work took a small piece of real physiology. In a model with no
+ion pumps, the charge over a full paced beat is conserved, which makes the qNet
+sum stubbornly insensitive to the very currents you care about. Adding a Na-Ca
+exchanger and then excluding it from the qNet sum breaks that conservation, and
+qNet starts discriminating: lower qNet, higher risk, exactly as the field expects.
+
+On the twelve CiPA training drugs the reduced qNet classifier recovers ten labels.
+More telling, across all twenty-eight CiPA compounds it never makes a two-category
+error. It never calls a high-risk drug low or a low-risk drug high. On a safety
+screen that is the property that matters. The exact three-way accuracy on the
+sixteen-drug validation set is honestly worse, because many of those drugs have a
+free plasma concentration so low that four times it still barely touches the
+channel, and no metric reads much signal from almost no block. The classic
+action-potential-prolongation metric is still there, one argument away
+(metric="apd90"), and it does worse than qNet on both counts.
 
 None of that weakens the thesis. The classifier is a demonstrator. The machinery
 that carries input variability through to a flip frequency is the contribution,
