@@ -88,6 +88,14 @@ def test_dose_response_monotone_for_pure_herg_blocker(ds):
     assert apd[-1] > apd[0]
 
 
+def test_triangulation_reported_as_diagnostic(ds):
+    """assess() surfaces triangulation (APD90-APD50) as a diagnostic readout; a
+    hERG blocker triangulates the AP beyond the drug-free baseline (spec §3)."""
+    a = assess(ds, "dofetilide", n_mc=0)
+    assert a.triangulation_ms > a.baseline_triangulation_ms
+    assert "triangulation" in a.summary().lower()
+
+
 def test_unknown_drug_raises(ds):
     with pytest.raises(KeyError):
         assess(ds, "not_a_drug", n_mc=4)

@@ -277,6 +277,13 @@ green line; the asterisked drugs are the 16-compound validation set. The kernel
 also captures the *protective* multichannel mechanism: **diltiazem and verapamil's
 ICaL block** raises their qNet (lowers risk), via an L-type window current.
 
+Alongside the classifier, every assessment reports **triangulation** (APD90 −
+APD50) — the *T* in the classic TRIaD proarrhythmia profile. hERG block prolongs
+late repolarization more than early, so a torsadogenic drug widens triangulation
+above the drug-free baseline (dofetilide ≈71 ms vs ≈36 ms). It is surfaced as an
+honest *diagnostic readout*, never as a second verdict; the high/intermediate/low
+call stays with qNet (or ΔAPD90).
+
 ### Recorded classification performance (Phase B/C)
 
 `harmonia performance` scores either metric against the CiPA expert labels and

@@ -46,7 +46,7 @@ def test_flip_tab_contract(ds):
                  "classification", "classification_distribution",
                  "classification_flip_frequency", "tier", "warnings",
                  "excluded_channels", "reference_exposure_nM", "baseline_apd90",
-                 "apd90", "metric"):
+                 "apd90", "metric", "triangulation_ms", "baseline_triangulation_ms"):
         getattr(a, attr)
     assert a.classification in RISK_LABELS
 

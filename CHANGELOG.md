@@ -6,6 +6,21 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — triangulation biomarker surfaced (completes a spec §3 readout)
+- The reference kernel already computed **triangulation** (APD90 − APD50, the *T*
+  in the TRIaD proarrhythmia profile) on every beat but discarded it. `assess`
+  now reports it on the `RiskAssessment` (`triangulation_ms` and the drug-free
+  `baseline_triangulation_ms`), in the CLI `simulate` summary, and in the
+  dashboard headline. hERG block widens triangulation monotonically (the textbook
+  signature: late repolarization is prolonged more than early), e.g. dofetilide
+  ≈71 ms vs a ≈36 ms drug-free baseline. It is an honest *diagnostic readout*,
+  never a second classification — the high/intermediate/low call stays with qNet
+  (or ΔAPD90). Tested at the kernel level (monotonicity under IKr block) and the
+  assess level; the dashboard data-contract test tracks the two new fields. The
+  EAD biomarker is deliberately *not* surfaced: the reduced kernel repolarizes
+  monotonically even when massively prolonged and structurally cannot generate an
+  EAD, so an always-zero "EAD frequency" would be misleading.
+
 ### Added — flip-sensitivity attribution (new analysis)
 - **`harmonia.flip_sensitivity`** (+ `harmonia sensitivity <drug>` CLI and a
   dashboard panel) attributes the classification-flip frequency to each channel's

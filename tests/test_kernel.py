@@ -56,6 +56,18 @@ def test_qnet_decreases_with_herg_block():
         last = qn
 
 
+def test_triangulation_widens_with_herg_block():
+    """The TRIaD signature: hERG block prolongs APD90 more than APD50, so
+    triangulation (APD90-APD50) increases monotonically (spec §3 biomarker)."""
+    last = simulate_beats(KernelParams()).triangulation
+    for bf in [0.5, 0.3, 0.15]:
+        p = KernelParams()
+        p.block["IKr"] = bf
+        tri = simulate_beats(p).triangulation
+        assert tri > last, f"triangulation did not widen at IKr bf={bf}"
+        last = tri
+
+
 def test_inaca_excluded_from_qnet():
     """INaCa is computed but must not appear in the qNet current set."""
     from harmonia.export.reference import QNET_CURRENTS, CURRENT_NAMES

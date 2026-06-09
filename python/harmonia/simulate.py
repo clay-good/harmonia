@@ -94,12 +94,13 @@ def classify(dapd90_pct: float) -> str:
 
 
 @lru_cache(maxsize=128)
-def _cached_baseline_apd90(scales_items: tuple, n_beats: int) -> float:
-    """Drug-free baseline APD90 for an AP-model variant. Deterministic and
-    independent of the drug, so it is memoised across the many assess() calls a
-    performance sweep or flip view makes."""
+def _cached_baseline(scales_items: tuple, n_beats: int) -> tuple:
+    """Drug-free baseline (APD90, triangulation=APD90-APD50) for an AP-model
+    variant, in ms. Deterministic and independent of the drug, so it is memoised
+    across the many assess() calls a performance sweep or flip view makes."""
     scales = dict(scales_items)
-    return simulate_beats(KernelParams().with_scales(scales), n_beats=n_beats).apd90
+    r = simulate_beats(KernelParams().with_scales(scales), n_beats=n_beats)
+    return r.apd90, r.triangulation
 
 
 def _worst_tier(tiers: Sequence[str]) -> str:
@@ -180,6 +181,10 @@ class RiskAssessment:
     qnet: float
     ead: bool
     classification: str
+    # triangulation (APD90 - APD50, ms): a TRIaD proarrhythmia diagnostic that
+    # hERG block widens (spec §3). Reported as a readout, never the classifier.
+    triangulation_ms: float
+    baseline_triangulation_ms: float
 
     # variability propagation
     n_mc: int
@@ -208,6 +213,8 @@ class RiskAssessment:
             f"({REFERENCE_EXPOSURE_MULTIPLE:g}x EFTPC)",
             f"point: APD90 {self.apd90:.0f} ms (dAPD90 {self.dapd90_pct:+.1f}%), "
             f"qNet {self.qnet:.4f}  -> [{self.metric}] point class: {self.classification.upper()}",
+            f"triangulation (APD90-APD50): {self.triangulation_ms:.0f} ms "
+            f"(drug-free {self.baseline_triangulation_ms:.0f} ms) — diagnostic, not the classifier",
             f"variability ({self.n_mc} MC draws): {dist}",
             f"classification-flip frequency: {self.classification_flip_frequency:.0%}",
         ]
@@ -260,7 +267,7 @@ def assess(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
     scales = ap_rec.conductance_scales
 
     # drug-free baseline for this model (memoised; deterministic & drug-free)
-    baseline = _cached_baseline_apd90(tuple(sorted(scales.items())), n_beats)
+    baseline, baseline_tri = _cached_baseline(tuple(sorted(scales.items())), n_beats)
 
     if metric not in ("qnet", "apd90"):
         raise ValueError(f"metric must be 'qnet' or 'apd90', got {metric!r}")
@@ -339,7 +346,9 @@ def assess(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
     return RiskAssessment(
         drug=drug_l, ap_model=ap_rec.id, reference_exposure_nM=reference_exposure,
         metric=metric, apd90=pt.apd90, baseline_apd90=baseline, dapd90_pct=dapd_point,
-        qnet=pt.qnet, ead=pt.ead, classification=point_class, n_mc=n_mc,
+        qnet=pt.qnet, ead=pt.ead, classification=point_class,
+        triangulation_ms=pt.triangulation, baseline_triangulation_ms=baseline_tri,
+        n_mc=n_mc,
         dapd90_distribution=dapd, apd90_distribution=apd, qnet_distribution=qn,
         classification_distribution=counts, classification_flip_frequency=flip_freq,
         tier=tier, warnings=warnings, excluded_channels=excluded,
@@ -422,7 +431,7 @@ def assess_combination(ds: Dataset, drugs: Sequence[str], ap_model: str = "cipao
 
     ap_rec = _resolve_ap_model(ds, ap_model)
     scales = ap_rec.conductance_scales
-    baseline = _cached_baseline_apd90(tuple(sorted(scales.items())), n_beats)
+    baseline = _cached_baseline(tuple(sorted(scales.items())), n_beats)[0]
 
     tiers = [ap_rec.tier]
     excluded, warnings = [], []
@@ -645,7 +654,7 @@ def flip_sensitivity(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
         exposure_multiple=exposure_multiple)
     ap_rec = _resolve_ap_model(ds, ap_model)
     scales = ap_rec.conductance_scales
-    baseline = _cached_baseline_apd90(tuple(sorted(scales.items())), n_beats)
+    baseline = _cached_baseline(tuple(sorted(scales.items())), n_beats)[0]
 
     excluded, warnings, tiers = [], [], [ap_rec.tier]
     for b in blocks:

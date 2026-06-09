@@ -38,6 +38,7 @@ def run_assess(drug, ap_model, mc, mult, seed, metric):
         "warnings": a.warnings, "excluded": a.excluded_channels,
         "exposure": a.reference_exposure_nM, "baseline": a.baseline_apd90,
         "apd90": a.apd90, "metric": a.metric,
+        "tri": a.triangulation_ms, "tri_base": a.baseline_triangulation_ms,
     }
 
 
@@ -71,6 +72,9 @@ with tab_flip:
     m3.metric("Propagated tier", res["tier"])
     m4.metric("qNet (point)" if metric == "qnet" else "ΔAPD90 (point)",
               f"{res['qnet']:.4f}" if metric == "qnet" else f"{res['point']:+.1f}%")
+    st.caption(f"Triangulation (APD90−APD50): **{res['tri']:.0f} ms** "
+               f"(drug-free {res['tri_base']:.0f} ms) — a TRIaD proarrhythmia "
+               "diagnostic that hERG block widens; a readout, never the classifier.")
 
     if res["excluded"]:
         st.error("Excluded channels (unidentifiable IC50, max block < 60% → caps at "
