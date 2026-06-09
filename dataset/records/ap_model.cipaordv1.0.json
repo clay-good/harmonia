@@ -7,7 +7,7 @@
   "model": {
     "name": "IKr-dynamic CiPAORd v1.0 — reduced reference variant",
     "lineage": "O'Hara-Rudy",
-    "formulation": "ORd re-optimized for CiPA; IKr re-scaled; dynamic hERG binding (Phase B). v0.1 kernel approximates it with a rescaled-IKr Hill variant.",
+    "formulation": "ORd re-optimized for CiPA; IKr re-scaled. Dynamic hERG binding (Langmuir kon/koff with trapping) is available at simulation time for drugs carrying dynamic_binding kinetics (assess(..., herg_dynamic=True)).",
     "currents": [
       "INa",
       "INaL",
@@ -41,12 +41,12 @@
   "validation": {
     "training_set_reproduced": null,
     "validation_set_accuracy": null,
-    "notes": "Dynamic-hERG binding is the Phase-B deliverable; the v0.1 kernel uses a rescaled-IKr Hill approximation labelled accordingly."
+    "notes": "Default classification model. Reduced-kernel APD90 classifier recovers 10/12 CiPA training labels and is weaker on the 16-drug validation set (~80% within-one-category); run `harmonia performance` for the live, honest confusion matrix. Not a qualified regulatory classifier (Tier C)."
   },
   "extraction": {
     "review_status": "unverified",
-    "method": "reduced CiPAORd variant",
+    "method": "reduced CiPAORd variant with dynamic-hERG option",
     "verified_by": [],
-    "notes": "Dynamic binding pending Phase B."
+    "notes": "Dynamic Langmuir hERG binding implemented (Phase B); full CiPA Markov hERG model + published optimized kinetics pending Phase C."
   }
 }

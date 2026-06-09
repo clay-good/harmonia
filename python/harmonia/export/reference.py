@@ -121,8 +121,11 @@ def gating_targets(V):
     )
 
 
-def currents(V, y, p: KernelParams):
-    """Return the seven ionic currents (µA/µF) at state ``y``."""
+def currents(V, y, p: KernelParams, b_ikr=None):
+    """Return the seven ionic currents (µA/µF) at state ``y``.
+
+    If ``b_ikr`` (the dynamically-bound hERG fraction) is given, IKr is scaled by
+    ``(1 - b_ikr)`` instead of the static Hill block factor ``p.block['IKr']``."""
     m, h, j = y[1], y[2], y[3]
     mL, hL = y[4], y[5]
     a, iF = y[6], y[7]
@@ -130,12 +133,14 @@ def currents(V, y, p: KernelParams):
     xr, xs = y[10], y[11]
     b = p.block
 
+    ikr_factor = (1.0 - b_ikr) if b_ikr is not None else b["IKr"]
+
     INa = p.gNa * m ** 3 * h * j * (V - ENA) * b["INa"]
     INaL = p.gNaL * mL * hL * (V - ENA) * b["INaL"]
     Ito = p.gto * a * iF * (V - EK) * b["Ito"]
     ICaL = p.gCaL * d * f * (V - ECAL) * b["ICaL"]
     Rkr = 1.0 / (1.0 + np.exp((V + 70.0) / 25.0))   # inward rectification
-    IKr = p.gKr * xr * Rkr * (V - EK) * b["IKr"]
+    IKr = p.gKr * xr * Rkr * (V - EK) * ikr_factor
     IKs = p.gKs * xs ** 2 * (V - EKS) * b["IKs"]
     xK1 = 1.0 / (1.0 + np.exp((V + 100.0) / 12.0))
     IK1 = p.gK1 * xK1 * (V - EK)
@@ -148,22 +153,66 @@ def _stim(t, cl, duration=1.0, amp=-52.0):
     return amp if phase < duration else 0.0
 
 
-def _rhs(t, y, p: KernelParams, cl: float):
+@dataclass
+class HERGDynamic:
+    """Dynamic (time-dependent) hERG drug binding — the CiPA-style upgrade over a
+    static Hill block (spec.md §4, Phase B).
+
+    A first-order Langmuir binding ODE for the bound fraction ``b``:
+
+        db/dt = kon * conc * (1 - b)  -  koff * open_factor * b
+
+    where ``open_factor`` is the hERG activation gate ``xr`` when ``trapping`` is
+    True (the drug can only unbind from the activated channel, so block
+    accumulates use-dependently) and 1 otherwise. At steady state with
+    open_factor=1 this reduces to a Hill block with IC50 = koff / kon and h = 1,
+    so the dynamic model is a strict generalisation of the static one — verified
+    in the tests.
+
+    Units: ``kon`` in 1/(nM·ms), ``koff`` in 1/ms, ``conc`` in nM.
+    """
+    conc_nm: float
+    kon: float
+    koff: float
+    trapping: bool = False
+
+    @property
+    def ic50_nm(self) -> float:
+        return self.koff / self.kon
+
+    def db_dt(self, b, xr):
+        open_factor = xr if self.trapping else 1.0
+        return self.kon * self.conc_nm * (1.0 - b) - self.koff * open_factor * b
+
+
+def _rhs(t, y, p: KernelParams, cl: float, herg: "HERGDynamic" = None):
     V = y[0]
-    INa, INaL, Ito, ICaL, IKr, IKs, IK1 = currents(V, y, p)
+    if herg is None:
+        INa, INaL, Ito, ICaL, IKr, IKs, IK1 = currents(V, y, p)
+        Iion = INa + INaL + Ito + ICaL + IKr + IKs + IK1
+        inf, tau = gating_targets(V)
+        dy = (inf - y) / tau
+        dy[0] = -(Iion + _stim(t, cl))
+        return dy
+    # dynamic-hERG path: y has one extra state, the bound fraction b (index 12)
+    b = y[12]
+    INa, INaL, Ito, ICaL, IKr, IKs, IK1 = currents(V, y[:12], p, b_ikr=b)
     Iion = INa + INaL + Ito + ICaL + IKr + IKs + IK1
-    dV = -(Iion + _stim(t, cl))
     inf, tau = gating_targets(V)
-    dy = (inf - y) / tau
-    dy[0] = dV
+    dy = np.empty_like(y)
+    dy[:12] = (inf - y[:12]) / tau
+    dy[0] = -(Iion + _stim(t, cl))
+    dy[12] = herg.db_dt(b, y[10])   # y[10] == xr
     return dy
 
 
-def _initial_state():
+def _initial_state(herg: "HERGDynamic" = None):
     y0 = np.zeros(len(_STATE))
     y0[0] = -85.0
     inf, _ = gating_targets(-85.0)
     y0[1:] = inf[1:]
+    if herg is not None:
+        y0 = np.append(y0, 0.0)   # bound fraction starts at 0 (drug-naive)
     return y0
 
 
@@ -181,6 +230,8 @@ class BeatResult:
     triangulation: float
     ead: bool
     cl: float
+    herg_bound_mean: float = float("nan")   # dynamic-binding diagnostics
+    herg_bound_max: float = float("nan")
 
     @property
     def repolarization_failed(self) -> bool:
@@ -189,24 +240,27 @@ class BeatResult:
 
 def simulate_beats(p: KernelParams, cl: float = 2000.0, n_beats: int = 3,
                    max_step: float = 2.0, dt_record: float = 1.0,
-                   rtol: float = 1e-6) -> BeatResult:
+                   rtol: float = 1e-6, herg: "HERGDynamic" = None) -> BeatResult:
     """Pace to (approximate) steady state; analyse the final beat.
 
     With fixed ionic concentrations the AP reaches steady state within ~2-3
     beats, so ``n_beats=3`` is sufficient (verified: APD90 is identical from
-    beat 3 onward)."""
-    y = _initial_state()
+    beat 3 onward). When ``herg`` is given, hERG block is computed by the dynamic
+    binding ODE (one extra state) instead of the static Hill factor; with a slow
+    off-rate the bound fraction needs more beats to equilibrate, so callers
+    should raise ``n_beats``."""
+    y = _initial_state(herg)
     t0 = 0.0
     # pre-pace all but the last beat
     for _ in range(max(n_beats - 1, 0)):
-        sol = solve_ivp(_rhs, (t0, t0 + cl), y, args=(p, cl), method="LSODA",
+        sol = solve_ivp(_rhs, (t0, t0 + cl), y, args=(p, cl, herg), method="LSODA",
                         rtol=rtol, atol=1e-8, max_step=max_step)
         y = sol.y[:, -1]
         t0 += cl
     # record the final beat
     n = int(cl / dt_record) + 1
     t_eval = np.linspace(t0, t0 + cl, n)
-    sol = solve_ivp(_rhs, (t0, t0 + cl), y, args=(p, cl), method="LSODA",
+    sol = solve_ivp(_rhs, (t0, t0 + cl), y, args=(p, cl, herg), method="LSODA",
                     rtol=rtol, atol=1e-8, max_step=max_step, t_eval=t_eval)
     t = sol.t - t0
     Y = sol.y
@@ -214,10 +268,15 @@ def simulate_beats(p: KernelParams, cl: float = 2000.0, n_beats: int = 3,
 
     # vectorised current evaluation over the whole trace
     names = ["INa", "INaL", "Ito", "ICaL", "IKr", "IKs", "IK1"]
-    vals = currents(V, Y, p)
+    b_ikr = Y[12] if herg is not None else None
+    vals = currents(V, Y[:12] if herg is not None else Y, p, b_ikr=b_ikr)
     cur_arrays = {name: np.asarray(val) for name, val in zip(names, vals)}
 
-    return _analyse(t, V, cur_arrays, cl)
+    res = _analyse(t, V, cur_arrays, cl)
+    if herg is not None:
+        res.herg_bound_mean = float(np.mean(Y[12]))
+        res.herg_bound_max = float(np.max(Y[12]))
+    return res
 
 
 def _analyse(t, V, cur, cl) -> BeatResult:

@@ -13,13 +13,17 @@ exposure** (default 4x the free therapeutic Cmax, EFTPC). APD/QT prolongation is
 the established proarrhythmia surrogate; qNet — the CiPA metric the reduced,
 pump-free kernel cannot make sensitive (see reference.py) — is reported for
 transparency but is NOT used to classify in v0.1. The two thresholds below were
-calibrated on the 12 CiPA training drugs; the resulting reduced-kernel classifier
-recovers 10/12 training labels. The two misses are sotalol (very weak hERG block
-but high exposure — its risk only emerges well above 4x EFTPC) and chlorpromazine
-(borderline) — the kind of cases that motivated CiPA to replace APD with qNet. It
-is a *methodology demonstrator*, not a qualified classifier. The durable
-contribution is the flip-frequency-under-variability machinery, which is correct
-regardless of the absolute classifier accuracy.
+calibrated on the 12 CiPA training drugs under the default AP model (cipaordv1.0);
+the resulting reduced-kernel classifier recovers 10/12 training labels. The two
+misses are sotalol (very weak hERG block but high exposure — its risk only emerges
+well above 4x EFTPC) and chlorpromazine (borderline) — the kind of cases that
+motivated CiPA to replace APD with qNet. On the 16-compound CiPA *validation* set
+the reduced kernel is weaker (~7/16 exact, ~80% within-one-category): many
+validation drugs have very low free Cmax, so block at 4x EFTPC is sub-IC50 and the
+APD surrogate underreads them. This is reported honestly by ``harmonia
+performance``. It is a *methodology demonstrator*, not a qualified classifier. The
+durable contribution is the flip-frequency-under-variability machinery, which is
+correct regardless of the absolute classifier accuracy.
 """
 from __future__ import annotations
 
@@ -31,12 +35,15 @@ import numpy as np
 from .load import Dataset
 from .records import APModel, ChannelBlock
 from .export.reference import (BLOCKABLE, KernelParams, simulate_beats,
-                               hill_block_factor)
+                               hill_block_factor, HERGDynamic)
 
 # --- classifier calibration (reduced kernel; see module docstring) ---------- #
 REFERENCE_EXPOSURE_MULTIPLE = 4.0     # x EFTPC (free Cmax)
-THRESH_LOW_PCT = 16.0                 # dAPD90% below -> "low"
-THRESH_HIGH_PCT = 33.0                # dAPD90% at/above -> "high"
+# Thresholds calibrated on the 12 CiPA training drugs under the DEFAULT AP model
+# (cipaordv1.0). They are model-specific: the flip view applies the same rule to
+# the ord / tor_ord variants to expose how the structural choice moves the call.
+THRESH_LOW_PCT = 17.0                 # dAPD90% below -> "low"
+THRESH_HIGH_PCT = 35.0                # dAPD90% at/above -> "high"
 DEFAULT_SINGLE_SOURCE_SIGMA = 0.25    # log10 SD assumed for a single-source IC50
 RISK_LABELS = ("low", "intermediate", "high")
 
@@ -146,6 +153,7 @@ class RiskAssessment:
     warnings: List[str] = field(default_factory=list)
     excluded_channels: List[str] = field(default_factory=list)
     channels_used: List[str] = field(default_factory=list)
+    herg_dynamic: bool = False
 
     clinical_use: str = ("PROHIBITED — research / safety-methodology / education only; "
                          "not a regulatory determination")
@@ -175,17 +183,30 @@ def assess(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
            exposure_nM: Optional[float] = None,
            exposure_multiple: float = REFERENCE_EXPOSURE_MULTIPLE,
            metric: str = "apd90", n_mc: int = 200, seed: int = 0,
-           n_beats: int = 3) -> RiskAssessment:
+           n_beats: int = 3, herg_dynamic: bool = False,
+           n_beats_dynamic: int = 10) -> RiskAssessment:
     """Assess a drug's proarrhythmia-metric *distribution* under input variability.
 
     Returns a :class:`RiskAssessment` — a distribution and a classification-flip
     frequency, with the propagated tier and unidentifiable-channel flags. It is
     not, and must not be presented as, a safety determination.
+
+    If ``herg_dynamic`` is True and the drug's hERG record carries
+    ``dynamic_binding`` kinetics, hERG block is simulated with the time-dependent
+    (CiPA-style) binding ODE instead of a static Hill factor — capturing
+    use-dependent trapping. The binding equilibrates slowly, so the dynamic path
+    paces ``n_beats_dynamic`` beats.
     """
     drug_l = drug.lower()
     blocks = [b for b in ds.blocks_for(drug_l) if isinstance(b, ChannelBlock)]
     if not blocks:
         raise KeyError(f"no channel-block records for drug '{drug}'")
+
+    # dynamic-hERG kinetics, if requested and available
+    herg_rec = next((b for b in blocks if b.channel == "IKr" and b.dynamic_binding), None)
+    use_dynamic = herg_dynamic and herg_rec is not None
+    if use_dynamic:
+        n_beats = n_beats_dynamic
 
     ref = ds.drug_reference(drug_l)
     if exposure_nM is not None:
@@ -227,12 +248,22 @@ def assess(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
 
     hill_by = {d.channel: d.hill for d in draws}
 
+    def _herg_for(ic50_nm: float):
+        """Build a HERGDynamic at the reference exposure with kon set so the
+        binding IC50 (koff/kon) tracks the sampled hERG IC50."""
+        if not use_dynamic:
+            return None
+        koff = herg_rec.dynamic_binding["koff"]
+        trapping = bool(herg_rec.dynamic_binding["trapping"])
+        return HERGDynamic(conc_nm=reference_exposure, kon=koff / ic50_nm,
+                           koff=koff, trapping=trapping)
+
     # ---- point estimate (geomean IC50 per channel) -------------------------- #
     ic50_point = {d.channel: 10 ** d.mu_log10 for d in draws}
     bf = _block_factors(ic50_point, hill_by, reference_exposure)
     p = KernelParams().with_scales(scales)
     p.block.update(bf)
-    pt = simulate_beats(p, n_beats=n_beats)
+    pt = simulate_beats(p, n_beats=n_beats, herg=_herg_for(ic50_point.get("IKr", 1e9)))
     dapd_point = 100.0 * (pt.apd90 - baseline) / baseline if baseline else float("nan")
     point_class = classify(dapd_point)
 
@@ -247,14 +278,20 @@ def assess(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
         bf = _block_factors(ic50_s, hill_by, reference_exposure)
         pp = KernelParams().with_scales(scales)
         pp.block.update(bf)
-        r = simulate_beats(pp, n_beats=n_beats)
+        r = simulate_beats(pp, n_beats=n_beats, herg=_herg_for(ic50_s.get("IKr", 1e9)))
         apd[i] = r.apd90
         dapd[i] = 100.0 * (r.apd90 - baseline) / baseline if baseline else float("nan")
         qn[i] = r.qnet
         classes.append(classify(dapd[i]))
 
-    counts = {lab: classes.count(lab) / n_mc for lab in RISK_LABELS}
-    flip_freq = float(np.mean([c != point_class for c in classes])) if n_mc else 0.0
+    # n_mc == 0 means "point estimate only" (used by performance scoring); the
+    # distribution collapses to the point classification.
+    if n_mc:
+        counts = {lab: classes.count(lab) / n_mc for lab in RISK_LABELS}
+        flip_freq = float(np.mean([c != point_class for c in classes]))
+    else:
+        counts = {lab: (1.0 if lab == point_class else 0.0) for lab in RISK_LABELS}
+        flip_freq = 0.0
 
     return RiskAssessment(
         drug=drug_l, ap_model=ap_rec.id, reference_exposure_nM=reference_exposure,
@@ -263,7 +300,7 @@ def assess(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
         dapd90_distribution=dapd, apd90_distribution=apd, qnet_distribution=qn,
         classification_distribution=counts, classification_flip_frequency=flip_freq,
         tier=tier, warnings=warnings, excluded_channels=excluded,
-        channels_used=channels_used,
+        channels_used=channels_used, herg_dynamic=use_dynamic,
     )
 
 

@@ -1,0 +1,27 @@
+{
+  "id": "drug_reference.metoprolol",
+  "kind": "drug_reference",
+  "subsystem": "drug_reference_sets",
+  "tier": "B",
+  "primary_citation": "li-2019",
+  "drug": {
+    "name": "metoprolol",
+    "unii": null,
+    "chembl": null
+  },
+  "cipa_set": "validation",
+  "expert_risk_label": "low",
+  "eftpc_nm": {
+    "central": 1800.0,
+    "units": "nM",
+    "kind": "free",
+    "citation": "li-2019"
+  },
+  "extraction": {
+    "review_status": "unverified",
+    "method": "CiPA working-group validation set + free Cmax (EFTPC) from CiPA references",
+    "verified_by": [],
+    "notes": "Expert risk label and EFTPC from the CiPA validation-set literature; unverified."
+  },
+  "notes": "Expert consensus risk label is GROUND TRUTH for classifier calibration/scoring only — it is NOT a Harmonia output and NOT a clinical determination."
+}

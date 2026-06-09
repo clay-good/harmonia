@@ -193,6 +193,11 @@ class ChannelBlock(Record):
         return self.raw.get("known_failure_modes", [])
 
     @property
+    def dynamic_binding(self) -> Optional[Dict[str, Any]]:
+        """hERG dynamic-binding kinetics (kon/koff/trapping), if present."""
+        return self.raw.get("dynamic_binding")
+
+    @property
     def identifiable(self) -> bool:
         return self.assay_context.identifiable
 

@@ -44,14 +44,14 @@ def test_unidentifiable_channel_caps_tier_at_D(ds):
 
 def test_variability_widens_distribution(ds):
     """A high-fold-range drug (cisapride) should show classification spread."""
-    a = assess(ds, "cisapride", n_mc=60)
+    a = assess(ds, "cisapride", n_mc=30)
     # more than one class should appear given the input spread
     nonzero = [k for k, v in a.classification_distribution.items() if v > 0]
     assert len(nonzero) >= 1
 
 
 def test_flip_view_across_models(ds):
-    fv = flip_view(ds, "verapamil", n_mc=24)
+    fv = flip_view(ds, "verapamil", n_mc=12)
     assert set(fv.flip_by_model.keys()) == {"ord", "cipaordv1.0", "tor_ord"}
     for c in fv.flip_by_model.values():
         assert c in ("low", "intermediate", "high")

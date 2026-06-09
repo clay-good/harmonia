@@ -76,6 +76,18 @@
         }
       }
     },
+    "dynamic_binding": {
+      "type": "object",
+      "description": "Time-dependent (CiPA-style) hERG drug-binding kinetics. Langmuir first-order: db/dt = kon*conc*(1-b) - koff*open_factor*b, IC50 = koff/kon.",
+      "additionalProperties": false,
+      "required": ["kon", "koff", "trapping"],
+      "properties": {
+        "kon": { "type": "number", "exclusiveMinimum": 0, "description": "association rate, 1/(nM*ms)" },
+        "koff": { "type": "number", "exclusiveMinimum": 0, "description": "dissociation rate, 1/ms" },
+        "trapping": { "type": "boolean", "description": "drug trapped in the closed channel (unbinds only from the activated state)" },
+        "citation": { "type": ["string", "null"] }
+      }
+    },
     "assay_context": {
       "type": "object",
       "additionalProperties": false,

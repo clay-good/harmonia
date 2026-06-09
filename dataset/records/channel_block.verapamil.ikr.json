@@ -10,7 +10,7 @@
     "chembl": null
   },
   "channel": "IKr",
-  "block_model": "hill",
+  "block_model": "dynamic_binding",
   "parameters": [
     {
       "symbol": "IC50",
@@ -82,5 +82,11 @@
     "method": "literature table transcribed by maintainer; values from CiPA-era patch-clamp datasets",
     "verified_by": [],
     "notes": "Values are literature-derived (see primary_citation / source_values). No source PDF has been confirmed inside Harmonia; review_status stays unverified per spec §9."
+  },
+  "dynamic_binding": {
+    "kon": 1.91e-05,
+    "koff": 0.005,
+    "trapping": false,
+    "citation": "li-2017"
   }
 }

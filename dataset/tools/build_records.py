@@ -106,7 +106,12 @@ DRUGS = {
         "IKr": dict(hill=0.9, max_block=95, primary="crumb-2016",
                     sources=[(4.9, "manual", "crumb-2016"),
                              (6.6, "automated", "kramer-2013"),
-                             (4.0, "manual", "li-2017")]),
+                             (4.0, "manual", "li-2017")],
+                    # Dofetilide is the prototypical TRAPPED hERG blocker (slow
+                    # off-rate; bound drug is trapped in the closed channel).
+                    # kon/koff set so IC50 = koff/kon ~= 5 nM (matches above).
+                    dynamic=dict(kon=1.0e-5, koff=5.0e-5, trapping=True,
+                                 citation="li-2017")),
     }),
     "bepridil": dict(category="high", unii="VWA7N2DT4P", eftpc=33.0, channels={
         "IKr": dict(hill=0.9, max_block=92, primary="crumb-2016",
@@ -193,9 +198,84 @@ DRUGS = {
         "IKr": dict(hill=1.0, max_block=85, primary="crumb-2016",
                     sources=[(250.0, "manual", "crumb-2016"),
                              (143.0, "automated", "kramer-2013"),
-                             (450.0, "manual", "li-2017")]),
+                             (450.0, "manual", "li-2017")],
+                    # Verapamil is a fast-off, NON-trapped hERG blocker; IC50 =
+                    # koff/kon ~= 262 nM (geomean above). Fast off-rate -> dynamic
+                    # block ~= static Hill block (no use-dependent accumulation).
+                    dynamic=dict(kon=1.91e-5, koff=5.0e-3, trapping=False,
+                                 citation="li-2017")),
         "ICaL": dict(ic50=202.0, hill=1.1, max_block=90, primary="crumb-2016"),  # balances hERG → low risk
         "INaL": dict(ic50=7000.0, hill=1.0, max_block=62, primary="crumb-2016"),
+    }),
+
+    # ======================================================================= #
+    # CiPA VALIDATION SET (16 compounds). Values are literature-derived from the
+    # CiPA-era datasets (Crumb 2016 / Li 2017, 2019) and ship unverified. EFTPC =
+    # free therapeutic Cmax. UNIIs are left null where not confirmed (honest).
+    # ======================================================================= #
+    # ----- HIGH risk (validation) -----
+    "azimilide": dict(category="high", cipa_set="validation", eftpc=70.0, channels={
+        "IKr": dict(ic50=1130.0, hill=0.9, max_block=85, primary="crumb-2016"),
+        "IKs": dict(ic50=2300.0, hill=1.0, max_block=70, primary="crumb-2016"),
+    }),
+    "disopyramide": dict(category="high", cipa_set="validation", eftpc=742.0, channels={
+        "IKr": dict(ic50=7240.0, hill=0.9, max_block=80, primary="crumb-2016"),
+        "INa": dict(ic50=16000.0, hill=1.0, max_block=70, primary="crumb-2016"),
+        "ICaL": dict(ic50=24000.0, hill=1.0, max_block=62, primary="crumb-2016"),
+    }),
+    "ibutilide": dict(category="high", cipa_set="validation", eftpc=0.5, channels={
+        "IKr": dict(ic50=14.0, hill=0.9, max_block=90, primary="crumb-2016"),
+    }),
+    "vandetanib": dict(category="high", cipa_set="validation", eftpc=256.0, channels={
+        "IKr": dict(ic50=400.0, hill=0.9, max_block=85, primary="kramer-2013"),
+    }),
+
+    # ----- INTERMEDIATE risk (validation) -----
+    "astemizole": dict(category="intermediate", cipa_set="validation", eftpc=0.3, channels={
+        "IKr": dict(ic50=0.9, hill=0.9, max_block=92, primary="kramer-2013"),
+        "ICaL": dict(ic50=2400.0, hill=1.0, max_block=65, primary="crumb-2016"),
+    }),
+    "clarithromycin": dict(category="intermediate", cipa_set="validation", eftpc=1206.0, channels={
+        "IKr": dict(ic50=32900.0, hill=0.9, max_block=70, primary="crumb-2016"),
+    }),
+    "clozapine": dict(category="intermediate", cipa_set="validation", eftpc=71.0, channels={
+        "IKr": dict(ic50=3200.0, hill=0.8, max_block=75, primary="crumb-2016"),
+        "INa": dict(ic50=9900.0, hill=1.0, max_block=62, primary="crumb-2016"),
+        "ICaL": dict(ic50=6900.0, hill=0.9, max_block=65, primary="crumb-2016"),
+    }),
+    "domperidone": dict(category="intermediate", cipa_set="validation", eftpc=19.0, channels={
+        "IKr": dict(ic50=57.0, hill=0.9, max_block=88, primary="kramer-2013"),
+    }),
+    "droperidol": dict(category="intermediate", cipa_set="validation", eftpc=6.3, channels={
+        "IKr": dict(ic50=60.0, hill=0.9, max_block=88, primary="kramer-2013"),
+    }),
+    "pimozide": dict(category="intermediate", cipa_set="validation", eftpc=0.43, channels={
+        "IKr": dict(ic50=18.0, hill=0.9, max_block=90, primary="kramer-2013"),
+        "ICaL": dict(ic50=45.0, hill=1.0, max_block=80, primary="crumb-2016"),
+    }),
+    "risperidone": dict(category="intermediate", cipa_set="validation", eftpc=1.8, channels={
+        "IKr": dict(ic50=298.0, hill=0.9, max_block=85, primary="kramer-2013"),
+    }),
+
+    # ----- LOW risk (validation) -----
+    "loratadine": dict(category="low", cipa_set="validation", eftpc=0.45, channels={
+        "IKr": dict(ic50=9200.0, hill=0.9, max_block=72, primary="crumb-2016"),
+        "ICaL": dict(ic50=28000.0, hill=1.0, max_block=60, primary="crumb-2016"),
+    }),
+    "metoprolol": dict(category="low", cipa_set="validation", eftpc=1800.0, channels={
+        "IKr": dict(ic50=28000.0, hill=0.9, max_block=62, primary="crumb-2016"),
+    }),
+    "nifedipine": dict(category="low", cipa_set="validation", eftpc=7.7, channels={
+        "IKr": dict(ic50=44000.0, hill=0.9, max_block=62, primary="crumb-2016"),
+        "ICaL": dict(ic50=60.0, hill=1.0, max_block=92, primary="crumb-2016"),  # strong CaL → protective
+    }),
+    "nitrendipine": dict(category="low", cipa_set="validation", eftpc=3.0, channels={
+        "IKr": dict(ic50=10000.0, hill=0.9, max_block=65, primary="crumb-2016"),
+        "ICaL": dict(ic50=100.0, hill=1.0, max_block=90, primary="crumb-2016"),  # strong CaL → protective
+    }),
+    "tamoxifen": dict(category="low", cipa_set="validation", eftpc=25.0, channels={
+        "IKr": dict(ic50=800.0, hill=0.9, max_block=80, primary="crumb-2016"),
+        "ICaL": dict(ic50=6800.0, hill=1.0, max_block=62, primary="crumb-2016"),
     }),
 }
 
@@ -281,6 +361,7 @@ def build_channel_block(drug, dmeta, channel, cmeta):
             action="propagate the full source distribution (Monte-Carlo), never a single value",
             citation="chang-2017"))
 
+    dyn = cmeta.get("dynamic")
     rec = {
         "id": f"channel_block.{drug}.{channel.lower()}",
         "kind": "channel_block",
@@ -289,7 +370,7 @@ def build_channel_block(drug, dmeta, channel, cmeta):
         "primary_citation": primary,
         "drug": {"name": drug, "unii": dmeta.get("unii"), "chembl": None},
         "channel": channel,
-        "block_model": "hill",
+        "block_model": "dynamic_binding" if dyn else "hill",
         "parameters": [
             {"symbol": "IC50", "label": "half-maximal inhibitory concentration",
              "value": {"central": central, "low": low, "high": high, "units": "nM"},
@@ -317,6 +398,11 @@ def build_channel_block(drug, dmeta, channel, cmeta):
                      "No source PDF has been confirmed inside Harmonia; review_status stays unverified per spec §9.",
         },
     }
+    if dyn:
+        rec["dynamic_binding"] = {
+            "kon": dyn["kon"], "koff": dyn["koff"], "trapping": dyn["trapping"],
+            "citation": dyn.get("citation", "li-2017"),
+        }
     if tier == "D":
         rec["notes"] = ("Max block observed < 60% — the IC50 is UNIDENTIFIABLE. The value stored "
                         "is an extrapolation kept only for provenance; it is excluded from point "
@@ -325,24 +411,26 @@ def build_channel_block(drug, dmeta, channel, cmeta):
 
 
 def build_drug_reference(drug, dmeta):
+    cipa_set = dmeta.get("cipa_set", "training")
+    cit = "li-2017" if cipa_set == "training" else "li-2019"
     return {
         "id": f"drug_reference.{drug}",
         "kind": "drug_reference",
         "subsystem": "drug_reference_sets",
         "tier": "B",
-        "primary_citation": "li-2017",
+        "primary_citation": cit,
         "drug": {"name": drug, "unii": dmeta.get("unii"), "chembl": None},
-        "cipa_set": "training",
+        "cipa_set": cipa_set,
         "expert_risk_label": dmeta["category"],
         "eftpc_nm": {"central": dmeta["eftpc"], "units": "nM", "kind": "free",
-                     "citation": "li-2017"},
+                     "citation": cit},
         "extraction": {
             "review_status": "unverified",
-            "method": "CiPA working-group training set + free Cmax (EFTPC) from CiPA references",
+            "method": f"CiPA working-group {cipa_set} set + free Cmax (EFTPC) from CiPA references",
             "verified_by": [],
-            "notes": "Expert risk label and EFTPC from the CiPA training-set literature; unverified.",
+            "notes": f"Expert risk label and EFTPC from the CiPA {cipa_set}-set literature; unverified.",
         },
-        "notes": "Expert consensus risk label is GROUND TRUTH for classifier calibration only — "
+        "notes": "Expert consensus risk label is GROUND TRUTH for classifier calibration/scoring only — "
                  "it is NOT a Harmonia output and NOT a clinical determination.",
     }
 
@@ -384,8 +472,9 @@ def build_ap_models():
         "model": {
             "name": "IKr-dynamic CiPAORd v1.0 — reduced reference variant",
             "lineage": "O'Hara-Rudy",
-            "formulation": "ORd re-optimized for CiPA; IKr re-scaled; dynamic hERG binding (Phase B). "
-                           "v0.1 kernel approximates it with a rescaled-IKr Hill variant.",
+            "formulation": "ORd re-optimized for CiPA; IKr re-scaled. Dynamic hERG binding "
+                           "(Langmuir kon/koff with trapping) is available at simulation time "
+                           "for drugs carrying dynamic_binding kinetics (assess(..., herg_dynamic=True)).",
             "currents": common_currents,
         },
         "model_parameters": [
@@ -394,10 +483,13 @@ def build_ap_models():
             {"symbol": "g_scale_INaL", "label": "INaL conductance scale", "value": 1.30, "units": "dimensionless"},
         ],
         "validation": {"training_set_reproduced": None, "validation_set_accuracy": None,
-                       "notes": "Dynamic-hERG binding is the Phase-B deliverable; the v0.1 kernel uses a "
-                                "rescaled-IKr Hill approximation labelled accordingly."},
-        "extraction": {"review_status": "unverified", "method": "reduced CiPAORd variant",
-                       "verified_by": [], "notes": "Dynamic binding pending Phase B."},
+                       "notes": "Default classification model. Reduced-kernel APD90 classifier recovers "
+                                "10/12 CiPA training labels and is weaker on the 16-drug validation set "
+                                "(~80% within-one-category); run `harmonia performance` for the live, honest "
+                                "confusion matrix. Not a qualified regulatory classifier (Tier C)."},
+        "extraction": {"review_status": "unverified", "method": "reduced CiPAORd variant with dynamic-hERG option",
+                       "verified_by": [], "notes": "Dynamic Langmuir hERG binding implemented (Phase B); "
+                       "full CiPA Markov hERG model + published optimized kinetics pending Phase C."},
     })
     models.append({
         "id": "ap_model.tor_ord",

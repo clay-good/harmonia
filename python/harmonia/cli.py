@@ -88,6 +88,17 @@ def cmd_flip(args) -> int:
     return 0
 
 
+def cmd_performance(args) -> int:
+    from .performance import score
+    ds = _load(args)
+    for cipa_set in (["training", "validation", "all"] if args.set == "report" else [args.set]):
+        rep = score(ds, ap_model=args.ap_model, cipa_set=cipa_set,
+                    herg_dynamic=args.dynamic, exposure_multiple=args.exposure_multiple)
+        print(rep.summary())
+        print()
+    return 0
+
+
 def cmd_export(args) -> int:
     from .export import registry, combine
     ds = _load(args)
@@ -150,6 +161,15 @@ def build_parser() -> argparse.ArgumentParser:
     f.add_argument("--mc", type=int, default=200)
     f.add_argument("--seed", type=int, default=0)
     f.set_defaults(func=cmd_flip)
+
+    pf = sub.add_parser("performance", help="score the kernel's classification vs CiPA expert labels")
+    pf.add_argument("--ap-model", default="cipaordv1.0", dest="ap_model")
+    pf.add_argument("--set", default="report",
+                    choices=["training", "validation", "all", "report"],
+                    help="'report' prints training, validation, and all")
+    pf.add_argument("--dynamic", action="store_true", help="use dynamic hERG binding where available")
+    pf.add_argument("--exposure-multiple", type=float, default=4.0, dest="exposure_multiple")
+    pf.set_defaults(func=cmd_performance)
 
     e = sub.add_parser("export", help="generate export artifacts")
     e.add_argument("--format", choices=["cellml", "myokit", "sbml", "sedml", "cipa",

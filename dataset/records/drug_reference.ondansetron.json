@@ -23,5 +23,5 @@
     "verified_by": [],
     "notes": "Expert risk label and EFTPC from the CiPA training-set literature; unverified."
   },
-  "notes": "Expert consensus risk label is GROUND TRUTH for classifier calibration only — it is NOT a Harmonia output and NOT a clinical determination."
+  "notes": "Expert consensus risk label is GROUND TRUTH for classifier calibration/scoring only — it is NOT a Harmonia output and NOT a clinical determination."
 }

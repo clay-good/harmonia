@@ -119,6 +119,8 @@ def _cited_keys(rec: dict) -> List[str]:
             keys.append(f["citation"])
     if rec.get("eftpc_nm", {}).get("citation"):
         keys.append(rec["eftpc_nm"]["citation"])
+    if rec.get("dynamic_binding", {}).get("citation"):
+        keys.append(rec["dynamic_binding"]["citation"])
     return keys
 
 

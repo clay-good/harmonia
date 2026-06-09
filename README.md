@@ -66,6 +66,7 @@ harmonia validate            # JSON-Schema- + semantically validate the dataset
 harmonia info                # counts by subsystem / tier / review status
 harmonia simulate dofetilide --mc 200
 harmonia flip verapamil      # classification stability across AP-model variants
+harmonia performance         # score the kernel vs CiPA expert labels (train/val/all)
 harmonia export --all --output exports/
 ```
 
@@ -89,21 +90,26 @@ res.tier, res.warnings, res.excluded_channels # propagated tier + unidentifiable
 cmp = harmonia.flip_view(ds, "verapamil", ap_models=["ord", "cipaordv1.0", "tor_ord"])
 cmp.flip_by_model                             # {'ord': 'low', 'cipaordv1.0': 'intermediate', ...}
 cmp.stable_across_models                      # False
+
+# Dynamic (CiPA-style) hERG binding with trapping, where kinetics are recorded
+res = harmonia.assess(ds, "dofetilide", herg_dynamic=True)   # trapped blocker -> extra prolongation
 ```
 
 ---
 
-## What's in the box (Phase A)
+## What's in the box (Phases A + B)
 
 | Layer | Status |
 | --- | --- |
-| **Dataset** — 41 channel-block records (12 CiPA training drugs × the channels each blocks), 12 drug-reference records (expert risk label + free Cmax), 3 AP-model records, 10 Crossref-checked citations | ✅ |
+| **Dataset** — 68 channel-block records across the **28 CiPA compounds** (12 training + 16 validation), 28 drug-reference records (expert risk label + free Cmax), 3 AP-model records, 10 Crossref-checked citations | ✅ |
 | **Variability is first-class** — multi-source IC50s with computed fold-range / IQR; the reliability gate (max block < 60% ⇒ Tier D, unidentifiable) machine-enforced | ✅ |
 | **Reference kernel** — a SciPy reduced O'Hara-Rudy-lineage ventricular AP with Hill block per current; APD90 / qNet / triangulation / EAD biomarkers | ✅ |
+| **Dynamic hERG binding** (Phase B) — Langmuir kon/koff with **trapping**; reduces to the static Hill block at steady state, captures use-dependent block (`assess(..., herg_dynamic=True)`) | ✅ |
 | **Risk distribution + flip frequency** — Monte-Carlo over source variability; classification-flip frequency; worst-tier propagation | ✅ |
+| **Recorded classification performance** (Phase B) — `harmonia performance` scores the kernel vs CiPA expert labels on training / validation / all, with the full confusion matrix | ✅ |
 | **Exports** — CellML 2.0, Myokit `.mmt`, SBML L3v2, SED-ML, CiPA inputs (CSV/JSON), CSV, BibTeX, COMBINE `.omex` — all carrying `clinicalUse = PROHIBITED`, tier, and DOI RDF | ✅ |
 | **CLI · Streamlit dashboard · CI** | ✅ |
-| Dynamic-hERG CiPAORd v1.0, 16 validation drugs, ToR-ORd reformulation, exposure (Hypnos) coupling, populations | Phase B–F (roadmap below) |
+| Full CiPA Markov hERG + published optimized kinetics, ToR-ORd reformulation, pump/exchanger qNet, exposure (Hypnos) coupling, populations | Phase C–F (roadmap below) |
 
 ---
 
@@ -118,8 +124,9 @@ flowchart TD
     DS -->|"build_records.py (provenance log)"| REC["records/*.json"]
     REC --> LOAD["harmonia.load → Dataset"]
     LOAD --> VAL["validate.py<br/>schema + reliability-gate + citation rules"]
-    LOAD --> SIM["simulate.py<br/>Monte-Carlo variability → risk distribution + flip freq"]
+    LOAD --> SIM["simulate.py<br/>Monte-Carlo variability → risk distribution + flip freq<br/>+ dynamic hERG binding"]
     LOAD --> EXP["harmonia.export<br/>format builders"]
+    SIM --> PERF["performance.py<br/>score vs CiPA expert labels"]
     SIM --> REF["reference.py<br/>SciPy ORd-lineage AP kernel + risk metrics"]
     EXP --> SPEC["model_spec.py<br/>one AST → Myokit / CellML / SBML"]
     SPEC --> CELLML["CellML 2.0"]
@@ -196,7 +203,7 @@ The two load-bearing fields:
 > They are orthogonal. Every v0.1 record ships **`unverified`** — the values are
 > literature-derived but no PDF has been confirmed inside Harmonia. *LLMs assist
 > extraction but never promote to verified.* `harmonia info` reports the verified
-> count honestly (currently 0/56). Promoting records by reading the source is the
+> count honestly (currently 0/99). Promoting records by reading the source is the
 > single highest-leverage contribution — see [CONTRIBUTING](CONTRIBUTING.md).
 
 ---
@@ -219,21 +226,47 @@ It is **not** bit-exact to the published ORd CellML, so AP-model records ship at
   over the paced cycle, so its qNet is dominated by the fast-Na upstroke and is
   structurally insensitive to repolarization-current block — a qNet that
   discriminates risk needs the pump/exchanger currents of the full ORd (Phase
-  B/C). qNet is still computed and exported, flagged as not-for-classification.
+  C). qNet is still computed and exported, flagged as not-for-classification.
 - **The classifier is a methodology demonstrator, not a qualified classifier.**
-  Calibrated on the 12 CiPA training drugs (thresholds: low < 16%, high ≥ 33%),
-  the reduced kernel recovers **10/12** expert labels:
+  Calibrated on the 12 CiPA training drugs under the default model (thresholds:
+  low < 17%, high ≥ 35%), the reduced kernel recovers **10/12** expert labels:
 
 ![CiPA training set](docs/img/training_set.png)
 
 The two misses are **sotalol** (very weak hERG block but high exposure — its risk
 only emerges well above 4× EFTPC) and **chlorpromazine** (borderline) — the kind
-of case that motivated CiPA to replace APD with qNet. The durable contribution is
-the **flip-frequency-under-variability machinery**, which is correct regardless
-of the absolute classifier accuracy. Note the kernel correctly captures the
-*protective* multichannel mechanism: **diltiazem and verapamil's ICaL block
-shortens the AP** (diltiazem is the one bar left of zero), via an L-type window
-current in the kernel.
+of case that motivated CiPA to replace APD with qNet. The kernel correctly
+captures the *protective* multichannel mechanism: **diltiazem and verapamil's ICaL
+block shortens the AP** (diltiazem is the bar left of zero), via an L-type window
+current.
+
+### Recorded classification performance (Phase B)
+
+`harmonia performance` scores the kernel against the CiPA expert labels and prints
+the full confusion matrix. On the 16-compound **validation** set the reduced
+kernel is honestly weaker — exact 3-way accuracy ≈ 6/16, but ≈ 81%
+*within-one-category*:
+
+![CiPA validation set](docs/img/validation_set.png)
+
+Most validation misses are high/intermediate drugs with very low free Cmax
+(ibutilide, azimilide, the antipsychotics), where block at 4× EFTPC is sub-IC50
+and an APD surrogate underreads them — exactly the regime where the full CiPA
+qNet model is needed. The low-risk dihydropyridines (nifedipine, nitrendipine) are
+correctly protective via ICaL block. The durable contribution is the
+**flip-frequency-under-variability machinery**, correct regardless of absolute
+accuracy.
+
+### Dynamic hERG binding (Phase B)
+
+hERG records can carry **dynamic binding kinetics** (`kon`, `koff`, `trapping`).
+With `assess(..., herg_dynamic=True)` the kernel integrates a Langmuir binding ODE
+instead of applying a static Hill factor. It reduces to the static block at steady
+state (verified in tests) but captures **use-dependent trapping**: dofetilide, the
+prototypical trapped blocker, accumulates more block over successive beats and
+prolongs the AP further than the static estimate.
+
+![Dynamic hERG binding with trapping](docs/img/dynamic_binding.png)
 
 Figures regenerate from the dataset with `python docs/make_figures.py`.
 
@@ -288,7 +321,8 @@ harmonia/
 │   └── tools/build_records.py   # provenance log: the curated table → records (CI checks reproducibility)
 ├── python/harmonia/
 │   ├── load.py · validate.py · filter.py · records.py
-│   ├── simulate.py              # Monte-Carlo variability → risk distribution + flip view
+│   ├── simulate.py              # Monte-Carlo variability → risk distribution + flip view; dynamic hERG
+│   ├── performance.py           # score the kernel vs CiPA expert labels (confusion matrix)
 │   ├── cli.py
 │   └── export/
 │       ├── reference.py         # SciPy ORd-lineage AP kernel + risk metrics (the oracle)
@@ -296,7 +330,7 @@ harmonia/
 │       ├── cellml.py · myokit.py · sbml.py · sedml.py · cipa_inputs.py
 │       ├── csv_bibtex.py · annotate.py · combine.py · registry.py
 ├── dashboard/app.py             # Streamlit: browse + risk-uncertainty (flip) view
-├── tests/                       # 41 tests: dataset, kernel, simulate, exports, CLI
+├── tests/                       # 49 tests: dataset, kernel, simulate, dynamic binding, performance, exports, CLI
 ├── docs/                        # essay, figures, make_figures.py
 └── exports/                     # sample generated artifacts (regenerated in CI)
 ```
@@ -327,9 +361,9 @@ feature does not get built.
 
 | Phase | Content | Status |
 | --- | --- | --- |
-| **A — CiPA spine** | Channel block + ORd kernel + risk metric for the 12 training drugs, end to end, with exports, validation, and the flip view | ✅ **this release** |
-| **B — Dynamic hERG + validation** | IKr-dynamic CiPAORd v1.0 with binding kinetics; the 16 validation drugs; recorded classification performance | ◻ |
-| **C — Variability layer** | Broader multi-source aggregation; ToR-ORd reformulation; pump/exchanger currents → a discriminating qNet; SED-ML + COMBINE depth | ◻ |
+| **A — CiPA spine** | Channel block + ORd kernel + risk metric for the 12 training drugs, end to end, with exports, validation, and the flip view | ✅ |
+| **B — Dynamic hERG + validation** | Dynamic (Langmuir + trapping) hERG binding; the 16 validation drugs (28 CiPA compounds total); recorded classification performance | ✅ **this release** |
+| **C — Variability layer** | Full CiPA Markov hERG + published optimized kinetics; broader multi-source aggregation; ToR-ORd reformulation; pump/exchanger currents → a discriminating qNet; SED-ML + COMBINE depth | ◻ |
 | **D — Exposure layer** | Free plasma conc + protein binding (composable with Hypnos); drug combinations | ◻ |
 | **E — Populations** | Population-of-models / disease backgrounds, shipped non-predictive | ◻ |
 | **F — Hardening** | CellML unit conformance + OpenCOR cross-check; Zenodo DOI; perf | ◻ |

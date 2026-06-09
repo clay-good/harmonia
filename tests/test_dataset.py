@@ -15,9 +15,15 @@ def test_validation_passes():
     assert report.ok, "\n".join(report.errors)
 
 
-def test_twelve_training_drugs(ds):
-    assert len(ds.drugs()) == 12
+def test_cipa_compound_sets(ds):
+    assert len(ds.drugs()) == 28  # 12 training + 16 validation
+    training = [r for r in ds.drug_references if r.cipa_set == "training"]
+    validation = [r for r in ds.drug_references if r.cipa_set == "validation"]
+    assert len(training) == 12
+    assert len(validation) == 16
     for d in ["dofetilide", "verapamil", "sotalol", "ranolazine"]:
+        assert d in ds.drugs()
+    for d in ["azimilide", "astemizole", "nifedipine", "ibutilide"]:  # validation
         assert d in ds.drugs()
 
 

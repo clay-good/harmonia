@@ -15,7 +15,7 @@ def test_info(capsys):
     assert main(["info"]) == 0
     out = capsys.readouterr().out
     assert "VERIFIED: 0/" in out
-    assert "drugs (12)" in out
+    assert "drugs (28)" in out
 
 
 def test_simulate(capsys):
@@ -26,6 +26,11 @@ def test_simulate(capsys):
 def test_flip(capsys):
     assert main(["flip", "verapamil", "--mc", "12"]) == 0
     assert "flip-view" in capsys.readouterr().out
+
+
+def test_performance(capsys):
+    assert main(["performance", "--set", "training"]) == 0
+    assert "accuracy" in capsys.readouterr().out
 
 
 def test_export_cipa_stdout(capsys):

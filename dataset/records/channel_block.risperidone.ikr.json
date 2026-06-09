@@ -1,0 +1,72 @@
+{
+  "id": "channel_block.risperidone.ikr",
+  "kind": "channel_block",
+  "subsystem": "channel_block",
+  "tier": "B",
+  "primary_citation": "kramer-2013",
+  "drug": {
+    "name": "risperidone",
+    "unii": null,
+    "chembl": null
+  },
+  "channel": "IKr",
+  "block_model": "hill",
+  "parameters": [
+    {
+      "symbol": "IC50",
+      "label": "half-maximal inhibitory concentration",
+      "value": {
+        "central": 298.0,
+        "low": 298.0,
+        "high": 298.0,
+        "units": "nM"
+      },
+      "tier": "B",
+      "primary_citation": "kramer-2013"
+    },
+    {
+      "symbol": "h",
+      "label": "Hill coefficient",
+      "value": {
+        "central": 0.9,
+        "low": null,
+        "high": null,
+        "units": "dimensionless"
+      },
+      "tier": "B",
+      "primary_citation": "kramer-2013"
+    }
+  ],
+  "assay_context": {
+    "platform": "manual_patch_clamp",
+    "temperature_c": 37,
+    "expression_system": "HEK293 / CHO (heterologous)",
+    "max_block_observed_percent": 85,
+    "holding_protocol": "depolarizing step protocol per source assay"
+  },
+  "source_values": [
+    {
+      "ic50_nm": 298.0,
+      "platform": "manual",
+      "citation": "kramer-2013",
+      "hill": 0.9,
+      "temperature_c": 37
+    }
+  ],
+  "variability": {
+    "fold_range": 1.0,
+    "n_sources": 1,
+    "iqr_nm": [
+      298.0,
+      298.0
+    ],
+    "geomean_nm": 298.0
+  },
+  "known_failure_modes": [],
+  "extraction": {
+    "review_status": "unverified",
+    "method": "literature table transcribed by maintainer; values from CiPA-era patch-clamp datasets",
+    "verified_by": [],
+    "notes": "Values are literature-derived (see primary_citation / source_values). No source PDF has been confirmed inside Harmonia; review_status stays unverified per spec §9."
+  }
+}
