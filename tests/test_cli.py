@@ -28,6 +28,13 @@ def test_flip(capsys):
     assert "flip-view" in capsys.readouterr().out
 
 
+def test_sensitivity(capsys):
+    assert main(["sensitivity", "dofetilide", "--mc", "8"]) == 0
+    out = capsys.readouterr().out
+    assert "flip-sensitivity" in out
+    assert "dominant uncertainty driver" in out
+
+
 def test_combo(capsys):
     assert main(["combo", "terfenadine", "ondansetron", "--mc", "12"]) == 0
     out = capsys.readouterr().out

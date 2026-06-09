@@ -67,6 +67,7 @@ harmonia validate            # JSON-Schema- + semantically validate the dataset
 harmonia info                # counts by subsystem / tier / review status
 harmonia simulate dofetilide --mc 200          # qNet metric (default); --metric apd90 to switch
 harmonia flip verapamil      # classification stability across AP-model variants
+harmonia sensitivity verapamil                 # which channel's IC50 spread drives the flip
 harmonia combo terfenadine ondansetron         # drug-combination (polypharmacy) assessment
 harmonia population sotalol  # population-of-models spread (HYPOTHESIS-TIER, not for prediction)
 harmonia performance         # score qNet vs CiPA expert labels (train/val/all); --metric apd90
@@ -94,6 +95,11 @@ harmonia.assess(ds, "dofetilide", metric="apd90")   # the classic QT/APD surroga
 cmp = harmonia.flip_view(ds, "verapamil", ap_models=["ord", "cipaordv1.0", "tor_ord"])
 cmp.flip_by_model                             # {'ord': 'low', 'cipaordv1.0': 'intermediate', ...}
 cmp.stable_across_models                      # False
+
+# Which input drives the flip? — per-channel uncertainty attribution
+sens = harmonia.flip_sensitivity(ds, "verapamil")
+sens.dominant_channel                         # 'ICaL' — the IC50 to pin down first
+sens.channels[0].solo_flip_frequency          # flip freq when ONLY ICaL's IC50 varies
 
 # Dynamic (CiPA-style) hERG binding with trapping, where kinetics are recorded
 res = harmonia.assess(ds, "dofetilide", herg_dynamic=True)   # trapped blocker -> extra prolongation
@@ -129,6 +135,7 @@ pop.tier                                      # "D"  (always; non-predictive)
 | **Drug combinations** (Phase D) — `assess_combination` propagates *joint* IC50 variability; independent block multiplies per channel; reports the interaction and how often the combined class flips | ✅ |
 | **Population-of-models** (Phase E) — `assess_population` samples a population of virtual myocytes (per-conductance variability) to spread a drug's risk across individuals. **Hypothesis-tier, Tier D, NOT FOR PREDICTION** | ✅ |
 | **Risk distribution + flip frequency** — Monte-Carlo over source variability; classification-flip frequency; worst-tier propagation | ✅ |
+| **Flip sensitivity** — `flip_sensitivity` attributes the flip to each channel's IC50 spread (solo / frozen effects), surfacing the dominant uncertain input to pin down first | ✅ |
 | **Recorded classification performance** (Phase B) — `harmonia performance` scores either metric vs CiPA expert labels on training / validation / all, with the full confusion matrix | ✅ |
 | **Exports** — CellML 2.0, Myokit `.mmt`, SBML L3v2, SED-ML, CiPA inputs (CSV/JSON), CSV, BibTeX, COMBINE `.omex` — all carrying `clinicalUse = PROHIBITED`, tier, and DOI RDF | ✅ |
 | **CLI · Streamlit dashboard · CI** | ✅ |
@@ -148,7 +155,7 @@ flowchart TD
     DS -->|"build_records.py (provenance log)"| REC["records/*.json"]
     REC --> LOAD["harmonia.load → Dataset"]
     LOAD --> VAL["validate.py<br/>schema + reliability-gate + citation rules"]
-    LOAD --> SIM["simulate.py<br/>Monte-Carlo variability → risk distribution + flip freq<br/>dynamic hERG · exposure scaling · drug combinations<br/>populations.py: population-of-models (Tier D)"]
+    LOAD --> SIM["simulate.py<br/>Monte-Carlo variability → risk distribution + flip freq<br/>flip sensitivity (per-channel attribution)<br/>dynamic hERG · exposure scaling · drug combinations<br/>populations.py: population-of-models (Tier D)"]
     LOAD --> EXP["harmonia.export<br/>format builders"]
     SIM --> PERF["performance.py<br/>score vs CiPA expert labels"]
     SIM --> REF["reference.py<br/>SciPy ORd-lineage AP kernel (+ INaCa)<br/>qNet (default) / APD90 / EAD biomarkers"]
@@ -351,6 +358,34 @@ is capped at **Tier D** and stamped **NOT FOR PREDICTION**. It is a
 hypothesis-generating methodology view, never a per-patient or population safety
 claim. Experimentally-calibrated populations are deferred to a later phase.
 
+### Which input drives the flip? (sensitivity attribution)
+
+The flip frequency says *whether* a safety call is unstable; the obvious next
+question is *which* channel's IC50 uncertainty drives it — i.e. which lab
+measurement, if pinned down, would most stabilize the call. `flip_sensitivity`
+answers it by re-running the Monte-Carlo with **one channel varying at a time**
+(main effect, "solo-flip") and with **one channel frozen while the rest vary**
+(total effect, "frozen-flip"), using common random numbers so the scenarios are
+comparable.
+
+For **verapamil** (point class LOW, but ~35% flip), the dominant driver is its
+**ICaL** block:
+
+```
+  channel   sources  fold   solo-flip  frozen-flip
+  ICaL         1*    1.0       38%         30%
+  IKr          3     3.1       33%         35%
+  INaL         1*    1.0        0%         37%
+dominant uncertainty driver: ICaL — pin this IC50 down first
+```
+
+The insight is sharper than the flip frequency alone: ICaL drives the call yet is
+**single-source** (`*`), so its spread is a prior, not a measurement — the honest
+recommendation is to characterize verapamil's ICaL block across more labs before
+trusting the call. This is the load-bearing thesis (input variability governs the
+safety call) made *actionable*, and like every Harmonia output it is an
+uncertainty attribution, never a verdict.
+
 Figures regenerate from the dataset with `python docs/make_figures.py`, and the
 headline analysis is reproduced (and asserted) in the executable notebook
 [`notebooks/01_flip_frequency.ipynb`](notebooks/01_flip_frequency.ipynb), run in
@@ -394,7 +429,7 @@ run in CI).
 ## Validation & testing
 
 Everything downstream of the dataset is a deterministic projection, so the test
-suite (106 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
+suite (112 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 *provable non-drift* rather than fixtures:
 
 | Guard | What it proves | Where |
@@ -460,7 +495,7 @@ harmonia/
 │       ├── csv_bibtex.py · annotate.py · combine.py · registry.py
 ├── dashboard/app.py             # Streamlit: browse + risk-uncertainty (flip) view
 ├── notebooks/                   # executable analyses, run in CI under nbmake
-├── tests/                       # 106 tests: dataset, kernel, qNet, simulate, dynamic binding, exposure, combinations, populations, performance, exports (round trips + unit conformance + SED-ML/OMEX integrity), CLI, dashboard contract
+├── tests/                       # 112 tests: dataset, kernel, qNet, simulate, dynamic binding, exposure, combinations, populations, performance, exports (round trips + unit conformance + SED-ML/OMEX integrity), CLI, dashboard contract
 ├── docs/                        # essay, figures, make_figures.py
 ├── CHANGELOG.md · .zenodo.json  # release metadata
 └── exports/                     # sample generated artifacts (regenerated in CI)

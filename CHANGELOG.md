@@ -6,6 +6,19 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — flip-sensitivity attribution (new analysis)
+- **`harmonia.flip_sensitivity`** (+ `harmonia sensitivity <drug>` CLI and a
+  dashboard panel) attributes the classification-flip frequency to each channel's
+  IC50 spread: a "solo-flip" main effect (only that channel varies) and a
+  "frozen-flip" total effect (that channel pinned, others vary), using common
+  random numbers across scenarios. It surfaces the **dominant uncertain input** —
+  the IC50 to pin down first to stabilize the safety call — and honestly flags
+  single-source channels whose sensitivity is prior-driven rather than measured.
+  This operationalizes the project's thesis (input variability governs the call)
+  one step further: from *whether* the call is unstable to *which input* drives
+  it. Still an uncertainty attribution, never a verdict. Tested (incl. a
+  dashboard-contract assertion and a CLI smoke test).
+
 ### Added — lint gate (housekeeping)
 - **Ruff** is now a CI gate (`ruff check .`, config in `pyproject.toml`; added to
   the `dev` extra). Selects Pyflakes + pycodestyle (E/F/W); does not enforce hard

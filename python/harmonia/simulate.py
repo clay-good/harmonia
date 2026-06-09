@@ -550,6 +550,162 @@ def flip_view(ds: Dataset, drug: str,
                     per_model=per_model, excluded=excluded)
 
 
+@dataclass
+class ChannelSensitivity:
+    """How much one channel's IC50 *uncertainty* drives the classification flip."""
+    channel: str
+    n_sources: int
+    single_source: bool
+    fold_range: Optional[float]
+    sigma_log10: float
+    solo_flip_frequency: float    # only THIS channel's IC50 varies (others at geomean)
+    frozen_flip_frequency: float  # this channel pinned at geomean (all others vary)
+
+
+@dataclass
+class FlipSensitivity:
+    """Attribution of the classification-flip frequency to individual channels.
+
+    The flip view says *whether* the high/intermediate/low call is unstable under
+    input variability; this says *which* channel's IC50 spread drives it — i.e.
+    which lab measurement, if pinned down, would most stabilise the call. It is an
+    analysis of the data's uncertainty, never a safety verdict.
+
+    - ``solo_flip_frequency`` (main effect): how often the call flips when ONLY
+      this channel's IC50 varies and every other channel is held at its geomean.
+      The largest is the dominant driver.
+    - ``frozen_flip_frequency`` (total effect): how often it flips when this
+      channel is pinned at its geomean while all others vary. Much lower than
+      ``all_vary_flip_frequency`` ⇒ pinning this channel stabilises the call.
+    """
+    drug: str
+    ap_model: str
+    metric: str
+    classification: str
+    all_vary_flip_frequency: float
+    n_mc: int
+    channels: List[ChannelSensitivity]   # sorted by solo_flip_frequency, descending
+    tier: str
+    warnings: List[str] = field(default_factory=list)
+    excluded_channels: List[str] = field(default_factory=list)
+    clinical_use: str = ("PROHIBITED — research / safety-methodology / education only; "
+                         "not a regulatory determination")
+
+    @property
+    def dominant_channel(self) -> Optional[str]:
+        return self.channels[0].channel if self.channels else None
+
+    def summary(self) -> str:
+        lines = [
+            f"flip-sensitivity  drug={self.drug}  ap_model={self.ap_model}  "
+            f"tier={self.tier}",
+            f"point class: {self.classification.upper()}   "
+            f"all-vary flip frequency: {self.all_vary_flip_frequency:.0%} "
+            f"({self.n_mc} MC draws)",
+            "  channel   sources  fold   solo-flip  frozen-flip",
+        ]
+        for c in self.channels:
+            fr = f"{c.fold_range:.1f}" if c.fold_range else "  - "
+            lines.append(f"  {c.channel:<8} {c.n_sources:>5}{'*' if c.single_source else ' '}  "
+                         f"{fr:>5}  {c.solo_flip_frequency:>8.0%}  {c.frozen_flip_frequency:>10.0%}")
+        if self.dominant_channel:
+            lines.append(f"dominant uncertainty driver: {self.dominant_channel} "
+                         "(largest solo-flip) — pin this IC50 down first")
+        if self.excluded_channels:
+            lines.append(f"EXCLUDED (unidentifiable IC50): {', '.join(self.excluded_channels)}")
+        for w in self.warnings:
+            lines.append(f"  warn: {w}")
+        lines.append("NOTE: an uncertainty attribution, not a safety verdict. "
+                     + self.clinical_use)
+        return "\n".join(lines)
+
+
+def flip_sensitivity(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
+                     metric: str = DEFAULT_METRIC, n_mc: int = 200, seed: int = 0,
+                     exposure_nM: Optional[float] = None, exposure_kind: str = "free",
+                     exposure_multiple: float = REFERENCE_EXPOSURE_MULTIPLE,
+                     n_beats: int = 3) -> FlipSensitivity:
+    """Attribute the classification-flip frequency to each channel's IC50 spread.
+
+    For every identifiable channel it runs two Monte-Carlo scenarios — "only this
+    channel varies" (main effect) and "this channel frozen, others vary" (total
+    effect) — using common random numbers across scenarios so the comparison is
+    apples-to-apples. See :class:`FlipSensitivity`.
+    """
+    drug_l = drug.lower()
+    blocks = [b for b in ds.blocks_for(drug_l) if isinstance(b, ChannelBlock)]
+    if not blocks:
+        raise KeyError(f"no channel-block records for drug '{drug}'")
+    if metric not in ("qnet", "apd90"):
+        raise ValueError(f"metric must be 'qnet' or 'apd90', got {metric!r}")
+
+    ref = ds.drug_reference(drug_l)
+    reference_exposure = resolve_free_exposure(
+        ref, exposure_nM=exposure_nM, exposure_kind=exposure_kind,
+        exposure_multiple=exposure_multiple)
+    ap_rec = _resolve_ap_model(ds, ap_model)
+    scales = ap_rec.conductance_scales
+    baseline = _cached_baseline_apd90(tuple(sorted(scales.items())), n_beats)
+
+    excluded, warnings, tiers = [], [], [ap_rec.tier]
+    for b in blocks:
+        tiers.append(b.tier)
+        if not b.identifiable:
+            mb = b.assay_context.max_block_observed_percent
+            excluded.append(f"{b.channel} (max block {mb:g}%)")
+    tier = _worst_tier(tiers)
+
+    draws = _channel_draws(blocks)
+    hill_by = {d.channel: d.hill for d in draws}
+    fold_by = {b.channel: b.variability.fold_range for b in blocks}
+    ic50_geomean = {d.channel: 10 ** d.mu_log10 for d in draws}
+    all_channels = {d.channel for d in draws}
+
+    def _classify(ic50_by: Dict[str, float]) -> str:
+        bf = _block_factors(ic50_by, hill_by, reference_exposure)
+        p = KernelParams().with_scales(scales)
+        p.block.update(bf)
+        r = simulate_beats(p, n_beats=n_beats)
+        dapd = 100.0 * (r.apd90 - baseline) / baseline if baseline else float("nan")
+        return classify_metric(metric, dapd, r.qnet)
+
+    point_class = _classify(ic50_geomean)
+
+    def _flip_freq(vary: set) -> float:
+        if not n_mc:
+            return 0.0
+        rng = np.random.default_rng(seed)
+        flips = 0
+        for _ in range(n_mc):
+            # draw for ALL channels every iteration (common random numbers), then
+            # keep the draw only for varying channels; others stay at geomean.
+            sampled = {d.channel: 10 ** rng.normal(d.mu_log10, d.sigma_log10) for d in draws}
+            ic50_s = {ch: (sampled[ch] if ch in vary else ic50_geomean[ch])
+                      for ch in all_channels}
+            if _classify(ic50_s) != point_class:
+                flips += 1
+        return flips / n_mc
+
+    all_vary = _flip_freq(all_channels)
+    chans: List[ChannelSensitivity] = []
+    for d in draws:
+        chans.append(ChannelSensitivity(
+            channel=d.channel, n_sources=d.n_sources, single_source=d.single_source,
+            fold_range=fold_by.get(d.channel), sigma_log10=d.sigma_log10,
+            solo_flip_frequency=_flip_freq({d.channel}),
+            frozen_flip_frequency=_flip_freq(all_channels - {d.channel})))
+    chans.sort(key=lambda c: c.solo_flip_frequency, reverse=True)
+
+    if any(c.single_source for c in chans):
+        warnings.append("single-source channels use a default log10 SD prior "
+                        f"({DEFAULT_SINGLE_SOURCE_SIGMA}); their sensitivity is prior-driven, "
+                        "not measured")
+    return FlipSensitivity(
+        drug=drug_l, ap_model=ap_rec.id, metric=metric, classification=point_class,
+        all_vary_flip_frequency=all_vary, n_mc=n_mc, channels=chans, tier=tier,
+        warnings=warnings, excluded_channels=excluded)
+
+
 def dose_response(ds: Dataset, drug: str, concentrations_nM: Sequence[float],
                   ap_model: str = "cipaordv1.0", n_beats: int = 3) -> Dict[str, np.ndarray]:
     """APD90 / qNet vs concentration, using geomean IC50 per identifiable channel.

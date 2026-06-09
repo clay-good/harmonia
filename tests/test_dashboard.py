@@ -15,7 +15,8 @@ import pathlib
 
 import numpy as np
 
-from harmonia.simulate import (assess, flip_view, dose_response, assess_combination,
+from harmonia.simulate import (assess, flip_view, flip_sensitivity, dose_response,
+                               assess_combination,
                                THRESH_LOW_PCT, THRESH_HIGH_PCT, RISK_LABELS,
                                QNET_THRESH_LOW, QNET_THRESH_HIGH)
 
@@ -60,6 +61,13 @@ def test_flip_tab_contract(ds):
     concs = np.geomspace(eftpc * 0.1, eftpc * 30, 4)
     dr = dose_response(ds, "verapamil", concs, ap_model="cipaordv1.0")
     assert dr["concentration_nM"].shape == dr["apd90"].shape == concs.shape
+
+    # the per-channel sensitivity panel
+    sens = flip_sensitivity(ds, "verapamil", ap_model="cipaordv1.0", metric="qnet", n_mc=4)
+    for c in sens.channels:
+        c.channel, c.n_sources, c.single_source, c.fold_range
+        c.solo_flip_frequency, c.frozen_flip_frequency
+    sens.dominant_channel
 
 
 def test_combination_tab_contract(ds):

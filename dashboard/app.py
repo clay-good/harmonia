@@ -13,7 +13,7 @@ import numpy as np
 import streamlit as st
 
 import harmonia
-from harmonia.simulate import (assess, flip_view, dose_response,
+from harmonia.simulate import (assess, flip_view, flip_sensitivity, dose_response,
                                THRESH_LOW_PCT, THRESH_HIGH_PCT, RISK_LABELS,
                                QNET_THRESH_LOW, QNET_THRESH_HIGH)
 
@@ -106,6 +106,25 @@ with tab_flip:
     st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
     st.info("Stable across model variants: " + ("YES" if fv.stable_across_models else
             "**NO** — the classification depends on which AP-model variant you trust."))
+
+    st.subheader("Which input drives the flip? (per-channel sensitivity)")
+    st.caption("Solo-flip = how often the call flips when ONLY that channel's IC50 "
+               "varies (others held at geomean) — the dominant driver is the IC50 "
+               "worth pinning down first. `*` marks single-source (prior-driven) channels.")
+    sens = flip_sensitivity(ds, drug, ap_model=ap_model, metric=metric,
+                            n_mc=min(mc, 80), seed=0)
+    if sens.channels:
+        srows = [{"channel": c.channel,
+                  "sources": f"{c.n_sources}{'*' if c.single_source else ''}",
+                  "fold range": c.fold_range,
+                  "solo-flip": c.solo_flip_frequency,
+                  "frozen-flip": c.frozen_flip_frequency} for c in sens.channels]
+        st.dataframe(pd.DataFrame(srows), hide_index=True, use_container_width=True)
+        st.bar_chart(pd.DataFrame({"solo-flip frequency": [c.solo_flip_frequency for c in sens.channels]},
+                                  index=[c.channel for c in sens.channels]))
+        if sens.dominant_channel:
+            st.info(f"Dominant uncertainty driver: **{sens.dominant_channel}** — "
+                    "pinning this IC50 down would most stabilize the classification.")
 
     st.subheader("Dose–response (APD90 vs concentration, geomean IC50)")
     eftpc = ds.drug_reference(drug).eftpc_nm

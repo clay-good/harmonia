@@ -93,6 +93,16 @@ def cmd_flip(args) -> int:
     return 0
 
 
+def cmd_sensitivity(args) -> int:
+    from .simulate import flip_sensitivity
+    ds = _load(args)
+    res = flip_sensitivity(ds, args.drug, ap_model=args.ap_model, metric=args.metric,
+                           n_mc=args.mc, seed=args.seed,
+                           exposure_multiple=args.exposure_multiple)
+    print(res.summary())
+    return 0
+
+
 def cmd_combo(args) -> int:
     from .simulate import assess_combination
     ds = _load(args)
@@ -210,6 +220,17 @@ def build_parser() -> argparse.ArgumentParser:
     f.add_argument("--mc", type=int, default=200)
     f.add_argument("--seed", type=int, default=0)
     f.set_defaults(func=cmd_flip)
+
+    se = sub.add_parser("sensitivity",
+                        help="attribute the classification-flip to each channel's IC50 spread")
+    se.add_argument("drug")
+    se.add_argument("--ap-model", default="cipaordv1.0", dest="ap_model")
+    se.add_argument("--metric", default="qnet", choices=["qnet", "apd90"])
+    se.add_argument("--mc", type=int, default=100,
+                    help="Monte-Carlo draws per scenario (runs ~2*n_channels+1 scenarios)")
+    se.add_argument("--exposure-multiple", type=float, default=4.0, dest="exposure_multiple")
+    se.add_argument("--seed", type=int, default=0)
+    se.set_defaults(func=cmd_sensitivity)
 
     cb = sub.add_parser("combo", help="assess a DRUG COMBINATION (polypharmacy proarrhythmia)")
     cb.add_argument("drugs", nargs="+", help="two or more drug names")
