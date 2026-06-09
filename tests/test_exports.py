@@ -110,6 +110,49 @@ def test_omex_is_valid_zip_with_manifest(ds):
     ET.fromstring(z.read("model.sbml"))
 
 
+@pytest.mark.parametrize("ap", ["ord", "cipaordv1.0", "tor_ord"])
+def test_sedml_references_resolve(ds, ap):
+    """Every internal SED-ML cross-reference (task→model/sim, variable→task,
+    curve→dataGenerator) resolves."""
+    assert sedml.reference_violations(registry.build_text(ds, "sedml", ap_model=ap)) == []
+
+
+def test_sedml_reference_check_catches_a_dangling_reference(ds):
+    text = registry.build_text(ds, "sedml", ap_model="ord")
+    broken = text.replace('modelReference="apmodel"', 'modelReference="ghost"', 1)
+    assert any("ghost" in v for v in sedml.reference_violations(broken))
+
+
+def test_sedml_model_source_resolves_to_an_exported_file(ds, tmp_path):
+    """Regression: the standalone SED-ML protocol must point at the CellML model
+    that build_all actually writes (a sibling cellml/ dir), not a flattened
+    'model.cellml' that does not exist in the standalone layout."""
+    import xml.etree.ElementTree as ET
+    registry.build_all(ds, str(tmp_path))
+    for sed in (tmp_path / "sedml").glob("*.sedml"):
+        root = ET.fromstring(sed.read_text())
+        src = next(root.iter(f"{{{sedml.SEDML_NS}}}model")).get("source")
+        assert (sed.parent / src).resolve().exists(), f"{sed.name} -> missing model {src}"
+
+
+@pytest.mark.parametrize("ap", ["ord", "cipaordv1.0", "tor_ord"])
+def test_omex_manifest_matches_archive(ds, ap):
+    """The COMBINE manifest lists exactly the archive's files, with one master."""
+    assert combine.manifest_violations(combine.build_bytes(ds, ap)) == []
+
+
+def test_omex_manifest_check_catches_a_missing_file(ds):
+    """Drop a listed file from the archive and confirm the manifest check flags it."""
+    data = combine.build_bytes(ds, "ord")
+    z = zipfile.ZipFile(io.BytesIO(data))
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as out:
+        for n in z.namelist():
+            if n != "model.sbml":          # omit a file the manifest still lists
+                out.writestr(n, z.read(n))
+    assert any("model.sbml" in v for v in combine.manifest_violations(buf.getvalue()))
+
+
 def test_bibtex_contains_all_citations(ds):
     bib = csv_bibtex.citations_bibtex(ds)
     for key in ds.citations:

@@ -4,6 +4,9 @@ with CellML in the cardiac-modeling convention.
 """
 from __future__ import annotations
 
+import xml.etree.ElementTree as ET
+from typing import List
+
 from ..load import Dataset
 
 SEDML_NS = "http://sed-ml.org/sed-ml/level1/version3"
@@ -49,3 +52,42 @@ def build(ds: Dataset, ap_model: str = "cipaordv1.0", model_source: str = "model
          "  </listOfOutputs>",
          "</sedML>"]
     return "\n".join(L) + "\n"
+
+
+def reference_violations(text: str) -> List[str]:
+    """Check that every internal SED-ML cross-reference resolves (no engine):
+
+      - each task's ``modelReference`` / ``simulationReference`` names a defined
+        model / simulation;
+      - each data-generator variable's ``taskReference`` names a defined task;
+      - each output curve's ``xDataReference`` / ``yDataReference`` names a defined
+        data generator.
+
+    Returns the list of dangling references (empty == internally consistent). A
+    SED-ML document that parses can still reference a task or model that does not
+    exist; that is the bug this catches.
+    """
+    ns = f"{{{SEDML_NS}}}"
+    root = ET.fromstring(text)
+    ids = lambda tag: {e.get("id") for e in root.iter(f"{ns}{tag}")}
+    models = ids("model")
+    sims = ids("uniformTimeCourse") | ids("oneStep") | ids("steadyState")
+    tasks = ids("task") | ids("repeatedTask")
+    datagens = ids("dataGenerator")
+
+    v: List[str] = []
+    for t in root.iter(f"{ns}task"):
+        if t.get("modelReference") not in models:
+            v.append(f"task {t.get('id')}: modelReference '{t.get('modelReference')}' undefined")
+        if t.get("simulationReference") not in sims:
+            v.append(f"task {t.get('id')}: simulationReference "
+                     f"'{t.get('simulationReference')}' undefined")
+    for var in root.iter(f"{ns}variable"):
+        tr = var.get("taskReference")
+        if tr is not None and tr not in tasks:
+            v.append(f"variable {var.get('id')}: taskReference '{tr}' undefined")
+    for cur in root.iter(f"{ns}curve"):
+        for ref in ("xDataReference", "yDataReference"):
+            if cur.get(ref) not in datagens:
+                v.append(f"curve {cur.get('id')}: {ref} '{cur.get(ref)}' undefined")
+    return v

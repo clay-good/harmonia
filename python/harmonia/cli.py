@@ -125,26 +125,33 @@ def cmd_performance(args) -> int:
 
 
 def cmd_export(args) -> int:
-    from .export import registry, combine
+    from .export import registry, combine, cellml, sedml
     ds = _load(args)
     if args.all:
         out = args.output or "exports/"
         written = registry.build_all(ds, out, dataset_version=__version__)
         print(f"wrote {len(written)} artifacts under {out}")
-        # Exports are generated artifacts, never hand-edited: round-trip-validate
-        # them so a drift between the dataset/kernel and the exports fails loudly
-        # (spec.md §6, §7). Covers the numeric CiPA round trip, the parameter
-        # round trip, and the ODE round trip (the AST re-integrates to the kernel).
+        # Exports are generated artifacts, never hand-edited: validate them so any
+        # drift between the dataset/kernel and the exports fails loudly (spec.md
+        # §6, §7). Covers the CiPA numeric round trip, the parameter round trip,
+        # the ODE round trip (the AST re-integrates to the kernel), CellML unit
+        # conformance, SED-ML cross-reference resolution, and OMEX manifest
+        # consistency.
         errors = list(registry.roundtrip_cipa(ds))
         for ap in registry.list_ap_models(ds):
             errors += registry.roundtrip_parameters(ds, ap)
             errors += registry.roundtrip_ode(ds, ap)
+            errors += cellml.conformance_violations(cellml.build(ds, ap))
+            errors += sedml.reference_violations(
+                registry.build_text(ds, "sedml", ap_model=ap))
+            errors += combine.manifest_violations(combine.build_bytes(ds, ap))
         if errors:
-            print("round-trip validation FAILED:", file=sys.stderr)
+            print("export validation FAILED:", file=sys.stderr)
             for e in errors:
                 print(f"  - {e}", file=sys.stderr)
             return 1
-        print(f"round-trip validated: CiPA + parameters + ODE across "
+        print(f"validated: CiPA + parameters + ODE round trips, CellML units, "
+              f"SED-ML refs, OMEX manifests across "
               f"{len(registry.list_ap_models(ds))} AP models")
         return 0
 

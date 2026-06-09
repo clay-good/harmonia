@@ -73,6 +73,51 @@ def build_bytes(ds: Dataset, ap_model: str = "cipaordv1.0",
     return buf.getvalue()
 
 
+def manifest_violations(data: bytes) -> list:
+    """Check a COMBINE ``.omex`` archive's manifest against its actual contents:
+
+      - every manifest ``location`` (other than the archive root ".") names a file
+        present in the zip;
+      - every file in the zip (other than the manifest itself) is listed in the
+        manifest;
+      - the manifest declares exactly one ``master`` entry and that file exists.
+
+    Returns the list of inconsistencies (empty == the archive is self-consistent).
+    A manifest that points at a missing file — or a file the manifest forgot — is
+    the bug this catches.
+    """
+    import xml.etree.ElementTree as ET
+
+    z = zipfile.ZipFile(io.BytesIO(data))
+    members = set(z.namelist())
+    if "manifest.xml" not in members:
+        return ["archive has no manifest.xml"]
+    root = ET.fromstring(z.read("manifest.xml"))
+    ns = f"{{{OMEX_MANIFEST_NS}}}"
+
+    listed, masters = set(), []
+    for c in root.iter(f"{ns}content"):
+        loc = (c.get("location") or "").lstrip("./")
+        if c.get("location") == ".":
+            continue
+        listed.add(loc)
+        if c.get("master") == "true":
+            masters.append(loc)
+
+    v = []
+    for loc in sorted(listed):
+        if loc not in members:
+            v.append(f"manifest lists '{loc}' but it is not in the archive")
+    for m in sorted(members - {"manifest.xml"}):
+        if m not in listed:
+            v.append(f"archive file '{m}' is not listed in the manifest")
+    if len(masters) != 1:
+        v.append(f"expected exactly one master entry, found {len(masters)}")
+    elif masters[0] not in members:
+        v.append(f"master '{masters[0]}' is not in the archive")
+    return v
+
+
 def build(ds: Dataset, output_path: str, ap_model: str = "cipaordv1.0",
           block: Optional[Dict[str, float]] = None, dataset_version: str = "0.1.0") -> str:
     data = build_bytes(ds, ap_model, block=block, dataset_version=dataset_version)

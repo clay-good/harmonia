@@ -6,6 +6,23 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+- **Standalone SED-ML model source.** `exports/sedml/<model>.sedml` referenced
+  `source="model.cellml"`, but in the export layout the CellML model lives in a
+  sibling directory — so a SED-ML tool opening the standalone protocol could not
+  find its model. It now points at `../cellml/<model>.cellml` (the flattened
+  COMBINE archive still uses `model.cellml`, which is correct there). Regression-
+  tested by resolving the `source` against the written files.
+
+### Added — SED-ML / COMBINE export integrity
+- **`sedml.reference_violations`**: every internal SED-ML cross-reference
+  (task→model/simulation, variable→task, curve→dataGenerator) must resolve.
+- **`combine.manifest_violations`**: the COMBINE `.omex` manifest must list
+  exactly the archive's files, with exactly one master entry that exists.
+- `harmonia export --all` now also runs CellML unit conformance, SED-ML reference
+  resolution, and OMEX manifest consistency (alongside the three round trips) and
+  exits non-zero on any drift.
+
 ### Added — test coverage for the previously-unguarded headline surfaces
 - **Dashboard data contract** (`tests/test_dashboard.py`): byte-compiles
   `dashboard/app.py` and exercises the exact simulate/load API the dashboard

@@ -2,7 +2,7 @@
 <sedML xmlns="http://sed-ml.org/sed-ml/level1/version3" level="1" version="3">
   <!-- Harmonia pacing protocol: single cell, CL=2000 ms (0.5 Hz), 3 beats to steady state, record final beat. NOT a clinical protocol. -->
   <listOfModels>
-    <model id="apmodel" language="urn:sedml:language:cellml" source="model.cellml"/>
+    <model id="apmodel" language="urn:sedml:language:cellml" source="../cellml/cipaordv1.0.cellml"/>
   </listOfModels>
   <listOfSimulations>
     <uniformTimeCourse id="pace" initialTime="0" outputStartTime="4000" outputEndTime="6000" numberOfPoints="6000">

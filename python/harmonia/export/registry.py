@@ -46,7 +46,10 @@ def build_text(ds: Dataset, fmt: str, ap_model: str = "cipaordv1.0",
     if fmt == "myokit":
         return myokit.build(ds, ap_model, dataset_version=dataset_version)
     if fmt == "sedml":
-        return sedml.build(ds, ap_model)
+        # In the build_all layout the CellML model is a sibling directory
+        # (cellml/<ap>.cellml), so the standalone protocol must point there — not
+        # at the flattened "model.cellml" the COMBINE archive uses.
+        return sedml.build(ds, ap_model, model_source=f"../cellml/{ap_model}.cellml")
     if fmt == "cipa":
         return cipa_inputs.to_csv(ds)
     if fmt == "csv":

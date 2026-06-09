@@ -394,7 +394,7 @@ run in CI).
 ## Validation & testing
 
 Everything downstream of the dataset is a deterministic projection, so the test
-suite (97 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
+suite (106 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 *provable non-drift* rather than fixtures:
 
 | Guard | What it proves | Where |
@@ -405,15 +405,18 @@ suite (97 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 | **Parameter round trip** | the kernel conductances appear verbatim in the CellML/SBML/Myokit text | `registry.roundtrip_parameters` |
 | **ODE round trip** | the model AST re-integrates to the reference-kernel AP within ≈1e-7 — the exported *equations* match the oracle, not just the constants | `registry.roundtrip_ode` |
 | **CellML unit conformance** | every variable and `<cn>` carries a defined/built-in unit, no dangling references | `cellml.conformance_violations` |
+| **SED-ML reference resolution** | every task→model/sim, variable→task, curve→dataGenerator reference resolves; the model `source` points at a file that exists | `sedml.reference_violations` |
+| **OMEX manifest consistency** | the COMBINE manifest lists exactly the archive's files, with one master | `combine.manifest_violations` |
 | **Executable notebook** | the headline flip-frequency analysis runs clean and its assertions hold | `nbmake notebooks/` |
 | **Dashboard data contract** | the headline UI's data API (every field it reads) still exists | `tests/test_dashboard.py` |
 | **Recorded performance** | the honest, live confusion matrix vs CiPA expert labels — never hidden behind one accuracy number | `harmonia performance` |
 
-`harmonia export --all` runs the three round trips and exits non-zero on any
-drift, so a regenerated artifact that disagrees with the dataset or kernel fails
-the build. The OpenCOR/libcellml dimensional cross-check against the *canonical*
-ORd CellML is the one validation deliberately left out of CI (it needs a heavy
-engine); it remains an optional local step.
+`harmonia export --all` runs all of these checks (the three round trips, CellML
+unit conformance, SED-ML reference resolution, and OMEX manifest consistency) and
+exits non-zero on any drift, so a regenerated artifact that disagrees with the
+dataset or kernel fails the build. The OpenCOR/libcellml dimensional cross-check
+against the *canonical* ORd CellML is the one validation deliberately left out of
+CI (it needs a heavy engine); it remains an optional local step.
 
 ---
 
@@ -456,7 +459,7 @@ harmonia/
 │       ├── csv_bibtex.py · annotate.py · combine.py · registry.py
 ├── dashboard/app.py             # Streamlit: browse + risk-uncertainty (flip) view
 ├── notebooks/                   # executable analyses, run in CI under nbmake
-├── tests/                       # 97 tests: dataset, kernel, qNet, simulate, dynamic binding, exposure, combinations, populations, performance, exports (round trips + unit conformance), CLI, dashboard contract
+├── tests/                       # 106 tests: dataset, kernel, qNet, simulate, dynamic binding, exposure, combinations, populations, performance, exports (round trips + unit conformance + SED-ML/OMEX integrity), CLI, dashboard contract
 ├── docs/                        # essay, figures, make_figures.py
 ├── CHANGELOG.md · .zenodo.json  # release metadata
 └── exports/                     # sample generated artifacts (regenerated in CI)
