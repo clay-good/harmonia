@@ -9,7 +9,7 @@ equations is a change in one place.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
@@ -243,8 +243,8 @@ _GATES: List[Tuple[str, Expr, Expr]] = [
 
 
 def build_model_spec(name: str = "harmonia_ord_reduced",
-                     conductance_scales: Dict[str, float] = None,
-                     block: Dict[str, float] = None,
+                     conductance_scales: Optional[Dict[str, float]] = None,
+                     block: Optional[Dict[str, float]] = None,
                      cl: float = 2000.0) -> ModelSpec:
     """Build the spec for one AP-model variant + drug block configuration."""
     scales = conductance_scales or {}

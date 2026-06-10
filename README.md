@@ -259,7 +259,7 @@ The two load-bearing fields:
 > They are orthogonal. Every v0.1 record ships **`unverified`** — the values are
 > literature-derived but no PDF has been confirmed inside Harmonia. *LLMs assist
 > extraction but never promote to verified.* `harmonia info` reports the verified
-> count honestly (currently 0/100). Promoting records by reading the source is the
+> count honestly (currently 0/104). Promoting records by reading the source is the
 > single highest-leverage contribution — see [CONTRIBUTING](CONTRIBUTING.md).
 
 ---
@@ -660,6 +660,7 @@ suite (180 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 | Guard | What it proves | Where |
 | --- | --- | --- |
 | **Lint** | no dead imports, undefined names, or unused variables (Pyflakes + pycodestyle) | `ruff check` |
+| **Type-check** | the package's `py.typed` contract holds — every public `load` / `simulate` / `infer` / `export` signature checks under **mypy** (no implicit Optional, no unused ignores), so the typed views downstream tools rely on cannot silently drift | `mypy` |
 | **Dataset reproducibility** | `dataset/records` regenerates byte-identically from `build_records.py` (the provenance log) — the curated table *is* the dataset | CI `git diff --exit-code` |
 | **Schema + semantic validation** | every record satisfies the JSON Schema; the reliability gate (block < 60% ⟺ Tier D ⟺ failure-mode) and variability bookkeeping hold | `harmonia validate` |
 | **Prior registry validity** (v0.2) | every prior schema-validates, its id matches its filename, every cited key resolves, and `predictive == false` (no prior carries a risk conclusion) | `harmonia validate` |

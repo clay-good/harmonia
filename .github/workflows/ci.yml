@@ -30,6 +30,9 @@ jobs:
       - name: Lint (ruff)
         run: ruff check .
 
+      - name: Type-check (mypy)
+        run: mypy
+
       - name: Validate dataset (schema + semantic rules)
         run: harmonia validate
 

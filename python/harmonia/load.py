@@ -11,9 +11,11 @@ from __future__ import annotations
 import json
 import os
 import pathlib
-from typing import Dict, Iterable, Iterator, List, Optional
+from typing import Dict, Iterable, Iterator, List, Optional, Union
 
-from .records import Citation, Record, wrap
+from .records import (
+    APModel, ChannelBlock, Citation, DrugReference, Population, Record, wrap,
+)
 
 
 class Dataset:
@@ -52,46 +54,45 @@ class Dataset:
         return [r for r in self._records if r.kind == kind]
 
     @property
-    def channel_blocks(self) -> List[Record]:
-        return self.of_kind("channel_block")
+    def channel_blocks(self) -> List[ChannelBlock]:
+        return [r for r in self._records if isinstance(r, ChannelBlock)]
 
     @property
-    def ap_models(self) -> List[Record]:
-        return self.of_kind("ap_model")
+    def ap_models(self) -> List[APModel]:
+        return [r for r in self._records if isinstance(r, APModel)]
 
     @property
-    def drug_references(self) -> List[Record]:
-        return self.of_kind("drug_reference")
+    def drug_references(self) -> List[DrugReference]:
+        return [r for r in self._records if isinstance(r, DrugReference)]
 
     @property
-    def populations(self) -> List[Record]:
-        return self.of_kind("population")
+    def populations(self) -> List[Population]:
+        return [r for r in self._records if isinstance(r, Population)]
 
-    def population(self, name: str) -> Optional[Record]:
+    def population(self, name: str) -> Optional[Population]:
         """Lookup a population record by id or short name."""
-        if name in self._by_id:
-            return self._by_id[name]
-        full = f"population.{name}"
-        return self._by_id.get(full)
+        rec = self._by_id.get(name) or self._by_id.get(f"population.{name}")
+        return rec if isinstance(rec, Population) else None
 
     def drugs(self) -> List[str]:
-        names = {r.drug for r in self.channel_blocks}  # type: ignore[attr-defined]
+        names = {r.drug for r in self.channel_blocks}
         return sorted(names)
 
-    def blocks_for(self, drug: str) -> List[Record]:
+    def blocks_for(self, drug: str) -> List[ChannelBlock]:
         """All channel-block records for a drug (case-insensitive)."""
         d = drug.lower()
-        return [r for r in self.channel_blocks
-                if r.drug.lower() == d]  # type: ignore[attr-defined]
+        return [r for r in self.channel_blocks if r.drug.lower() == d]
 
-    def drug_reference(self, drug: str) -> Optional[Record]:
+    def drug_reference(self, drug: str) -> Optional[DrugReference]:
         d = drug.lower()
         for r in self.drug_references:
-            if r.drug.lower() == d:  # type: ignore[attr-defined]
+            if r.drug.lower() == d:
                 return r
         return None
 
-    def citation(self, key: str) -> Optional[Citation]:
+    def citation(self, key: Optional[str]) -> Optional[Citation]:
+        if key is None:
+            return None
         return self.citations.get(key)
 
     def prior(self, key: str):
@@ -102,7 +103,7 @@ class Dataset:
 # --------------------------------------------------------------------------- #
 # Dataset directory discovery
 # --------------------------------------------------------------------------- #
-def find_dataset_dir(path: Optional[os.PathLike] = None) -> pathlib.Path:
+def find_dataset_dir(path: Optional[Union[str, os.PathLike]] = None) -> pathlib.Path:
     if path is not None:
         p = pathlib.Path(path)
         if not p.exists():
@@ -137,7 +138,7 @@ def _read_json(p: pathlib.Path) -> dict:
     return json.loads(p.read_text(encoding="utf-8"))
 
 
-def load(path: Optional[os.PathLike] = None) -> Dataset:
+def load(path: Optional[Union[str, os.PathLike]] = None) -> Dataset:
     """Load every record + citation under the dataset directory."""
     root = find_dataset_dir(path)
 
@@ -158,6 +159,6 @@ def load(path: Optional[os.PathLike] = None) -> Dataset:
     return Dataset(records, citations, root=root, priors=priors)
 
 
-def iter_record_files(root: Optional[os.PathLike] = None) -> Iterable[pathlib.Path]:
+def iter_record_files(root: Optional[Union[str, os.PathLike]] = None) -> Iterable[pathlib.Path]:
     base = find_dataset_dir(root)
     return sorted((base / "records").glob("*.json"))

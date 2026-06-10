@@ -61,7 +61,7 @@ def cmd_info(args) -> int:
     drugs = ds.drugs()
     print(f"  drugs ({len(drugs)}): {', '.join(drugs)}")
 
-    unident = [b.id for b in ds.channel_blocks if not b.identifiable]  # type: ignore[attr-defined]
+    unident = [b.id for b in ds.channel_blocks if not b.identifiable]
     if unident:
         print(f"  UNIDENTIFIABLE IC50 (max block < 60% -> Tier D): {', '.join(unident)}")
     pops = ds.populations

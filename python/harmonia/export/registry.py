@@ -107,12 +107,12 @@ def roundtrip_cipa(ds: Dataset, rel_tol: float = 1e-9) -> List[str]:
     parsed = {(r["drug"], r["channel"]): r for r in cipa_inputs.parse_csv(text)}
     errors = []
     for b in ds.channel_blocks:
-        key = (b.drug, b.channel)  # type: ignore[attr-defined]
+        key = (b.drug, b.channel)
         if key not in parsed:
             errors.append(f"{b.id}: missing from CiPA export")
             continue
         got = float(parsed[key]["ic50_nM"])
-        want = b.ic50_nm  # type: ignore[attr-defined]
+        want = b.ic50_nm
         if abs(got - want) > rel_tol * max(abs(want), 1.0):
             errors.append(f"{b.id}: IC50 round-trip {got} != {want}")
     return errors

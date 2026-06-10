@@ -13,7 +13,6 @@ import json
 from typing import Dict, List, Optional
 
 from ..load import Dataset
-from ..records import ChannelBlock
 
 CIPA_CHANNELS = ["IKr", "ICaL", "INaL", "INa", "Ito", "IKs", "IK1"]
 COLUMNS = [
@@ -27,10 +26,9 @@ def _rows(ds: Dataset, drug: Optional[str] = None) -> List[Dict[str, object]]:
     rows = []
     blocks = ds.channel_blocks
     if drug:
-        blocks = [b for b in blocks if b.drug.lower() == drug.lower()]  # type: ignore[attr-defined]
+        blocks = [b for b in blocks if b.drug.lower() == drug.lower()]
     for b in sorted(blocks, key=lambda r: (r.drug, CIPA_CHANNELS.index(r.channel)
                                            if r.channel in CIPA_CHANNELS else 99)):
-        assert isinstance(b, ChannelBlock)
         v = b.variability
         rows.append({
             "drug": b.drug,

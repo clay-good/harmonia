@@ -30,7 +30,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -334,10 +334,12 @@ def assess(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
     def _herg_for(ic50_nm: float):
         """Build a HERGDynamic at the reference exposure with kon set so the
         binding IC50 (koff/kon) tracks the sampled hERG IC50."""
-        if not use_dynamic:
+        if not use_dynamic or herg_rec is None:
             return None
-        koff = herg_rec.dynamic_binding["koff"]
-        trapping = bool(herg_rec.dynamic_binding["trapping"])
+        kinetics = herg_rec.dynamic_binding
+        assert kinetics is not None  # use_dynamic implies the hERG record carries kinetics
+        koff = kinetics["koff"]
+        trapping = bool(kinetics["trapping"])
         return HERGDynamic(conc_nm=reference_exposure, kon=koff / ic50_nm,
                            koff=koff, trapping=trapping)
 
@@ -901,7 +903,9 @@ def _sobol_sensitivity(ds: Dataset, drug: str, ap_model: str, metric: str, n_mc:
 
     # build per-channel log10-IC50 samplers + fixed Hill (IC50-spread attribution)
     rng = np.random.default_rng(seed)
-    samplers, hill_by, chan_meta = {}, {}, []
+    samplers: Dict[str, Callable[[int], Any]] = {}
+    hill_by: Dict[str, float] = {}
+    chan_meta: List[Tuple[str, int]] = []
     if uq == "bayes":
         from .infer import infer_channel, learn_tau_pop, resolve_prior
         prior_obj = resolve_prior(ds, prior)
@@ -910,7 +914,10 @@ def _sobol_sensitivity(ds: Dataset, drug: str, ap_model: str, metric: str, n_mc:
             post = infer_channel(b, prior_obj, tau_pop, n_draws=max(4 * n_mc, 2000),
                                  seed=seed + 1009 * (j + 1))
             pool = post.log10_ic50
-            samplers[b.channel] = (lambda n, _p=pool: rng.choice(_p, size=n))
+
+            def _posterior_sampler(n: int, _p: Any = pool) -> Any:
+                return rng.choice(_p, size=n)
+            samplers[b.channel] = _posterior_sampler
             hill_by[b.channel] = float(np.median(post.hill))
             chan_meta.append((b.channel, len(b.source_ic50s_nm)))
             if post.censored:
@@ -918,7 +925,10 @@ def _sobol_sensitivity(ds: Dataset, drug: str, ap_model: str, metric: str, n_mc:
     else:
         for d in _channel_draws(blocks):
             mu, sigma = d.mu_log10, d.sigma_log10
-            samplers[d.channel] = (lambda n, _m=mu, _s=sigma: rng.normal(_m, _s, n))
+
+            def _lognormal_sampler(n: int, _m: float = mu, _s: float = sigma) -> Any:
+                return rng.normal(_m, _s, n)
+            samplers[d.channel] = _lognormal_sampler
             hill_by[d.channel] = d.hill
             chan_meta.append((d.channel, d.n_sources))
         for b in blocks:
@@ -926,8 +936,8 @@ def _sobol_sensitivity(ds: Dataset, drug: str, ap_model: str, metric: str, n_mc:
                 excluded.append(f"{b.channel} (max block {b.assay_context.max_block_observed_percent:g}%)")
 
     channels = [c for c, _ in chan_meta]
-    d = len(channels)
-    if d == 0:
+    n_dims = len(channels)
+    if n_dims == 0:
         return SobolSensitivity(drug=drug_l, ap_model=ap_rec.id, metric=metric, uq=uq,
                                 classification="intermediate", all_vary_flip_frequency=0.0,
                                 metric_variance=0.0, n_base=0, channels=[], tier=tier,

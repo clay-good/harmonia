@@ -103,15 +103,15 @@ def score(ds: Dataset, ap_model: str = "cipaordv1.0", cipa_set: str = "all",
     label. ``cipa_set`` is 'training', 'validation', or 'all'."""
     scores: List[DrugScore] = []
     for ref in ds.drug_references:
-        if cipa_set != "all" and ref.cipa_set != cipa_set:  # type: ignore[attr-defined]
+        if cipa_set != "all" and ref.cipa_set != cipa_set:
             continue
-        drug = ref.drug  # type: ignore[attr-defined]
+        drug = ref.drug
         if not ds.blocks_for(drug):
             continue
         a = assess(ds, drug, ap_model=ap_model, n_mc=0, metric=metric,
                    exposure_multiple=exposure_multiple, herg_dynamic=herg_dynamic)
         scores.append(DrugScore(
-            drug=drug, cipa_set=ref.cipa_set, expert=ref.expert_risk_label,  # type: ignore[attr-defined]
+            drug=drug, cipa_set=ref.cipa_set, expert=ref.expert_risk_label,
             predicted=a.classification, dapd90_pct=a.dapd90_pct, tier=a.tier))
     scores.sort(key=lambda s: ({"high": 0, "intermediate": 1, "low": 2}[s.expert], s.drug))
     return PerformanceReport(ap_model=ap_model, cipa_set=cipa_set, scores=scores,

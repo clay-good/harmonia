@@ -6,6 +6,39 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-06-10
+
+### Changed — type-safety hardening: the `py.typed` contract is now enforced in CI
+The package shipped a `py.typed` marker (advertising itself as fully typed to
+downstream tools) but was never type-checked, and `mypy` reported 33 errors. This
+release closes that gap with **no runtime behavior change** and adds **mypy** as a
+CI gate alongside `ruff`, so the typed surface tools depend on cannot silently
+drift.
+
+- **`Dataset` convenience views now return their concrete record subtypes** —
+  `channel_blocks → List[ChannelBlock]`, `ap_models → List[APModel]`,
+  `drug_references → List[DrugReference]`, `populations → List[Population]`, and
+  `population()` / `drug_reference()` their `Optional[...]` counterparts (via
+  `isinstance` narrowing). This is a type-level refinement only: every value
+  returned is unchanged at runtime, and it removes the scattered
+  `# type: ignore[attr-defined]` workarounds in `load`, `cli`, `performance`,
+  `registry`, and `cipa_inputs`.
+- **Implicit-`Optional` defaults made explicit** (`build_model_spec`'s
+  `conductance_scales` / `block`; the reference kernel's `herg` parameter), and
+  `Dataset.citation()` / `find_dataset_dir()` / `load()` widened to accept the
+  `Optional[str]` / `str`-or-`PathLike` values their callers already pass.
+- **Genuine `Optional`-narrowing guards** added where a value could be `None` at
+  the type level (the censored-inference max-block read; the dynamic-hERG kinetics
+  closure), and the Sobol sampler dictionaries explicitly typed.
+- New `[tool.mypy]` config (checks `python/harmonia`, `no_implicit_optional`,
+  `warn_unused_ignores`; missing-stub third-party libs — `scipy`, `jsonschema`,
+  `libsbml`, `libcellml` — declared ignored), `mypy>=1.8` added to the `dev`
+  extra, and a **Type-check (mypy)** step in CI. Runtime support down to Python 3.9
+  is still guaranteed by the pytest matrix.
+
+### Fixed
+- README: the honest verified-record count was stale (`0/100` → `0/104`).
+
 ## [0.5.0] — 2026-06-09
 
 ### Added — experimentally-calibrated populations (Britton 2013), completing Phase E (spec v0.5)

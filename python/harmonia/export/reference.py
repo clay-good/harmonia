@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Dict
+from typing import Dict, Optional
 
 import numpy as np
 from scipy.integrate import solve_ivp, trapezoid
@@ -220,7 +220,7 @@ class HERGDynamic:
         return self.kon * self.conc_nm * (1.0 - b) - self.koff * open_factor * b
 
 
-def _rhs(t, y, p: KernelParams, cl: float, herg: "HERGDynamic" = None):
+def _rhs(t, y, p: KernelParams, cl: float, herg: Optional["HERGDynamic"] = None):
     V = y[0]
     if herg is None:
         Iion = sum(currents(V, y, p))
@@ -239,7 +239,7 @@ def _rhs(t, y, p: KernelParams, cl: float, herg: "HERGDynamic" = None):
     return dy
 
 
-def _initial_state(herg: "HERGDynamic" = None):
+def _initial_state(herg: Optional["HERGDynamic"] = None):
     y0 = np.zeros(len(_STATE))
     y0[0] = -85.0
     inf, _ = gating_targets(-85.0)
@@ -275,7 +275,7 @@ class BeatResult:
 
 def simulate_beats(p: KernelParams, cl: float = 2000.0, n_beats: int = 3,
                    max_step: float = 2.0, dt_record: float = 1.0,
-                   rtol: float = 1e-6, herg: "HERGDynamic" = None) -> BeatResult:
+                   rtol: float = 1e-6, herg: Optional["HERGDynamic"] = None) -> BeatResult:
     """Pace to (approximate) steady state; analyse the final beat.
 
     With fixed ionic concentrations the AP reaches steady state within ~2-3

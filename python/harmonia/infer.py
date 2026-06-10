@@ -344,7 +344,9 @@ def _infer_censored(block: ChannelBlock, prior: Prior, tau_pop: float,
     """
     from scipy.special import ndtr, expit
 
-    m_obs = float(np.clip(block.assay_context.max_block_observed_percent / 100.0, 1e-3, 0.95))
+    max_block = block.assay_context.max_block_observed_percent
+    assert max_block is not None, "censored inference requires a recorded max block"
+    m_obs = float(np.clip(max_block / 100.0, 1e-3, 0.95))
     ic50_point = block.ic50_nm
     h_point = block.hill
     x_max = ic50_point * (m_obs / (1.0 - m_obs)) ** (1.0 / h_point)

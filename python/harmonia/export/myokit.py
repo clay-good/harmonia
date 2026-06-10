@@ -68,6 +68,7 @@ def build(ds: Dataset, ap_model: str = "cipaordv1.0",
     rec = _resolve_ap_model(ds, ap_model)
     spec = build_model_spec(name=f"harmonia_{rec.id.split('.')[-1]}",
                             conductance_scales=rec.conductance_scales, block=block)
-    doi = ds.citation(rec.primary_citation).doi if ds.citation(rec.primary_citation) else None
+    cit = ds.citation(rec.primary_citation)
+    doi = cit.doi if cit else None
     return _render(spec, tier=rec.tier, dataset_version=dataset_version,
                    dois=[doi] if doi else [])
