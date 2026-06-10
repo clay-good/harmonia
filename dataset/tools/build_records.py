@@ -609,6 +609,59 @@ def build_populations():
                  "calibrated to human data; every population assessment is capped at "
                  "Tier D and labelled non-predictive.",
     }]
+    # v0.5 experimentally-calibrated population (Britton et al. 2013): the same
+    # illustrative variability cloud, but a candidate myocyte is admitted only if
+    # its DRUG-FREE AP biomarkers fall in plausible ranges (and it repolarizes),
+    # which removes the abnormal repolarization tail of the raw prior. The ranges
+    # are kernel-plausibility bounds (this kernel's own units; baseline APD90 ~272
+    # ms, triangulation ~42 ms), bracketing the physiological bulk and rejecting
+    # the long/triangular-repolarization outliers — NOT a fit to patient data, so
+    # the assessment stays Tier D / non-predictive.
+    pops.append({
+        "id": "population.calibrated_v0",
+        "kind": "population",
+        "subsystem": "populations",
+        "tier": "D",
+        "primary_citation": "britton-2013",
+        "population": {
+            "name": "Experimentally-calibrated population (drug-free AP biomarker acceptance, v0)",
+            "n_default": 100,
+            "conductance_cv": dict(_POP_CV),
+            "calibration": {
+                "method": "drug-free AP biomarker acceptance / calibration-by-rejection "
+                          "(Britton et al. 2013): keep only candidate myocytes whose "
+                          "drug-free APD90, resting and peak potential, and triangulation "
+                          "fall within plausible ranges and that repolarize",
+                "citation": "britton-2013",
+                "max_oversample": 40,
+                "biomarkers": {
+                    "apd90_ms":          {"min": 180.0, "max": 360.0},
+                    "vrest_mv":          {"min": -90.0, "max": -80.0},
+                    "vpeak_mv":          {"min": 40.0,  "max": 70.0},
+                    "triangulation_ms":  {"min": 10.0,  "max": 120.0},
+                },
+            },
+            "predictive": False,
+        },
+        "extraction": {
+            "review_status": "unverified",
+            "method": "calibration ranges are kernel-plausibility bounds bracketing the "
+                      "reduced kernel's drug-free biomarker bulk; methodology after Britton 2013",
+            "verified_by": [],
+            "notes": "Ranges are kernel-specific plausibility bounds, NOT a fit to human "
+                     "population electrophysiology data; the methodology (not the numbers) "
+                     "is Britton et al. 2013.",
+        },
+        "notes": "HYPOTHESIS-TIER — DO NOT USE FOR PREDICTION. The experimentally-calibrated "
+                 "populations-of-models method (Britton et al. 2013) admits a virtual myocyte "
+                 "only when its DRUG-FREE action potential is physiologically plausible, so the "
+                 "population excludes the abnormal repolarization tail that the raw prior cloud "
+                 "(illustrative_v0) contains. Here the acceptance ranges are bounds on THIS "
+                 "kernel's own biomarkers (not borrowed regulatory or patient-fit values), so "
+                 "the calibration buys physiological plausibility, not predictiveness: every "
+                 "assessment is still capped at Tier D and labelled non-predictive. The "
+                 "drug-response thresholds remain the healthy reference.",
+    })
     for pid, name, mechanism, scale in _LQTS:
         shift = ", ".join(f"{c}x{v:g}" for c, v in scale.items())
         pops.append({

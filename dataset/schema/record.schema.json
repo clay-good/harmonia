@@ -260,6 +260,31 @@
           "additionalProperties": { "type": "number", "exclusiveMinimum": 0 },
           "description": "v0.3 disease/genetic background: channel/conductance -> MEAN multiplier (default 1), applied under the conductance_cv spread. Illustrative, hypothesis-tier (Tier D), NOT predictive."
         },
+        "calibration": {
+          "type": "object",
+          "description": "v0.5 experimentally-calibrated population (Britton et al. 2013): a candidate virtual myocyte is accepted into the population only if its DRUG-FREE action-potential biomarkers all fall within the declared ranges (and it repolarizes). Removes the implausible/abnormal tail of the prior conductance cloud, leaving a physiologically plausible population. The ranges are kernel-plausibility bounds (the kernel's own units), NOT patient-fit data, so a calibrated assessment stays hypothesis-tier (Tier D), NOT predictive.",
+          "additionalProperties": false,
+          "required": ["method", "citation", "biomarkers"],
+          "properties": {
+            "method": { "type": "string" },
+            "citation": { "type": "string" },
+            "max_oversample": {
+              "type": "integer", "minimum": 1,
+              "description": "cap on candidates drawn per accepted myocyte before giving up (determinism / termination guard)"
+            },
+            "biomarkers": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["min", "max"],
+                "properties": { "min": { "type": "number" }, "max": { "type": "number" } }
+              },
+              "description": "biomarker name (apd90_ms | vrest_mv | vpeak_mv | triangulation_ms) -> accepted [min, max] range in the kernel's units"
+            }
+          }
+        },
         "predictive": { "const": false }
       }
     }

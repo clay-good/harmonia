@@ -343,6 +343,73 @@ def fig_disease_populations():
     plt.close(fig)
 
 
+def fig_calibrated_populations():
+    """v0.5: experimentally-calibrated populations (Britton 2013). Left — the raw
+    prior cloud's drug-free triangulation has an abnormal long tail that the
+    acceptance band rejects. Right — the calibrated population is the same drug
+    assessment built only from physiologically-plausible myocytes."""
+    from harmonia.populations import (assess_population, _biomarker_values,
+                                      _draw_multiplier)
+    from harmonia.simulate import _resolve_ap_model
+    pop = ds.population("calibrated_v0")
+    rng_lo, rng_hi = pop.calibration["biomarkers"]["triangulation_ms"].values()
+    scales = _resolve_ap_model(ds, "cipaordv1.0").conductance_scales
+    cv = pop.conductance_cv
+    channels = list(cv.keys())
+
+    # drug-free triangulation of the raw prior cloud, and which myocytes survive calibration
+    rng = np.random.default_rng(0)
+    raw_tri, kept_tri = [], []
+    for _ in range(400):
+        mult = _draw_multiplier(rng, channels, cv, {})
+        base = KernelParams().with_scales(scales).with_conductance_multipliers(mult)
+        r = simulate_beats(base, n_beats=3)
+        if r.repolarization_failed or r.ead:
+            continue
+        raw_tri.append(r.triangulation)
+        bm = _biomarker_values(r)
+        ranges = pop.calibration["biomarkers"]
+        if all(lim["min"] <= bm[k] <= lim["max"] for k, lim in ranges.items()):
+            kept_tri.append(r.triangulation)
+    raw_tri, kept_tri = np.array(raw_tri), np.array(kept_tri)
+
+    fig, (axL, axR) = plt.subplots(1, 2, figsize=(11, 4.2))
+    bins = np.linspace(0, max(raw_tri.max(), 130), 40)
+    axL.hist(raw_tri, bins=bins, color=GREY, alpha=0.85, label=f"raw prior cloud (n={len(raw_tri)})")
+    axL.hist(kept_tri, bins=bins, color=GREEN, alpha=0.9,
+             label=f"calibrated (kept {len(kept_tri)})")
+    axL.axvspan(rng_lo, rng_hi, color=GREEN, alpha=0.10)
+    axL.axvline(rng_hi, color=GREEN, lw=1.2, ls="--")
+    axL.set_xlabel("drug-free triangulation APD90−APD50 (ms)")
+    axL.set_ylabel("virtual myocytes")
+    axL.set_title("Calibration rejects the abnormal repolarization tail\n"
+                  "(accept band shaded; baseline ≈ 42 ms)", fontsize=10)
+    axL.legend(fontsize=8, frameon=False)
+    axL.spines[["top", "right"]].set_visible(False)
+
+    drugs = ["dofetilide", "ranolazine", "verapamil"]
+    raw_s, cal_s = [], []
+    for d in drugs:
+        raw_s.append(assess_population(ds, d, population="illustrative_v0",
+                                       n_models=120, seed=0).susceptible_fraction)
+        cal_s.append(assess_population(ds, d, population="calibrated_v0",
+                                       n_models=120, seed=0).susceptible_fraction)
+    x = np.arange(len(drugs)); w = 0.38
+    axR.bar(x - w / 2, raw_s, w, color=GREY, label="raw prior cloud")
+    axR.bar(x + w / 2, cal_s, w, color=GREEN, label="calibrated")
+    axR.set_xticks(x); axR.set_xticklabels(drugs, fontsize=9)
+    axR.set_ylabel("susceptible fraction (classified high)")
+    axR.set_title("Same drugs, a physiologically-plausible population\n"
+                  "HYPOTHESIS-TIER · Tier D · NOT FOR PREDICTION", fontsize=10)
+    axR.legend(fontsize=8, frameon=False)
+    axR.spines[["top", "right"]].set_visible(False)
+
+    fig.suptitle("Experimentally-calibrated populations of models (Britton et al. 2013) — "
+                 "kernel-plausibility ranges, not patient-fit", fontsize=10.5)
+    fig.tight_layout(); fig.savefig(IMG / "calibrated_populations.png", dpi=130)
+    plt.close(fig)
+
+
 def fig_cqinward():
     """v0.4: the cqInward inward-charge biomarker — mechanism cases + real drugs."""
     from harmonia.simulate import _cqinward
@@ -395,5 +462,6 @@ if __name__ == "__main__":
     fig_bayesian_uq()      # v0.2 Bayesian dose-response UQ
     fig_disease_populations()  # v0.3 disease/genetic backgrounds (LQTS)
     fig_cqinward()         # v0.4 cqInward inward-charge biomarker
+    fig_calibrated_populations()  # v0.5 experimentally-calibrated populations (Britton 2013)
     # fig_training_set() / fig_validation_set() remain available for the APD90 metric
     print(f"wrote figures to {IMG}")

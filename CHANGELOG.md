@@ -6,6 +6,45 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-06-09
+
+### Added — experimentally-calibrated populations (Britton 2013), completing Phase E (spec v0.5)
+The `populations` subsystem could sample a prior conductance cloud (v0.1
+`illustrative_v0`) and recenter it on a disease mean (v0.3 LQTS), but it accepted
+**every** draw — including the implausible tail where an extreme conductance
+combination yields a drug-free action potential no real myocyte would show
+(triangulation reaching 250–300 ms against a ~42 ms baseline). v0.5 adds the
+landmark **experimentally-calibrated populations-of-models** method
+([Britton et al. 2013](https://doi.org/10.1073/pnas.1304382110)): a candidate
+myocyte is admitted only if its **drug-free** AP biomarkers are physiologically
+plausible. Fully backward-compatible — a population with no `calibration` block is
+byte-identical to before (the draw logic was extracted to a shared
+`_draw_multiplier` that preserves the exact RNG sequence).
+
+- **`calibration`** (optional, on a `population` record): accepted ranges for
+  drug-free biomarkers (`apd90_ms`, `vrest_mv`, `vpeak_mv`, `triangulation_ms`) in
+  the kernel's own units, a `max_oversample` termination guard, and the cited method
+  (spec v0.5 §2–3). A candidate is accepted iff it repolarizes and every biomarker is
+  in range; the accepted myocyte's drug-free beat is cached and reused as the APD90
+  baseline, so calibration adds no extra simulation to that path.
+- **`calibrate_population`** primitive + **`calibrated_v0`** record: the
+  `illustrative_v0` variability cloud admitted through the filter.
+  `harmonia population <drug> --population calibrated_v0` runs it. Empirically ≈92%
+  of drug-free myocytes are admitted; the **triangulation** bound is the dominant
+  filter (high drug-free triangulation is itself a repolarization-instability marker
+  — exactly the abnormality calibration should remove). The assessment reports the
+  acceptance rate and per-biomarker rejection counts.
+- **Strictly hypothesis-tier, never predictive.** The acceptance ranges are
+  **kernel-plausibility bounds** (bounds on *this* reduced kernel's biomarkers,
+  bracketing its physiological bulk) — the *methodology* is Britton 2013, the
+  *numbers* are not a fit to patient data. Every calibrated assessment is **Tier D**
+  and stamped NOT FOR PREDICTION; the qNet/APD thresholds stay the healthy reference.
+- New `tests/test_calibrated_populations.py` (acceptance correctness, rejection
+  happens, triangulation dominance, tail-removal, APD90 path, Tier-D / non-prediction,
+  determinism, byte-identical uncalibrated path). Figure
+  `docs/img/calibrated_populations.png`; spec
+  [`docs/specs/v0.5-calibrated-populations.md`]; README populations section + roadmap.
+
 ## [0.4.0] — 2026-06-09
 
 ### Added — the cqInward inward-charge biomarker, completing the computable spec §3 metrics (spec v0.4)

@@ -288,6 +288,16 @@ class Population(Record):
         return bool(self.conductance_scale)
 
     @property
+    def calibration(self) -> Optional[Dict[str, Any]]:
+        """v0.5 experimentally-calibrated population (Britton 2013): accepted
+        biomarker ranges, or None for an uncalibrated prior-cloud population."""
+        return _get(self.raw, "population", "calibration", default=None)
+
+    @property
+    def is_calibrated(self) -> bool:
+        return self.calibration is not None
+
+    @property
     def predictive(self) -> bool:
         return bool(_get(self.raw, "population", "predictive", default=False))
 

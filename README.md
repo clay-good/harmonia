@@ -140,7 +140,7 @@ pop.tier                                      # "D"  (always; non-predictive)
 
 | Layer | Status |
 | --- | --- |
-| **Dataset** — 68 channel-block records across the **28 CiPA compounds** (12 training + 16 validation), 28 drug-reference records (expert risk label + free Cmax + protein binding), 3 AP-model records, 4 population specs (1 variability + 3 LQTS disease backgrounds), 15 Crossref-checked citations | ✅ |
+| **Dataset** — 68 channel-block records across the **28 CiPA compounds** (12 training + 16 validation), 28 drug-reference records (expert risk label + free Cmax + protein binding), 3 AP-model records, 5 population specs (1 variability + 3 LQTS disease backgrounds + 1 experimentally-calibrated), 15 Crossref-checked citations | ✅ |
 | **Variability is first-class** — multi-source IC50s with computed fold-range / IQR; the reliability gate (max block < 60% ⇒ Tier D, unidentifiable) machine-enforced | ✅ |
 | **Bayesian dose-response UQ** (Phase C, **v0.2**) — the IC50/Hill spread is *inferred* under a declared prior, not transcribed: hierarchical posterior with dataset-learned between-lab pooling, propagated Hill uncertainty, a one-sided **censored** posterior for sub-60%-block channels, a **raw dose-response regime** (fit from concentration-block points), a prior registry with per-channel `prior_sensitivity`, variance-based (Sobol) sensitivity, and a calibrated inference (simulation-based calibration + posterior coverage). Opt-in via `uq="bayes"`; `uq="moments"` (default) reproduces every v0.1 number | ✅ |
 | **Reference kernel** — a SciPy reduced O'Hara-Rudy-lineage ventricular AP (7 currents + Na-Ca exchanger) with Hill block per current; APD90 / qNet / triangulation / **cqInward** / EAD biomarkers | ✅ |
@@ -150,13 +150,14 @@ pop.tier                                      # "D"  (always; non-predictive)
 | **Drug combinations** (Phase D) — `assess_combination` propagates *joint* IC50 variability; independent block multiplies per channel; reports the interaction and how often the combined class flips | ✅ |
 | **Population-of-models** (Phase E) — `assess_population` samples a population of virtual myocytes (per-conductance variability) to spread a drug's risk across individuals. **Hypothesis-tier, Tier D, NOT FOR PREDICTION** | ✅ |
 | **Disease / genetic backgrounds** (**v0.3**) — the three congenital long-QT channelopathies (LQT1 IKs↓, LQT2 IKr↓, LQT3 INaL↑) as population records: a per-current *mean* conductance shift recenters the variability cloud on a reduced-repolarization-reserve background, so a drug's risk distribution can be re-evaluated against a susceptible subpopulation. **Hypothesis-tier, Tier D, NOT FOR PREDICTION** | ✅ |
+| **Experimentally-calibrated populations** (**v0.5**) — the Britton-2013 calibration-by-rejection: a virtual myocyte enters the population only if its *drug-free* AP biomarkers (APD90, rest/peak potential, triangulation) are physiologically plausible, removing the abnormal-repolarization tail of the raw prior. Acceptance ranges are kernel-plausibility bounds (not patient-fit), so it stays **Tier D, NOT FOR PREDICTION** | ✅ |
 | **Risk distribution + flip frequency** — Monte-Carlo over source variability; classification-flip frequency; worst-tier propagation | ✅ |
 | **Flip sensitivity** — `flip_sensitivity` attributes the flip to each channel's IC50 spread (solo / frozen effects), surfacing the dominant uncertain input to pin down first | ✅ |
 | **Recorded classification performance** (Phase B) — `harmonia performance` scores either metric vs CiPA expert labels on training / validation / all, with the full confusion matrix | ✅ |
 | **Exports** — CellML 2.0, Myokit `.mmt`, SBML L3v2, SED-ML, CiPA inputs (CSV/JSON), CSV, BibTeX, COMBINE `.omex` — all carrying `clinicalUse = PROHIBITED`, tier, and DOI RDF | ✅ |
 | **CLI · Streamlit dashboard · CI** | ✅ |
 | **Release hardening** (Phase F) — declaration-level CellML unit-conformance check, an executable `nbmake` notebook, `.zenodo.json`, `CHANGELOG.md` | ✅ |
-| Full CiPA Markov hERG + published optimized kinetics, ToR-ORd reformulation, broader multi-source aggregation, experimentally-calibrated populations, full dimensional/OpenCOR cross-check | Phase C/E/F (roadmap below) |
+| Full CiPA Markov hERG + published optimized kinetics, ToR-ORd reformulation, broader multi-source aggregation, full dimensional/OpenCOR cross-check | Phase C/F (roadmap below) |
 
 ---
 
@@ -401,7 +402,8 @@ sensitivity gain population approaches are known for
 are illustrative, *not* calibrated to human data, so every population assessment
 is capped at **Tier D** and stamped **NOT FOR PREDICTION**. It is a
 hypothesis-generating methodology view, never a per-patient or population safety
-claim. Experimentally-calibrated populations are deferred to a later phase.
+claim. (v0.5 refines *which* myocytes enter the population — see
+[Experimentally-calibrated populations](#experimentally-calibrated-populations-v05--britton-2013) below.)
 
 ### Disease / genetic backgrounds (v0.3) — LQTS channelopathies
 
@@ -446,6 +448,42 @@ assessment is capped at **Tier D** and stamped NOT FOR PREDICTION. It makes the
 gene–drug repolarization-reserve interaction visible and quantitative — a mechanism
 demonstration, never a per-patient or per-genotype safety claim
 ([spec v0.3](docs/specs/v0.3-disease-populations.md)).
+
+### Experimentally-calibrated populations (v0.5) — Britton 2013
+
+The v0.1/v0.3 population samples the prior conductance cloud and accepts **every**
+draw — including the implausible tail where an extreme conductance combination
+yields a drug-free action potential no real myocyte would show. v0.5 adds the
+landmark **experimentally-calibrated populations-of-models** discipline
+([Britton et al. 2013](https://doi.org/10.1073/pnas.1304382110)): a candidate
+myocyte is admitted only if its **drug-free** AP biomarkers are physiologically
+plausible, so the population's members could actually exist before any drug is
+applied.
+
+A `population` record gains an optional `calibration` block — accepted ranges for
+the drug-free `apd90_ms`, `vrest_mv`, `vpeak_mv`, and `triangulation_ms` — and the
+`calibrated_v0` record ships the `illustrative_v0` cloud admitted through that
+filter. Empirically ≈92% of drug-free myocytes pass; the **triangulation** bound is
+the dominant filter, which is mechanistically right — high drug-free triangulation
+is itself a repolarization-instability marker, exactly the abnormality calibration
+removes (here the kernel's drug-free triangulation tail reaches ~250–300 ms against
+a ~42 ms baseline).
+
+![Experimentally-calibrated populations](docs/img/calibrated_populations.png)
+
+```bash
+harmonia population dofetilide --population calibrated_v0   # drug-free-plausible population
+```
+
+**Still strictly hypothesis-tier and never predictive.** The acceptance ranges are
+**kernel-plausibility bounds** — bounds on *this reduced kernel's* own biomarkers,
+bracketing its physiological bulk — **not a fit to human population
+electrophysiology**. The *methodology* is Britton 2013; the *numbers* are not.
+Calibration buys physiological plausibility, not predictiveness: every calibrated
+assessment is still capped at **Tier D**, stamped NOT FOR PREDICTION, and assessed
+against the *healthy* qNet/APD thresholds, while the assessment additionally reports
+the acceptance rate and per-biomarker rejection counts
+([spec v0.5](docs/specs/v0.5-calibrated-populations.md)).
 
 ### Which input drives the flip? (sensitivity attribution)
 
@@ -616,7 +654,7 @@ optional local step (they need a heavy simulation engine, so are not run in CI).
 ## Validation & testing
 
 Everything downstream of the dataset is a deterministic projection, so the test
-suite (169 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
+suite (180 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 *provable non-drift* rather than fixtures:
 
 | Guard | What it proves | Where |
@@ -629,6 +667,7 @@ suite (169 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 | **Sampler convergence + censoring** (v0.2) | every channel posterior meets `rhat < 1.01` / an `ess` floor; a sub-60%-block channel yields a wide, prior-dominated one-sided posterior and still produces a Tier-D assessment | `tests/test_infer.py` |
 | **Inference calibration** (v0.2.1, §9) | simulation-based calibration → rank-uniform posteriors; 90% credible interval covers the truth ≈90%; raw dose-response fit recovers a synthetic IC50/Hill | `tests/test_infer_raw.py` |
 | **Disease populations** (v0.3) | the `conductance_scale` mean shift is applied correctly; LQTS backgrounds raise the susceptible fraction in the textbook order; every disease assessment is Tier D / NOT FOR PREDICTION; the healthy population is byte-identical | `tests/test_disease_populations.py` |
+| **Calibrated populations** (v0.5) | every accepted myocyte's drug-free biomarkers are in range; the abnormal-repolarization tail is rejected (triangulation-dominated); the calibrated assessment is Tier D / NOT FOR PREDICTION; the uncalibrated path is byte-identical (shared RNG draw) | `tests/test_calibrated_populations.py` |
 | **cqInward biomarker** (v0.4) | control identity (=1 at no drug); ICaL/INaL block lowers it (<1), IKr block raises it (>1); propagated as a distribution; adding it changes no qNet/flip number | `tests/test_cqinward.py` |
 | **Sobol consistency** (v0.2) | total-effect ≥ first-order per channel (within MC error); indices deterministic; standard errors reported | `tests/test_sobol.py` |
 | **CiPA numeric round trip** | export the CiPA CSV, parse it back, every IC50/Hill equals the dataset value | `registry.roundtrip_cipa` |
@@ -681,7 +720,7 @@ harmonia/
 │   ├── load.py · validate.py · filter.py · records.py
 │   ├── simulate.py              # Monte-Carlo variability → risk distribution + flip view; dynamic hERG; combinations
 │   ├── exposure.py              # free ↔ total plasma concentration (protein binding)
-│   ├── populations.py           # population-of-models risk spread (hypothesis-tier, Tier D)
+│   ├── populations.py           # population-of-models risk spread + Britton-2013 calibration (hypothesis-tier, Tier D)
 │   ├── performance.py           # score the kernel vs CiPA expert labels (confusion matrix)
 │   ├── cli.py
 │   └── export/
@@ -691,7 +730,7 @@ harmonia/
 │       ├── csv_bibtex.py · annotate.py · combine.py · registry.py
 ├── dashboard/app.py             # Streamlit: browse + risk-uncertainty (flip) view
 ├── notebooks/                   # executable analyses, run in CI under nbmake
-├── tests/                       # 112 tests: dataset, kernel, qNet, simulate, dynamic binding, exposure, combinations, populations, performance, exports (round trips + unit conformance + SED-ML/OMEX integrity), CLI, dashboard contract
+├── tests/                       # 180 tests: dataset, kernel, qNet, simulate, dynamic binding, exposure, combinations, populations (incl. calibrated), performance, Bayesian UQ, exports (round trips + unit conformance + SED-ML/OMEX integrity), CLI, dashboard contract
 ├── docs/                        # essay, figures, make_figures.py
 ├── CHANGELOG.md · .zenodo.json  # release metadata
 └── exports/                     # sample generated artifacts (regenerated in CI)
@@ -727,7 +766,7 @@ feature does not get built.
 | **B — Dynamic hERG + validation** | Dynamic (Langmuir + trapping) hERG binding; the 16 validation drugs (28 CiPA compounds total); recorded classification performance | ✅ |
 | **C — Variability layer** | **Discriminating qNet via a shape-dependent Na-Ca exchanger ✅.** Remaining: full CiPA Markov hERG + published optimized kinetics; broader multi-source aggregation; ToR-ORd reformulation | ◧ |
 | **D — Exposure layer** | Free ↔ total plasma conc + protein binding (composable with Hypnos); drug-combination assessment | ✅ **this release** |
-| **E — Populations** | **Population-of-models risk spread, shipped non-predictive (Tier D) ✅ (this release).** Remaining: experimentally-calibrated populations; disease & genetic backgrounds | ◧ |
+| **E — Populations** | **Population-of-models risk spread ✅; disease & genetic backgrounds (LQTS, v0.3) ✅; experimentally-calibrated populations (Britton 2013, v0.5) ✅** — all shipped non-predictive (Tier D). Remaining: real-data-calibrated (not kernel-plausibility) populations | ✅ |
 | **F — Hardening** | **Declaration-level CellML unit-conformance check (in CI) ✅; executable `nbmake` notebook ✅; `.zenodo.json` + `CHANGELOG.md` ✅.** Remaining: full dimensional validation + the Myokit/OpenCOR cross-check against the *canonical* ORd CellML (optional local step); minted Zenodo DOI on first tagged release | ◧ |
 
 ---
