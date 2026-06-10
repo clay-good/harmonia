@@ -78,8 +78,64 @@ def cmd_simulate(args) -> int:
     ds = _load(args)
     res = assess(ds, args.drug, ap_model=args.ap_model, n_mc=args.mc, metric=args.metric,
                  exposure_multiple=args.exposure_multiple, seed=args.seed,
-                 herg_dynamic=args.dynamic)
+                 herg_dynamic=args.dynamic, uq=args.uq)
     print(res.summary())
+    return 0
+
+
+def cmd_infer(args) -> int:
+    """Show the v0.2 per-channel Bayesian posteriors + sampler diagnostics."""
+    from .infer import infer_channel, resolve_prior, learn_tau_pop
+    from .records import ChannelBlock
+    ds = _load(args)
+    pr = resolve_prior(ds, args.prior)
+    tau_pop = learn_tau_pop(ds.channel_blocks, pr)
+    blocks = [b for b in ds.blocks_for(args.drug) if isinstance(b, ChannelBlock)]
+    if not blocks:
+        print(f"no channel-block records for drug '{args.drug}'", file=sys.stderr)
+        return 1
+    print(f"posteriors  drug={args.drug.lower()}  prior={pr.id}  "
+          f"learned between-lab SD tau_pop={tau_pop:.3f} log10")
+    print(f"  {'channel':<7} {'n':>2} {'IC50 (nM) q05/med/q95':>26}  {'hill':>10}  "
+          f"{'ident':>5} {'priorS':>6} {'rhat':>5} {'ess':>5}  flags")
+    import numpy as np
+    for b in blocks:
+        p = infer_channel(b, pr, tau_pop, n_draws=4000, seed=args.seed)
+        q = 10 ** np.quantile(p.log10_ic50, [0.05, 0.5, 0.95])
+        flags = []
+        if p.censored:
+            flags.append("CENSORED")
+        if p.prior_dominated:
+            flags.append("PRIOR-DOMINATED")
+        print(f"  {b.channel:<7} {p.n_sources:>2} "
+              f"{q[0]:>7.1f}/{q[1]:>7.1f}/{q[2]:>8.1f}  "
+              f"{p.hill_mean:>5.2f}+/-{p.hill_sd:<4.2f}  {p.identifiability_score:>5.2f} "
+              f"{p.prior_sensitivity:>6.2f} {p.rhat_max:>5.3f} {p.ess_min:>5.0f}  "
+              f"{' '.join(flags)}")
+    print("\n  A posterior is not a point estimate. Outputs are distributions + diagnostics, "
+          "never a verdict.")
+    return 0
+
+
+def cmd_priors(args) -> int:
+    """List the prior registry and which records use each prior."""
+    ds = _load(args)
+    if not ds.priors:
+        print("no priors registered (dataset/priors/ is empty)")
+        return 0
+    for pid, pr in sorted(ds.priors.items()):
+        d = pr.raw or {}
+        print(f"{pid}  (v{d.get('version', '?')})")
+        print(f"  channel-level true log10 IC50 ~ Normal(m0={pr.m0}, s0={pr.s0})")
+        print(f"  between-lab SD ~ HalfNormal(scale={pr.tau_scale} log10)")
+        print(f"  hill ~ LogNormal(mu={pr.hill_mu}, sigma={pr.hill_sigma})   "
+              f"predictive={d.get('predictive')}")
+        cites = ", ".join(d.get("citations", [])) or "(none)"
+        print(f"  citations: {cites}")
+        if d.get("rationale"):
+            print(f"  rationale: {d['rationale'][:200]}{'...' if len(d['rationale']) > 200 else ''}")
+    print("\n  Priors are declared inputs, not hidden choices (spec v0.2 sec 7). "
+          "prior_sensitivity is reported per channel; no prior may carry a risk conclusion.")
     return 0
 
 
@@ -98,7 +154,8 @@ def cmd_sensitivity(args) -> int:
     ds = _load(args)
     res = flip_sensitivity(ds, args.drug, ap_model=args.ap_model, metric=args.metric,
                            n_mc=args.mc, seed=args.seed,
-                           exposure_multiple=args.exposure_multiple)
+                           exposure_multiple=args.exposure_multiple,
+                           method="sobol" if args.sobol else "oat", uq=args.uq)
     print(res.summary())
     return 0
 
@@ -213,8 +270,19 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--mc", type=int, default=200, help="Monte-Carlo draws")
     s.add_argument("--exposure-multiple", type=float, default=4.0, dest="exposure_multiple")
     s.add_argument("--dynamic", action="store_true", help="use dynamic hERG binding where available")
+    s.add_argument("--uq", default="moments", choices=["moments", "bayes"],
+                   help="uncertainty engine: v0.1 method-of-moments or v0.2 hierarchical Bayes")
     s.add_argument("--seed", type=int, default=0)
     s.set_defaults(func=cmd_simulate)
+
+    inf = sub.add_parser("infer", help="v0.2 per-channel Bayesian posteriors + diagnostics")
+    inf.add_argument("drug")
+    inf.add_argument("--prior", default=None, help="prior id (default: harmonia-ic50-prior-v1)")
+    inf.add_argument("--seed", type=int, default=0)
+    inf.set_defaults(func=cmd_infer)
+
+    sub.add_parser("priors", help="list the v0.2 prior registry"
+                   ).set_defaults(func=cmd_priors)
 
     f = sub.add_parser("flip", help="classification-flip view across AP-model variants")
     f.add_argument("drug")
@@ -231,6 +299,10 @@ def build_parser() -> argparse.ArgumentParser:
     se.add_argument("--mc", type=int, default=100,
                     help="Monte-Carlo draws per scenario (runs ~2*n_channels+1 scenarios)")
     se.add_argument("--exposure-multiple", type=float, default=4.0, dest="exposure_multiple")
+    se.add_argument("--sobol", action="store_true",
+                    help="variance-based (Sobol) indices with interactions, not one-at-a-time")
+    se.add_argument("--uq", default="moments", choices=["moments", "bayes"],
+                    help="uncertainty engine for the Sobol sampler")
     se.add_argument("--seed", type=int, default=0)
     se.set_defaults(func=cmd_sensitivity)
 

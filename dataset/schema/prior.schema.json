@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/clay-good/harmonia/dataset/schema/prior.schema.json",
+  "title": "Harmonia prior",
+  "description": "A version-pinned, citable prior for the v0.2 hierarchical Bayesian dose-response inference. A prior is a declared input, not a hidden choice (spec v0.2 sec 7): every posterior names the prior it was inferred under, and prior_sensitivity is reported so a prior-dominated number is visible. No prior may carry a risk conclusion (predictive MUST be false).",
+  "type": "object",
+  "required": ["id", "kind", "version", "channel_level", "between_lab_tau", "hill", "rationale", "predictive"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+    "kind": { "const": "prior" },
+    "version": { "type": "integer", "minimum": 1 },
+    "channel_level": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["m_0_log10nm", "s_0_log10nm"],
+      "properties": {
+        "m_0_log10nm": { "type": "number", "description": "prior mean of the true log10 IC50 (nM)" },
+        "s_0_log10nm": { "type": "number", "exclusiveMinimum": 0, "description": "prior SD of the true log10 IC50 (nM)" }
+      }
+    },
+    "between_lab_tau": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dist", "scale_log10"],
+      "properties": {
+        "dist": { "const": "half_normal" },
+        "scale_log10": { "type": "number", "exclusiveMinimum": 0, "description": "HalfNormal scale of the between-lab SD (log10 nM)" }
+      }
+    },
+    "hill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dist", "mu", "sigma"],
+      "properties": {
+        "dist": { "const": "lognormal" },
+        "mu": { "type": "number", "description": "lognormal mu of the Hill coefficient" },
+        "sigma": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "censored": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["block_sigma"],
+      "properties": {
+        "block_sigma": { "type": "number", "exclusiveMinimum": 0, "maximum": 1, "description": "fractional-block observation noise for the one-sided (top-dose-censored) likelihood" }
+      }
+    },
+    "rationale": { "type": "string" },
+    "citations": { "type": "array", "items": { "type": "string" } },
+    "predictive": { "const": false }
+  }
+}

@@ -8,7 +8,7 @@ uncertainty; it never issues a bare "safe/unsafe" verdict. See spec.md §10.
 """
 from __future__ import annotations
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from .load import Dataset, load, find_dataset_dir
 from .validate import validate_dataset, ValidationReport
@@ -18,9 +18,11 @@ from . import filter, records
 # are hard dependencies, so a plain ``import harmonia`` already needs them.
 from .simulate import (assess, assess_combination, flip_view, flip_sensitivity,
                        RiskAssessment, CombinationAssessment, FlipView,
-                       FlipSensitivity, ChannelSensitivity)
+                       FlipSensitivity, ChannelSensitivity, SobolSensitivity,
+                       SobolChannel)
 from .populations import assess_population, PopulationAssessment
 from .exposure import free_from_total, total_from_free
+from .infer import posterior, infer_channel, Posterior, Prior, resolve_prior, learn_tau_pop
 
 CLINICAL_USE = (
     "PROHIBITED — research / safety-methodology / education only; "
@@ -47,7 +49,15 @@ __all__ = [
     "FlipView",
     "FlipSensitivity",
     "ChannelSensitivity",
+    "SobolSensitivity",
+    "SobolChannel",
     "free_from_total",
     "total_from_free",
+    "posterior",
+    "infer_channel",
+    "Posterior",
+    "Prior",
+    "resolve_prior",
+    "learn_tau_pop",
     "CLINICAL_USE",
 ]

@@ -99,6 +99,18 @@ CITATIONS_TABLE = [
          authors="Passini E, Britton OJ, Lu HR, Rohrbacher J, Hermans AN, Gallacher DJ, Greig RJH, Bueno-Orovio A, Rodriguez B",
          journal="Frontiers in Physiology", year=2017,
          doi="10.3389/fphys.2017.00668", pmid="28955244"),
+    # v0.2 (Bayesian dose-response UQ) methodological precedents.
+    dict(key="johnstone-2016", type="article",
+         title="Hierarchical Bayesian inference for ion channel screening dose-response data",
+         authors="Johnstone RH, Bardenet R, Gavaghan DJ, Mirams GR",
+         journal="Wellcome Open Research", year=2016,
+         doi="10.12688/wellcomeopenres.9945.1", pmid="27918599"),
+    dict(key="elkins-2013", type="article",
+         title="Variability in high-throughput ion-channel screening data and "
+               "consequences for cardiac safety assessment",
+         authors="Elkins RC, Davies MR, Brough SJ, Gavaghan DJ, Cui Y, Abi-Gerges N, Mirams GR",
+         journal="Journal of Pharmacological and Toxicological Methods", year=2013,
+         doi="10.1016/j.vascn.2013.04.007", pmid="23651875"),
 ]
 
 # --------------------------------------------------------------------------- #

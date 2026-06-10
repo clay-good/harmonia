@@ -66,8 +66,12 @@ pip install -e ".[dev]"      # numpy, scipy, jsonschema
 harmonia validate            # JSON-Schema- + semantically validate the dataset
 harmonia info                # counts by subsystem / tier / review status
 harmonia simulate dofetilide --mc 200          # qNet metric (default); --metric apd90 to switch
+harmonia simulate dofetilide --uq bayes        # v0.2 hierarchical-Bayesian uncertainty propagation
+harmonia infer verapamil     # v0.2 per-channel IC50/Hill posteriors + sampler diagnostics
+harmonia priors              # the prior registry (declared, citable, non-predictive)
 harmonia flip verapamil      # classification stability across AP-model variants
 harmonia sensitivity verapamil                 # which channel's IC50 spread drives the flip
+harmonia sensitivity verapamil --sobol         # variance-based indices WITH interactions (v0.2)
 harmonia combo terfenadine ondansetron         # drug-combination (polypharmacy) assessment
 harmonia population sotalol  # population-of-models spread (HYPOTHESIS-TIER, not for prediction)
 harmonia performance         # score qNet vs CiPA expert labels (train/val/all); --metric apd90
@@ -101,6 +105,16 @@ sens = harmonia.flip_sensitivity(ds, "verapamil")
 sens.dominant_channel                         # 'ICaL' — the IC50 to pin down first
 sens.channels[0].solo_flip_frequency          # flip freq when ONLY ICaL's IC50 varies
 
+# v0.2 — Bayesian dose-response UQ: infer the IC50/Hill posterior, don't transcribe it
+res = harmonia.assess(ds, "dofetilide", uq="bayes")   # posterior-predictive propagation
+res.classification_flip_frequency             # samples the TRUE-value posterior
+res.reproducibility_flip_frequency            # samples the NEW-LAB predictive (a fresh replication)
+res.censored_channels, res.prior_dominated_channels   # one-sided / prior-shaped flags
+post = harmonia.posterior(ds, "dofetilide", "IKr")    # the inferred object, not a point
+post.mean_log10, post.sd_log10, post.identifiability_score, post.prior_sensitivity
+sob = harmonia.flip_sensitivity(ds, "verapamil", method="sobol")   # interaction-aware
+sob.channels[0].total_effect, sob.channels[0].interaction_load     # S_Ti and S_Ti - S_i
+
 # Dynamic (CiPA-style) hERG binding with trapping, where kinetics are recorded
 res = harmonia.assess(ds, "dofetilide", herg_dynamic=True)   # trapped blocker -> extra prolongation
 
@@ -122,12 +136,13 @@ pop.tier                                      # "D"  (always; non-predictive)
 
 ---
 
-## What's in the box (Phases A + B + C-start + D + E + F-start)
+## What's in the box (Phases A + B + C + D + E + F-start)
 
 | Layer | Status |
 | --- | --- |
-| **Dataset** — 68 channel-block records across the **28 CiPA compounds** (12 training + 16 validation), 28 drug-reference records (expert risk label + free Cmax + protein binding), 3 AP-model records, 1 population spec, 12 Crossref-checked citations | ✅ |
+| **Dataset** — 68 channel-block records across the **28 CiPA compounds** (12 training + 16 validation), 28 drug-reference records (expert risk label + free Cmax + protein binding), 3 AP-model records, 1 population spec, 14 Crossref-checked citations | ✅ |
 | **Variability is first-class** — multi-source IC50s with computed fold-range / IQR; the reliability gate (max block < 60% ⇒ Tier D, unidentifiable) machine-enforced | ✅ |
+| **Bayesian dose-response UQ** (Phase C, **v0.2**) — the IC50/Hill spread is *inferred* under a declared prior, not transcribed: hierarchical posterior with dataset-learned between-lab pooling, propagated Hill uncertainty, a one-sided **censored** posterior for sub-60%-block channels, a prior registry with per-channel `prior_sensitivity`, and variance-based (Sobol) sensitivity. Opt-in via `uq="bayes"`; `uq="moments"` (default) reproduces every v0.1 number | ✅ |
 | **Reference kernel** — a SciPy reduced O'Hara-Rudy-lineage ventricular AP (7 currents + Na-Ca exchanger) with Hill block per current; APD90 / qNet / triangulation / EAD biomarkers | ✅ |
 | **Discriminating qNet** (Phase C) — adding a shape-dependent Na-Ca exchanger (excluded from the qNet sum) makes qNet sensitive; **qNet is now the default metric** (10/12 training, zero two-category errors over all 28 compounds); APD90 selectable | ✅ |
 | **Dynamic hERG binding** (Phase B) — Langmuir kon/koff with **trapping**; reduces to the static Hill block at steady state, captures use-dependent block (`assess(..., herg_dynamic=True)`) | ✅ |
@@ -155,7 +170,10 @@ flowchart TD
     DS -->|"build_records.py (provenance log)"| REC["records/*.json"]
     REC --> LOAD["harmonia.load → Dataset"]
     LOAD --> VAL["validate.py<br/>schema + reliability-gate + citation rules"]
-    LOAD --> SIM["simulate.py<br/>Monte-Carlo variability → risk distribution + flip freq<br/>flip sensitivity (per-channel attribution)<br/>dynamic hERG · exposure scaling · drug combinations<br/>populations.py: population-of-models (Tier D)"]
+    LOAD --> SIM["simulate.py<br/>Monte-Carlo variability → risk distribution + flip freq<br/>flip sensitivity (OAT + Sobol) · uq=moments|bayes<br/>dynamic hERG · exposure scaling · drug combinations<br/>populations.py: population-of-models (Tier D)"]
+    LOAD --> INFER["infer.py (v0.2)<br/>hierarchical Bayesian IC50/Hill posterior<br/>learned between-lab pooling · censored likelihood<br/>prior_sensitivity · identifiability_score"]
+    PRI["dataset/priors/<br/>declared, citable, non-predictive priors"] --> INFER
+    INFER --> SIM
     LOAD --> EXP["harmonia.export<br/>format builders"]
     SIM --> PERF["performance.py<br/>score vs CiPA expert labels"]
     SIM --> REF["reference.py<br/>SciPy ORd-lineage AP kernel (+ INaCa)<br/>qNet (default) / APD90 / EAD biomarkers"]
@@ -400,6 +418,87 @@ CI under `nbmake`.
 
 ---
 
+## v0.2 — Bayesian dose-response uncertainty quantification
+
+Where v0.1 made input variability a first-class **field**, v0.2 makes it a
+first-class **inference**: the spread of an IC50 stops being a number transcribed
+from a table and becomes a posterior, derived under a declared prior from the
+underlying data. It is **opt-in** — `uq="moments"` (the default) reproduces every
+v0.1 number exactly; `uq="bayes"` swaps the per-channel draw for a
+posterior-predictive sample. Full design rationale:
+[`docs/specs/v0.2-bayesian-dose-response-uq.md`](docs/specs/v0.2-bayesian-dose-response-uq.md).
+
+![Bayesian dose-response UQ](docs/img/bayesian_uq.png)
+
+The v0.1 Monte-Carlo built, per channel, a lognormal IC50 draw centered on the
+log-geomean with `sigma = std(log10(source_ic50s))` (or a hard-coded constant for
+a single source) and a **fixed** Hill coefficient. That is correct but discards
+information in three places. v0.2 closes all three:
+
+| Gap in the v0.1 sampler | v0.2 fix |
+| --- | --- |
+| **Spread is a point estimate from 2–3 numbers**, and a single-source channel carries a magic `DEFAULT_SINGLE_SOURCE_SIGMA`. | A **hierarchical posterior** whose between-lab SD `tau_pop` is *learned across every multi-source channel in the dataset* (`learn_tau_pop`) and **borrowed** by sparse channels — a constant becomes an inferred, citable quantity that sharpens as the dataset grows. |
+| **The Hill coefficient is fixed**, even when sources disagree on block steepness. | A joint `(IC50, Hill)` posterior; Hill uncertainty now propagates into the block factor. |
+| **Sub-60%-block is a binary exclusion** — a "45% block at the top dose" measurement is thrown away entirely. | A **one-sided censored posterior**: the max-block observation becomes a probit likelihood that bounds the IC50 from below near the recovered top tested dose, with the Hill marginalized over its prior — a proper but wide, heavy-right-tailed posterior. The Tier-D gate is **preserved**; v0.2 only stops discarding the information. |
+
+**The non-drift guarantee.** In the well-identified, multi-source, agreed-Hill
+limit the posterior mean of `log10(IC50)` converges to the log-geomean and the
+predictive SD to the sample SD — so `uq="bayes"` and `uq="moments"` agree where
+v0.1 was already right (left panel above; asserted in `tests/test_infer.py`). A
+reviewer can trust v0.2 precisely because it does not move the numbers v0.1 had
+right.
+
+**Two distinct flip frequencies — and v0.2 never conflates them.** The headline
+`classification_flip_frequency` samples the **true-value** posterior (μ_c, "what is
+the drug's IC50?"). A separate, labeled `reproducibility_flip_frequency` samples the
+**new-lab predictive** (adds the between-lab spread τ_c, "how much would a fresh
+replication move the call?"). Both are distributions; neither is a verdict.
+
+**Priors are declared inputs, not hidden choices.** Every prior lives in
+[`dataset/priors/`](dataset/priors) as a version-pinned, citable, **non-predictive**
+object (`harmonia validate` enforces `predictive == false` — no prior may carry a
+risk conclusion). Each posterior reports its `prior_sensitivity` — the fraction of
+posterior variance attributable to the genuinely-subjective priors, probed by
+re-inference under a widened prior while the empirical-Bayes `tau_pop` is held fixed.
+A high value is not an error; it is the honest statement "this number is mostly
+prior," and it drives the prior-dominance flag. A censored channel is prior-dominated
+by construction (centre panel above), and the honest recommendation is unchanged from
+v0.1: go measure it at higher doses.
+
+```text
+$ harmonia infer verapamil
+posteriors  drug=verapamil  prior=harmonia-ic50-prior-v1  learned between-lab SD tau_pop=0.249 log10
+  channel  n      IC50 (nM) q05/med/q95        hill  ident priorS  rhat   ess  flags
+  ICaL     1     81.6/  203.1/   526.3   1.09+/-0.10   0.39   0.11 1.000  3723
+  IKr      3    136.2/  252.8/   475.1   1.00+/-0.06   0.69   0.07 1.000  3722
+  INaL     1   2529.5/ 6900.4/ 16480.0   1.00+/-0.09   0.45   0.11 1.000  3713
+```
+
+**Global, interaction-aware sensitivity (Sobol).** The v0.1 one-at-a-time
+attribution reads main effects but **cannot see channel interactions** (an IKr–ICaL
+trade-off where neither IC50 alone flips the call but their joint variation does).
+`flip_sensitivity(method="sobol")` reports first-order `S_i` (Janon estimator),
+total-effect `S_Ti` (Jansen estimator), and the **interaction load** `S_Ti − S_i`,
+each with a bootstrap Monte-Carlo standard error. The dominant-driver recommendation
+becomes interaction-aware: a channel can be the dominant *total-effect* driver while
+having a small *solo* effect — exactly the case OAT misses. The cheap OAT readout
+remains the default.
+
+**Implementation choices** (and why), in the family tradition:
+
+| Decision | Rationale |
+| --- | --- |
+| **Exact direct (grid + conjugate) sampler in pure NumPy**, not a PPL/MCMC | The summary regime has 1–3 data points per channel; the between-lab SD is drawn from its collapsed 1-D marginal (the channel mean integrated out in closed form, so **no Neal funnel**) and the true log-IC50 from a conjugate Normal. Draws are i.i.d. and exactly from the posterior, deterministic, dependency-free, and millisecond-fast; `rhat`/`ess` are still reported and trivially satisfied. |
+| **Posteriors recomputed on demand, not cached into records** | Keeps the source of truth `(source data + prior)` and `harmonia.load()` a zero-extra-dependency read; reproducibility is asserted by a "run twice → byte-identical" test rather than a brittle cross-platform `git diff` of 68 regenerated files. |
+| **`uq="moments"` stays the default** | A non-flag-day rollout (spec v0.2 §11): every v0.2 number is diffable against its v0.1 counterpart, and the backward-compatibility suite guards the moments path byte-for-byte. |
+| **The 60%-block gate is preserved; censoring is additive** | The gate governs the *claim* (Tier cap); the continuous `identifiability_score` governs the *diagnostic*. A continuous score must never launder a sub-threshold channel into a higher tier. |
+
+The v0.2 analysis is reproduced and asserted in
+[`notebooks/02_bayesian_uq.ipynb`](notebooks/02_bayesian_uq.ipynb), run in CI under
+`nbmake`.
+
+---
+
 ## Export formats
 
 | Format | Role | File |
@@ -445,7 +544,7 @@ optional local step (they need a heavy simulation engine, so are not run in CI).
 ## Validation & testing
 
 Everything downstream of the dataset is a deterministic projection, so the test
-suite (125 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
+suite (147 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 *provable non-drift* rather than fixtures:
 
 | Guard | What it proves | Where |
@@ -453,6 +552,10 @@ suite (125 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 | **Lint** | no dead imports, undefined names, or unused variables (Pyflakes + pycodestyle) | `ruff check` |
 | **Dataset reproducibility** | `dataset/records` regenerates byte-identically from `build_records.py` (the provenance log) — the curated table *is* the dataset | CI `git diff --exit-code` |
 | **Schema + semantic validation** | every record satisfies the JSON Schema; the reliability gate (block < 60% ⟺ Tier D ⟺ failure-mode) and variability bookkeeping hold | `harmonia validate` |
+| **Prior registry validity** (v0.2) | every prior schema-validates, its id matches its filename, every cited key resolves, and `predictive == false` (no prior carries a risk conclusion) | `harmonia validate` |
+| **Bayesian reduction / non-drift** (v0.2) | the posterior mean → log-geomean for a multi-source channel; the moments path is byte-identical, so `uq="moments"` reproduces v0.1 exactly | `tests/test_infer.py`, `tests/test_uq_assess.py` |
+| **Sampler convergence + censoring** (v0.2) | every channel posterior meets `rhat < 1.01` / an `ess` floor; a sub-60%-block channel yields a wide, prior-dominated one-sided posterior and still produces a Tier-D assessment | `tests/test_infer.py` |
+| **Sobol consistency** (v0.2) | total-effect ≥ first-order per channel (within MC error); indices deterministic; standard errors reported | `tests/test_sobol.py` |
 | **CiPA numeric round trip** | export the CiPA CSV, parse it back, every IC50/Hill equals the dataset value | `registry.roundtrip_cipa` |
 | **Parameter round trip** | the kernel conductances appear verbatim in the CellML/SBML/Myokit text | `registry.roundtrip_parameters` |
 | **ODE round trip** | the model AST re-integrates to the reference-kernel AP within ≈1e-7 — the exported *equations* match the oracle, not just the constants | `registry.roundtrip_ode` |

@@ -116,7 +116,41 @@
           },
           "temperature_c": { "type": ["number", "null"] },
           "max_block_observed_percent": { "type": ["number", "null"] },
-          "citation": { "type": "string" }
+          "citation": { "type": "string" },
+          "fit_sd_log10": {
+            "type": ["number", "null"],
+            "exclusiveMinimum": 0,
+            "description": "v0.2 summary regime: per-source fit SD (log10 nM) of the fitted IC50, if known."
+          },
+          "dose_response": {
+            "type": "object",
+            "description": "v0.2 raw regime (optional upgrade path): raw concentration-block points that let the IC50/Hill be INFERRED rather than transcribed (spec v0.2 sec 3). Records without it fall back to the summary regime.",
+            "additionalProperties": false,
+            "required": ["concentration_nm", "fractional_block"],
+            "properties": {
+              "concentration_nm": { "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 } },
+              "fractional_block": { "type": "array", "items": { "type": "number", "minimum": 0, "maximum": 1 } },
+              "n_cells": { "type": "array", "items": { "type": "integer", "minimum": 1 } },
+              "sem": { "type": "array", "items": { "type": "number", "minimum": 0 } },
+              "likelihood": { "enum": ["truncated_normal", "beta"] },
+              "top_dose_censored": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
+    "inference": {
+      "type": "object",
+      "description": "v0.2 per-channel posterior contract (spec v0.2 sec 3). OPTIONAL: when absent, the channel is inferred under the pinned default prior at assess time. The posterior_summary is a CACHED, generated projection of (source data + prior) — never hand-edited.",
+      "additionalProperties": false,
+      "properties": {
+        "method": { "enum": ["hierarchical_bayes", "method_of_moments"] },
+        "prior": { "type": "string", "description": "FK into the prior registry (dataset/priors/)" },
+        "censored": { "type": "boolean" },
+        "posterior_summary": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Cached sampler output (mean/sd/quantiles + rhat/ess + identifiability/prior-sensitivity). Regenerable by build_posteriors.py."
         }
       }
     },

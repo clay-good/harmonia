@@ -201,6 +201,14 @@ class RiskAssessment:
     channels_used: List[str] = field(default_factory=list)
     herg_dynamic: bool = False
 
+    # v0.2 Bayesian uncertainty quantification (spec v0.2). Defaults keep the v0.1
+    # moments path unchanged: uq="moments" reports no reproducibility flip and no
+    # censored/prior-dominated channels.
+    uq: str = "moments"
+    reproducibility_flip_frequency: float = float("nan")   # new-lab predictive (sec 2.4)
+    censored_channels: List[str] = field(default_factory=list)        # one-sided posteriors (sec 2.3)
+    prior_dominated_channels: List[str] = field(default_factory=list)  # sec 6/7 flags
+
     clinical_use: str = ("PROHIBITED — research / safety-methodology / education only; "
                          "not a regulatory determination")
 
@@ -215,12 +223,22 @@ class RiskAssessment:
             f"qNet {self.qnet:.4f}  -> [{self.metric}] point class: {self.classification.upper()}",
             f"triangulation (APD90-APD50): {self.triangulation_ms:.0f} ms "
             f"(drug-free {self.baseline_triangulation_ms:.0f} ms) — diagnostic, not the classifier",
-            f"variability ({self.n_mc} MC draws): {dist}",
+            f"variability ({self.n_mc} MC draws, uq={self.uq}): {dist}",
             f"classification-flip frequency: {self.classification_flip_frequency:.0%}",
         ]
+        if self.uq == "bayes" and not np.isnan(self.reproducibility_flip_frequency):
+            lines.append(f"reproducibility-flip frequency (new-lab predictive): "
+                         f"{self.reproducibility_flip_frequency:.0%}")
         if self.excluded_channels:
             lines.append(f"EXCLUDED (unidentifiable IC50, max block < 60%): "
                          f"{', '.join(self.excluded_channels)}")
+        if self.censored_channels:
+            lines.append(f"CENSORED (one-sided posterior, max block < 60%, prior-dominated; "
+                         f"still Tier-D-capped): {', '.join(self.censored_channels)}")
+        if self.prior_dominated_channels:
+            lines.append(f"PRIOR-DOMINATED channels (posterior is prior-shaped, not "
+                         f"data-shaped — measure at higher doses): "
+                         f"{', '.join(self.prior_dominated_channels)}")
         for w in self.warnings:
             lines.append(f"  warn: {w}")
         lines.append("NOTE: a risk distribution, not a safety verdict. " + self.clinical_use)
@@ -232,7 +250,8 @@ def assess(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
            exposure_multiple: float = REFERENCE_EXPOSURE_MULTIPLE,
            metric: str = DEFAULT_METRIC, n_mc: int = 200, seed: int = 0,
            n_beats: int = 3, herg_dynamic: bool = False,
-           n_beats_dynamic: int = 10) -> RiskAssessment:
+           n_beats_dynamic: int = 10, uq: str = "moments",
+           prior: Optional[object] = None) -> RiskAssessment:
     """Assess a drug's proarrhythmia-metric *distribution* under input variability.
 
     Returns a :class:`RiskAssessment` — a distribution and a classification-flip
@@ -244,6 +263,20 @@ def assess(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
     (CiPA-style) binding ODE instead of a static Hill factor — capturing
     use-dependent trapping. The binding equilibrates slowly, so the dynamic path
     paces ``n_beats_dynamic`` beats.
+
+    ``uq`` selects the uncertainty-propagation engine (spec v0.2):
+
+    - ``"moments"`` (default) — the v0.1 method-of-moments lognormal sampler. Exact
+      backward compatibility; every v0.1 number reproduces.
+    - ``"bayes"`` — the hierarchical Bayesian posterior-predictive sampler
+      (:mod:`harmonia.infer`). The per-channel ``(IC50, Hill)`` posterior is inferred
+      under a declared ``prior`` and sampled in place of the lognormal draw, so Hill
+      uncertainty propagates, single-source channels borrow the dataset-learned
+      between-lab spread instead of a magic constant, and a sub-60%-block channel
+      contributes a one-sided **censored** posterior rather than being excluded (it
+      stays Tier-D-capped). The headline flip frequency samples the *true-value*
+      posterior; a separate ``reproducibility_flip_frequency`` samples the *new-lab
+      predictive* (sec 2.4). Neither is a verdict.
     """
     drug_l = drug.lower()
     blocks = [b for b in ds.blocks_for(drug_l) if isinstance(b, ChannelBlock)]
@@ -271,32 +304,12 @@ def assess(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
 
     if metric not in ("qnet", "apd90"):
         raise ValueError(f"metric must be 'qnet' or 'apd90', got {metric!r}")
+    if uq not in ("moments", "bayes"):
+        raise ValueError(f"uq must be 'moments' or 'bayes', got {uq!r}")
 
-    # ---- honesty: tier propagation + flags (over ALL channel records) ------- #
-    excluded, warnings = [], []
-    tiers = [ap_rec.tier]
-    for b in blocks:
-        tiers.append(b.tier)
-        if not b.identifiable:
-            mb = b.assay_context.max_block_observed_percent
-            excluded.append(f"{b.channel} (max block {mb:g}%)")
-            warnings.append(
-                f"{b.channel}: IC50 unidentifiable (max block "
-                f"{mb:g}% < 60%) — excluded from simulation; caps assessment at Tier D")
-        elif b.variability.fold_range and b.variability.fold_range > 5:
-            warnings.append(f"{b.channel}: inter-source IC50 fold-range "
-                            f"{b.variability.fold_range:g} — classification may flip with source")
-    tier = _worst_tier(tiers)
-
-    draws = _channel_draws(blocks)
-    channels_used = [d.channel for d in draws]
-    singles = [d.channel for d in draws if d.single_source]
-    if singles:
-        warnings.append(
-            f"single-source channels {singles} sampled with a default log10 SD of "
-            f"{DEFAULT_SINGLE_SOURCE_SIGMA} (assumed inter-lab prior; flagged, not measured)")
-
-    hill_by = {d.channel: d.hill for d in draws}
+    # tier propagation is identical under either uq engine: worst-wins over every
+    # channel record + the AP model; a censored (sub-60%-block) channel keeps Tier D.
+    tier = _worst_tier([ap_rec.tier] + [b.tier for b in blocks])
 
     def _herg_for(ic50_nm: float):
         """Build a HERGDynamic at the reference exposure with kon set so the
@@ -307,6 +320,37 @@ def assess(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
         trapping = bool(herg_rec.dynamic_binding["trapping"])
         return HERGDynamic(conc_nm=reference_exposure, kon=koff / ic50_nm,
                            koff=koff, trapping=trapping)
+
+    if uq == "bayes":
+        return _assess_bayes(
+            ds, drug_l, blocks, ap_rec, scales, baseline, baseline_tri, metric,
+            reference_exposure, n_mc, seed, n_beats, _herg_for, use_dynamic, tier,
+            prior)
+
+    # ====================================================================== #
+    # v0.1 method-of-moments path (default) — kept byte-identical for non-drift
+    # ====================================================================== #
+    excluded, warnings = [], []
+    for b in blocks:
+        if not b.identifiable:
+            mb = b.assay_context.max_block_observed_percent
+            excluded.append(f"{b.channel} (max block {mb:g}%)")
+            warnings.append(
+                f"{b.channel}: IC50 unidentifiable (max block "
+                f"{mb:g}% < 60%) — excluded from simulation; caps assessment at Tier D")
+        elif b.variability.fold_range and b.variability.fold_range > 5:
+            warnings.append(f"{b.channel}: inter-source IC50 fold-range "
+                            f"{b.variability.fold_range:g} — classification may flip with source")
+
+    draws = _channel_draws(blocks)
+    channels_used = [d.channel for d in draws]
+    singles = [d.channel for d in draws if d.single_source]
+    if singles:
+        warnings.append(
+            f"single-source channels {singles} sampled with a default log10 SD of "
+            f"{DEFAULT_SINGLE_SOURCE_SIGMA} (assumed inter-lab prior; flagged, not measured)")
+
+    hill_by = {d.channel: d.hill for d in draws}
 
     # ---- point estimate (geomean IC50 per channel) -------------------------- #
     ic50_point = {d.channel: 10 ** d.mu_log10 for d in draws}
@@ -352,7 +396,103 @@ def assess(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
         dapd90_distribution=dapd, apd90_distribution=apd, qnet_distribution=qn,
         classification_distribution=counts, classification_flip_frequency=flip_freq,
         tier=tier, warnings=warnings, excluded_channels=excluded,
-        channels_used=channels_used, herg_dynamic=use_dynamic,
+        channels_used=channels_used, herg_dynamic=use_dynamic, uq="moments",
+    )
+
+
+def _assess_bayes(ds, drug_l, blocks, ap_rec, scales, baseline, baseline_tri, metric,
+                  reference_exposure, n_mc, seed, n_beats, _herg_for, use_dynamic, tier,
+                  prior):
+    """The v0.2 Bayesian posterior-predictive path of :func:`assess`.
+
+    Per channel (identifiable *and* censored), infer the ``(IC50, Hill)`` posterior
+    under the declared prior, then sample it in place of the v0.1 lognormal draw.
+    Channels are inferred with independent RNG streams so their IC50 uncertainties
+    are propagated independently; each channel's draws are a fixed, indexed sample
+    set, so the i-th Monte-Carlo iteration uses the i-th posterior sample (common
+    random numbers, exactly as the moments path and flip_sensitivity require).
+    """
+    from .infer import infer_channel, learn_tau_pop, resolve_prior
+
+    prior_obj = resolve_prior(ds, prior)
+    tau_pop = learn_tau_pop(ds.channel_blocks, prior_obj)
+    n_draws = max(n_mc, 500)   # floor so point/summary stats stay stable when n_mc is tiny
+
+    posts, warnings, censored_channels, prior_dominated = {}, [], [], []
+    for j, b in enumerate(blocks):
+        post = infer_channel(b, prior_obj, tau_pop, n_draws=n_draws,
+                             seed=seed + 1009 * (j + 1))
+        posts[b.channel] = post
+        if post.censored:
+            censored_channels.append(f"{b.channel} (max block "
+                                     f"{b.assay_context.max_block_observed_percent:g}%)")
+            warnings.append(
+                f"{b.channel}: IC50 unidentifiable (max block "
+                f"{b.assay_context.max_block_observed_percent:g}% < 60%) — contributes a "
+                f"one-sided CENSORED posterior (bounded below near the top tested dose, "
+                f"prior-dominated); still caps assessment at Tier D. Measure at higher doses.")
+        if post.prior_dominated:
+            prior_dominated.append(b.channel)
+        if b.variability.fold_range and b.variability.fold_range > 5:
+            warnings.append(f"{b.channel}: inter-source IC50 fold-range "
+                            f"{b.variability.fold_range:g} — classification may flip with source")
+    if prior_dominated:
+        warnings.append(
+            f"prior-dominated channels {prior_dominated}: the posterior is prior-shaped, "
+            f"not data-shaped (prior_sensitivity exceeds threshold) — the honest fix is "
+            f"more / higher-dose data, not a tighter prior.")
+
+    channels_used = list(posts.keys())
+
+    def _run(ic50_by, hill_by):
+        bf = _block_factors(ic50_by, hill_by, reference_exposure)
+        p = KernelParams().with_scales(scales)
+        p.block.update(bf)
+        return simulate_beats(p, n_beats=n_beats, herg=_herg_for(ic50_by.get("IKr", 1e9)))
+
+    # ---- point estimate (posterior MEDIAN per channel — a readout, not a verdict) -- #
+    ic50_point = {ch: float(np.median(p.ic50_samples())) for ch, p in posts.items()}
+    hill_point = {ch: float(np.median(p.hill)) for ch, p in posts.items()}
+    pt = _run(ic50_point, hill_point)
+    dapd_point = 100.0 * (pt.apd90 - baseline) / baseline if baseline else float("nan")
+    point_class = classify_metric(metric, dapd_point, pt.qnet)
+
+    def _mc(predictive: bool):
+        dapd = np.empty(n_mc); apd = np.empty(n_mc); qn = np.empty(n_mc)
+        classes = []
+        for i in range(n_mc):
+            ic50_s = {ch: (p.predictive_ic50_samples()[i] if predictive
+                           else p.ic50_samples()[i]) for ch, p in posts.items()}
+            hill_s = {ch: p.hill[i] for ch, p in posts.items()}
+            r = _run(ic50_s, hill_s)
+            apd[i] = r.apd90
+            dapd[i] = 100.0 * (r.apd90 - baseline) / baseline if baseline else float("nan")
+            qn[i] = r.qnet
+            classes.append(classify_metric(metric, dapd[i], qn[i]))
+        return dapd, apd, qn, classes
+
+    if n_mc:
+        dapd, apd, qn, classes = _mc(predictive=False)
+        counts = {lab: classes.count(lab) / n_mc for lab in RISK_LABELS}
+        flip_freq = float(np.mean([c != point_class for c in classes]))
+        _, _, _, repro_classes = _mc(predictive=True)
+        repro_flip = float(np.mean([c != point_class for c in repro_classes]))
+    else:
+        dapd = np.empty(0); apd = np.empty(0); qn = np.empty(0)
+        counts = {lab: (1.0 if lab == point_class else 0.0) for lab in RISK_LABELS}
+        flip_freq = 0.0
+        repro_flip = float("nan")
+
+    return RiskAssessment(
+        drug=drug_l, ap_model=ap_rec.id, reference_exposure_nM=reference_exposure,
+        metric=metric, apd90=pt.apd90, baseline_apd90=baseline, dapd90_pct=dapd_point,
+        qnet=pt.qnet, ead=pt.ead, classification=point_class,
+        triangulation_ms=pt.triangulation, baseline_triangulation_ms=baseline_tri,
+        n_mc=n_mc, dapd90_distribution=dapd, apd90_distribution=apd, qnet_distribution=qn,
+        classification_distribution=counts, classification_flip_frequency=flip_freq,
+        tier=tier, warnings=warnings, excluded_channels=[], channels_used=channels_used,
+        herg_dynamic=use_dynamic, uq="bayes", reproducibility_flip_frequency=repro_flip,
+        censored_channels=censored_channels, prior_dominated_channels=prior_dominated,
     )
 
 
@@ -629,18 +769,256 @@ class FlipSensitivity:
         return "\n".join(lines)
 
 
+@dataclass
+class SobolChannel:
+    """Variance-based sensitivity indices for one channel's IC50 (spec v0.2 sec 5)."""
+    channel: str
+    n_sources: int
+    first_order: float       # S_i  — variance explained by this channel alone
+    first_order_se: float
+    total_effect: float      # S_Ti — variance explained including all interactions
+    total_effect_se: float
+
+    @property
+    def interaction_load(self) -> float:
+        """S_Ti - S_i — the interaction contribution, invisible to a one-at-a-time
+        design. A channel with a large interaction load matters only jointly."""
+        return self.total_effect - self.first_order
+
+
+@dataclass
+class SobolSensitivity:
+    """Global, variance-based attribution of the metric's uncertainty to each channel.
+
+    Generalizes the OAT :class:`FlipSensitivity`: first-order ``S_i`` approximates the
+    OAT solo effect, total-effect ``S_Ti`` approximates the OAT frozen-complement, and
+    ``interaction_load = S_Ti - S_i`` is the part a one-at-a-time design cannot see. The
+    decomposition is of the *continuous* metric variance (the binary flip is reported
+    alongside as ``all_vary_flip_frequency``). An analysis of uncertainty, not a verdict.
+    """
+    drug: str
+    ap_model: str
+    metric: str
+    uq: str
+    classification: str
+    all_vary_flip_frequency: float
+    metric_variance: float
+    n_base: int                       # Saltelli base sample size N (cost ~ N*(d+2))
+    channels: List[SobolChannel]      # sorted by total_effect, descending
+    tier: str
+    warnings: List[str] = field(default_factory=list)
+    excluded_channels: List[str] = field(default_factory=list)
+    censored_channels: List[str] = field(default_factory=list)
+    clinical_use: str = ("PROHIBITED — research / safety-methodology / education only; "
+                         "not a regulatory determination")
+
+    @property
+    def dominant_channel(self) -> Optional[str]:
+        """Interaction-aware dominant driver: the largest total-effect channel."""
+        return self.channels[0].channel if self.channels else None
+
+    def summary(self) -> str:
+        lines = [
+            f"sobol-sensitivity  drug={self.drug}  ap_model={self.ap_model}  "
+            f"tier={self.tier}  uq={self.uq}",
+            f"point class: {self.classification.upper()}   metric={self.metric}   "
+            f"all-vary flip frequency: {self.all_vary_flip_frequency:.0%}   "
+            f"Var(metric)={self.metric_variance:.3g}  (N={self.n_base})",
+            "  channel   sources   S_i (1st)        S_Ti (total)     interaction",
+        ]
+        for c in self.channels:
+            lines.append(f"  {c.channel:<8} {c.n_sources:>5}    "
+                         f"{c.first_order:>5.2f} +/- {c.first_order_se:<4.2f}   "
+                         f"{c.total_effect:>5.2f} +/- {c.total_effect_se:<4.2f}   "
+                         f"{c.interaction_load:>+5.2f}")
+        if self.dominant_channel:
+            lines.append(f"dominant uncertainty driver (total-effect, interaction-aware): "
+                         f"{self.dominant_channel} — pin this IC50 down first")
+        if self.censored_channels:
+            lines.append(f"CENSORED (one-sided posterior; included under uq=bayes): "
+                         f"{', '.join(self.censored_channels)}")
+        if self.excluded_channels:
+            lines.append(f"EXCLUDED (unidentifiable IC50): {', '.join(self.excluded_channels)}")
+        for w in self.warnings:
+            lines.append(f"  warn: {w}")
+        lines.append("NOTE: an uncertainty attribution, not a safety verdict. "
+                     + self.clinical_use)
+        return "\n".join(lines)
+
+
+def _sobol_sensitivity(ds: Dataset, drug: str, ap_model: str, metric: str, n_mc: int,
+                       seed: int, exposure_nM, exposure_kind, exposure_multiple,
+                       n_beats, uq: str, prior) -> SobolSensitivity:
+    """Saltelli/Jansen first-order and total-effect Sobol indices over the continuous
+    metric. Each channel's IC50 is sampled from its marginal (moments lognormal, or
+    bootstrapped from the v0.2 Bayesian posterior when ``uq="bayes"``)."""
+    drug_l = drug.lower()
+    blocks = [b for b in ds.blocks_for(drug_l) if isinstance(b, ChannelBlock)]
+    if not blocks:
+        raise KeyError(f"no channel-block records for drug '{drug}'")
+    if metric not in ("qnet", "apd90"):
+        raise ValueError(f"metric must be 'qnet' or 'apd90', got {metric!r}")
+    if uq not in ("moments", "bayes"):
+        raise ValueError(f"uq must be 'moments' or 'bayes', got {uq!r}")
+
+    ref = ds.drug_reference(drug_l)
+    reference_exposure = resolve_free_exposure(
+        ref, exposure_nM=exposure_nM, exposure_kind=exposure_kind,
+        exposure_multiple=exposure_multiple)
+    ap_rec = _resolve_ap_model(ds, ap_model)
+    scales = ap_rec.conductance_scales
+    baseline = _cached_baseline(tuple(sorted(scales.items())), n_beats)[0]
+
+    excluded, censored, warnings = [], [], []
+    tier = _worst_tier([ap_rec.tier] + [b.tier for b in blocks])
+
+    # build per-channel log10-IC50 samplers + fixed Hill (IC50-spread attribution)
+    rng = np.random.default_rng(seed)
+    samplers, hill_by, chan_meta = {}, {}, []
+    if uq == "bayes":
+        from .infer import infer_channel, learn_tau_pop, resolve_prior
+        prior_obj = resolve_prior(ds, prior)
+        tau_pop = learn_tau_pop(ds.channel_blocks, prior_obj)
+        for j, b in enumerate(blocks):
+            post = infer_channel(b, prior_obj, tau_pop, n_draws=max(4 * n_mc, 2000),
+                                 seed=seed + 1009 * (j + 1))
+            pool = post.log10_ic50
+            samplers[b.channel] = (lambda n, _p=pool: rng.choice(_p, size=n))
+            hill_by[b.channel] = float(np.median(post.hill))
+            chan_meta.append((b.channel, len(b.source_ic50s_nm)))
+            if post.censored:
+                censored.append(f"{b.channel} (max block {b.assay_context.max_block_observed_percent:g}%)")
+    else:
+        for d in _channel_draws(blocks):
+            mu, sigma = d.mu_log10, d.sigma_log10
+            samplers[d.channel] = (lambda n, _m=mu, _s=sigma: rng.normal(_m, _s, n))
+            hill_by[d.channel] = d.hill
+            chan_meta.append((d.channel, d.n_sources))
+        for b in blocks:
+            if not b.identifiable:
+                excluded.append(f"{b.channel} (max block {b.assay_context.max_block_observed_percent:g}%)")
+
+    channels = [c for c, _ in chan_meta]
+    d = len(channels)
+    if d == 0:
+        return SobolSensitivity(drug=drug_l, ap_model=ap_rec.id, metric=metric, uq=uq,
+                                classification="intermediate", all_vary_flip_frequency=0.0,
+                                metric_variance=0.0, n_base=0, channels=[], tier=tier,
+                                warnings=["no identifiable channels to attribute"],
+                                excluded_channels=excluded, censored_channels=censored)
+
+    N = max(n_mc, 8)
+
+    def _metric(row: Dict[str, float]) -> float:
+        ic50_by = {ch: 10.0 ** row[ch] for ch in channels}
+        bf = _block_factors(ic50_by, hill_by, reference_exposure)
+        p = KernelParams().with_scales(scales)
+        p.block.update(bf)
+        r = simulate_beats(p, n_beats=n_beats)
+        if metric == "qnet":
+            return r.qnet
+        return 100.0 * (r.apd90 - baseline) / baseline if baseline else float("nan")
+
+    # Saltelli A/B design (each column is a channel)
+    A = {ch: samplers[ch](N) for ch in channels}
+    B = {ch: samplers[ch](N) for ch in channels}
+
+    def _eval(mat):
+        return np.array([_metric({ch: mat[ch][k] for ch in channels}) for k in range(N)])
+
+    fA = _eval(A)
+    fB = _eval(B)
+    fAB = {}
+    for ch in channels:
+        ABi = dict(A)
+        ABi[ch] = B[ch]
+        fAB[ch] = _eval(ABi)
+
+    allf = np.concatenate([fA, fB])
+    var = float(np.var(allf, ddof=1))
+
+    def _class(v: float) -> str:
+        return (classify_metric(metric, float("nan"), v) if metric == "qnet"
+                else classify_metric(metric, v, float("nan")))
+
+    # flip frequency from the full-variation A samples (all channels vary)
+    point_class = _class(float(np.median(allf)))
+    flip = float(np.mean([_class(v) != point_class for v in fA])) if N else 0.0
+
+    def _boot_se(estimator) -> float:
+        if N < 4:
+            return float("nan")
+        rb = np.random.default_rng(seed + 31)
+        vals = []
+        for _ in range(40):
+            idx = rb.integers(0, N, N)
+            vals.append(estimator(idx))
+        return float(np.std(vals, ddof=1))
+
+    def _first_order(fb, fc):
+        """Janon (2014) first-order estimator on the pair (f_B, f_AB^i), which share
+        factor i. Lower-variance and better-bounded than the Saltelli cross-product."""
+        mid = 0.5 * (fb + fc)
+        m = float(np.mean(mid))
+        num = float(np.mean(fb * fc)) - m * m
+        den = float(np.mean(0.5 * (fb * fb + fc * fc))) - m * m
+        return num / den if den > 0 else 0.0
+
+    sob_channels: List[SobolChannel] = []
+    for ch, nsrc in chan_meta:
+        fABi = fAB[ch]
+        if var > 0:
+            Si = _first_order(fB, fABi)
+            STi = float(np.mean((fA - fABi) ** 2) / (2.0 * var))        # Jansen 2010
+        else:
+            Si = STi = 0.0
+        Si = float(np.clip(Si, 0.0, 1.0))
+        STi = float(np.clip(STi, 0.0, 1.0))
+        se_i = _boot_se(lambda idx, fABi=fABi: _first_order(fB[idx], fABi[idx]))
+        se_t = _boot_se(lambda idx, fABi=fABi: np.mean((fA[idx] - fABi[idx]) ** 2) / (2.0 * var) if var > 0 else 0.0)
+        sob_channels.append(SobolChannel(channel=ch, n_sources=nsrc, first_order=Si,
+                                         first_order_se=se_i, total_effect=STi,
+                                         total_effect_se=se_t))
+    sob_channels.sort(key=lambda c: c.total_effect, reverse=True)
+
+    if censored:
+        warnings.append("censored channels contribute prior-shaped (one-sided) "
+                        "uncertainty; their indices are prior-influenced")
+    return SobolSensitivity(
+        drug=drug_l, ap_model=ap_rec.id, metric=metric, uq=uq, classification=point_class,
+        all_vary_flip_frequency=flip, metric_variance=var, n_base=N, channels=sob_channels,
+        tier=tier, warnings=warnings, excluded_channels=excluded, censored_channels=censored)
+
+
 def flip_sensitivity(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
                      metric: str = DEFAULT_METRIC, n_mc: int = 200, seed: int = 0,
                      exposure_nM: Optional[float] = None, exposure_kind: str = "free",
                      exposure_multiple: float = REFERENCE_EXPOSURE_MULTIPLE,
-                     n_beats: int = 3) -> FlipSensitivity:
+                     n_beats: int = 3, method: str = "oat", uq: str = "moments",
+                     prior: Optional[object] = None):
     """Attribute the classification-flip frequency to each channel's IC50 spread.
 
-    For every identifiable channel it runs two Monte-Carlo scenarios — "only this
-    channel varies" (main effect) and "this channel frozen, others vary" (total
-    effect) — using common random numbers across scenarios so the comparison is
-    apples-to-apples. See :class:`FlipSensitivity`.
+    ``method="oat"`` (default) runs the v0.1 one-at-a-time design: for every
+    identifiable channel, "only this channel varies" (main effect) and "this channel
+    frozen, others vary" (total effect), with common random numbers across scenarios.
+    Returns a :class:`FlipSensitivity`.
+
+    ``method="sobol"`` runs the v0.2 variance-based (Sobol) design over the continuous
+    metric, which — unlike OAT — *sees channel interactions*: it reports first-order
+    ``S_i``, total-effect ``S_Ti``, and the **interaction load** ``S_Ti - S_i`` per
+    channel, each with a bootstrap Monte-Carlo standard error. Returns a
+    :class:`SobolSensitivity`. The dominant-driver recommendation becomes
+    interaction-aware (a channel can have a small solo effect but a large total
+    effect). See spec v0.2 sec 5.
     """
+    if method == "sobol":
+        return _sobol_sensitivity(ds, drug, ap_model=ap_model, metric=metric, n_mc=n_mc,
+                                  seed=seed, exposure_nM=exposure_nM,
+                                  exposure_kind=exposure_kind,
+                                  exposure_multiple=exposure_multiple, n_beats=n_beats,
+                                  uq=uq, prior=prior)
+    if method != "oat":
+        raise ValueError(f"method must be 'oat' or 'sobol', got {method!r}")
     drug_l = drug.lower()
     blocks = [b for b in ds.blocks_for(drug_l) if isinstance(b, ChannelBlock)]
     if not blocks:

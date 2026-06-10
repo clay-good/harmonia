@@ -255,6 +255,70 @@ def fig_population():
     plt.close(fig)
 
 
+def fig_bayesian_uq():
+    """v0.2: the IC50 posterior — reduction, censoring, and the two flip frequencies."""
+    from harmonia.infer import infer_channel, resolve_prior, learn_tau_pop
+    from harmonia.records import ChannelBlock
+    prior = resolve_prior(ds)
+    tau_pop = learn_tau_pop(ds.channel_blocks, prior)
+    fig, axes = plt.subplots(1, 3, figsize=(13.5, 4.1))
+
+    # (1) well-identified channel: posterior reduces to the log-geomean
+    b = next(x for x in ds.blocks_for("dofetilide") if x.channel == "IKr")
+    p = infer_channel(b, prior, tau_pop, n_draws=8000, seed=0)
+    gm = float(np.log10(np.exp(np.mean(np.log(b.source_ic50s_nm)))))
+    ax = axes[0]
+    ax.hist(p.log10_ic50, bins=40, color=BLUE, alpha=0.85)
+    ax.axvline(gm, color=RED, lw=1.8, label=f"log-geomean (v0.1) = {gm:.2f}")
+    ax.axvline(p.mean_log10, color="black", ls="--", lw=1.4,
+               label=f"posterior mean = {p.mean_log10:.2f}")
+    for sv in b.source_ic50s_nm:
+        ax.axvline(np.log10(sv), color=GREY, lw=0.8, alpha=0.7)
+    ax.set_title(f"dofetilide hERG — 3 labs agree\nreduces to v0.1 "
+                 f"(prior_sens={p.prior_sensitivity:.2f})", fontsize=10)
+    ax.set_xlabel("log10 IC50 (nM)"); ax.set_ylabel("posterior draws")
+    ax.legend(fontsize=7.5, frameon=False)
+    ax.spines[["top", "right"]].set_visible(False)
+
+    # (2) censored channel: one-sided posterior, heavy right tail
+    cens = next(x for x in ds.channel_blocks
+                if isinstance(x, ChannelBlock) and not x.identifiable)
+    pc = infer_channel(cens, prior, tau_pop, n_draws=8000, seed=0)
+    ax = axes[1]
+    ax.hist(pc.log10_ic50, bins=40, color="#8e44ad", alpha=0.85)
+    ax.axvline(np.log10(pc.x_max_nm), color=RED, lw=1.8,
+               label=f"top tested dose ≈ {pc.x_max_nm:.0f} nM")
+    ax.set_title(f"{cens.drug} ICaL — {cens.assay_context.max_block_observed_percent:g}% block "
+                 f"(unidentifiable)\none-sided posterior, prior-dominated "
+                 f"(prior_sens={pc.prior_sensitivity:.2f})", fontsize=10)
+    ax.set_xlabel("log10 IC50 (nM)")
+    ax.legend(fontsize=7.5, frameon=False)
+    ax.spines[["top", "right"]].set_visible(False)
+
+    # (3) true-value vs new-lab predictive flip frequency
+    ax = axes[2]
+    drugs = ["dofetilide", "verapamil", "ranolazine"]
+    true_f, repro_f = [], []
+    for drug in drugs:
+        a = assess(ds, drug, n_mc=300, uq="bayes", seed=0)
+        true_f.append(a.classification_flip_frequency)
+        repro_f.append(a.reproducibility_flip_frequency)
+    x = np.arange(len(drugs)); w = 0.38
+    ax.bar(x - w / 2, true_f, w, color=BLUE, label="true-value flip")
+    ax.bar(x + w / 2, repro_f, w, color=GREEN, label="new-lab (reproducibility) flip")
+    ax.set_xticks(x); ax.set_xticklabels(drugs, fontsize=9)
+    ax.set_ylabel("classification-flip frequency")
+    ax.set_title("Two honest flip frequencies (uq=bayes)\ntrue value vs a fresh replication",
+                 fontsize=10)
+    ax.legend(fontsize=7.5, frameon=False)
+    ax.spines[["top", "right"]].set_visible(False)
+
+    fig.suptitle("v0.2 — the IC50 spread is inferred under a declared prior, not transcribed "
+                 "(reduction · censoring · reproducibility)", fontsize=10.5)
+    fig.tight_layout(); fig.savefig(IMG / "bayesian_uq.png", dpi=130)
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     fig_ap_traces()
     fig_flip_distribution()
@@ -262,5 +326,6 @@ if __name__ == "__main__":
     fig_dynamic_binding()
     fig_combination()
     fig_population()
+    fig_bayesian_uq()      # v0.2 Bayesian dose-response UQ
     # fig_training_set() / fig_validation_set() remain available for the APD90 metric
     print(f"wrote figures to {IMG}")

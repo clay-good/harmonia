@@ -6,6 +6,75 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-06-09
+
+### Added — Bayesian dose-response uncertainty quantification (spec v0.2, roadmap Phase C)
+Where v0.1 made input variability a first-class **field**, v0.2 makes it a
+first-class **inference**: an IC50's spread stops being a number transcribed from a
+table and becomes a posterior, derived under a declared prior. The v0.1
+method-of-moments path is preserved exactly (`uq="moments"`, the default), so every
+v0.1 number reproduces; the new machinery is opt-in via `uq="bayes"`.
+
+- **`harmonia.infer`** — a hierarchical Bayesian inference of the per-channel
+  `(IC50, Hill)` posterior, implemented as an exact **direct (grid + conjugate)
+  sampler** in pure NumPy (no MCMC funnel, no new dependency): the between-lab SD
+  `tau` is drawn from its collapsed 1-D marginal (the channel mean integrated out in
+  closed form), the true log-IC50 from a conjugate Normal, and the censored case from
+  a 1-D grid. Draws are i.i.d. and exactly from the posterior; `rhat`/`ess` are
+  reported and trivially satisfied. Closes the three gaps in the v0.1 sampler:
+  - **Partial pooling.** A single-source channel no longer gets the hard-coded
+    `DEFAULT_SINGLE_SOURCE_SIGMA`; its spread is `tau_pop`, the between-lab SD
+    *learned across every multi-source channel in the dataset* (`learn_tau_pop`) — a
+    magic constant becomes an inferred, citable quantity that sharpens as the dataset
+    grows.
+  - **Hill uncertainty.** The Hill coefficient carries a posterior and propagates,
+    instead of being fixed at a point value.
+  - **Censoring.** A sub-60%-block channel is no longer discarded; the max-block
+    observation becomes a **one-sided (probit-censored) likelihood** that bounds the
+    IC50 from below near the recovered top tested dose, with the Hill coefficient
+    marginalized over its prior — yielding a proper but wide posterior with a heavy,
+    prior-shaped right tail. It is **prior-dominated by construction** and still
+    **Tier-D-capped** (the reliability gate is preserved; v0.2 only stops throwing
+    the information away).
+- **`assess(..., uq="bayes")`** — the posterior-predictive drop-in. The headline
+  `classification_flip_frequency` samples the **true-value** posterior; a new
+  `reproducibility_flip_frequency` samples the **new-lab predictive** ("how much would
+  a fresh replication move the call?"). Censored channels now *contribute*
+  (`censored_channels`) instead of being excluded; prior-dominated channels are
+  flagged (`prior_dominated_channels`). Exposed on the CLI as `--uq bayes`.
+- **The prior registry** (`dataset/priors/harmonia-ic50-prior-v1.json` + its schema):
+  every prior is a version-pinned, citable, **non-predictive** object referenced by id;
+  each posterior reports its `prior_sensitivity` (fraction of posterior variance from
+  the genuinely-subjective priors, probed by re-inference under a widened prior — the
+  empirical-Bayes `tau_pop` is held fixed), and a high value drives the prior-dominance
+  flag. `harmonia validate` schema-validates every prior and enforces
+  `predictive == false` (no prior may carry a risk conclusion). `harmonia priors` lists
+  the registry.
+- **`harmonia.posterior` / `harmonia infer <drug>`** — inspect the per-channel
+  posteriors, their `identifiability_score` (continuous identifiability readout, spec
+  v0.2 §6) and sampler diagnostics.
+- **Variance-based (Sobol) sensitivity** — `flip_sensitivity(..., method="sobol")`
+  generalizes the one-at-a-time attribution to first-order `S_i` (Janon estimator),
+  total-effect `S_Ti` (Jansen estimator), and the **interaction load** `S_Ti − S_i`
+  that OAT cannot see, each with a bootstrap Monte-Carlo standard error. The
+  dominant-driver recommendation is now interaction-aware. `harmonia sensitivity
+  --sobol`.
+- **Schema delta** (backward-compatible): optional `inference` block + `dose_response`
+  / `fit_sd_log10` fields on source values (the raw-regime upgrade path). Every
+  existing record validates and simulates unchanged.
+- **Citations minted:** `johnstone-2016` (hierarchical Bayesian IC50 inference, the
+  methodological precedent) and `elkins-2013` (high-throughput screening variability).
+- **`dataset/tools/build_posteriors.py`** regenerates / inspects every channel's
+  posterior summary. Design note: posteriors are recomputed on demand (milliseconds)
+  rather than cached into the 68 record files — the source of truth stays
+  `(source data + prior)`, and `tests/test_infer.py` asserts deterministic
+  reproducibility (run twice → byte-identical) without a cross-platform git-diff gate.
+- **Notebook** [`notebooks/02_bayesian_uq.ipynb`](notebooks/02_bayesian_uq.ipynb),
+  executed in CI under `nbmake`, plus `tests/test_infer.py`, `tests/test_sobol.py`,
+  and `tests/test_uq_assess.py` (reduction/non-drift, censoring, single-source pooling,
+  prior-sensitivity, Sobol consistency, and the moments-path backward-compatibility
+  guard).
+
 ### Added — CellML validated against the canonical CellML 2.0 library (libCellML)
 - **`cellml.validity_violations`** runs **libCellML's Parser + Validator** (the
   canonical CellML 2.0 library) over every exported model, checking the full
@@ -158,5 +227,6 @@ end, covering roadmap phases A–E:
 - **E — Populations (hypothesis-tier):** population-of-models risk spread,
   shipped non-predictive (Tier D, "NOT FOR PREDICTION").
 
-[Unreleased]: https://github.com/clay-good/harmonia/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/clay-good/harmonia/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/clay-good/harmonia/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/clay-good/harmonia/releases/tag/v0.1.0

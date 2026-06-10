@@ -20,11 +20,12 @@ class Dataset:
     """An immutable, indexable collection of records plus their citations."""
 
     def __init__(self, records: List[Record], citations: Dict[str, Citation],
-                 root: Optional[pathlib.Path] = None):
+                 root: Optional[pathlib.Path] = None, priors: Optional[Dict] = None):
         self._records = records
         self._by_id = {r.id: r for r in records}
         self.citations = citations
         self.root = root
+        self.priors = priors or {}
 
     # -- container protocol -------------------------------------------------- #
     def __getitem__(self, record_id: str) -> Record:
@@ -93,6 +94,10 @@ class Dataset:
     def citation(self, key: str) -> Optional[Citation]:
         return self.citations.get(key)
 
+    def prior(self, key: str):
+        """Lookup a v0.2 inference prior by id (the prior registry, spec v0.2 sec 7)."""
+        return self.priors.get(key)
+
 
 # --------------------------------------------------------------------------- #
 # Dataset directory discovery
@@ -147,7 +152,10 @@ def load(path: Optional[os.PathLike] = None) -> Dataset:
             c = Citation.from_dict(_read_json(p))
             citations[c.key] = c
 
-    return Dataset(records, citations, root=root)
+    from .infer import load_priors
+    priors = load_priors(root)
+
+    return Dataset(records, citations, root=root, priors=priors)
 
 
 def iter_record_files(root: Optional[os.PathLike] = None) -> Iterable[pathlib.Path]:

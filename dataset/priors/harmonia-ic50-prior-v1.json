@@ -1,0 +1,24 @@
+{
+  "id": "harmonia-ic50-prior-v1",
+  "kind": "prior",
+  "version": 1,
+  "channel_level": {
+    "m_0_log10nm": 3.0,
+    "s_0_log10nm": 2.0
+  },
+  "between_lab_tau": {
+    "dist": "half_normal",
+    "scale_log10": 0.5
+  },
+  "hill": {
+    "dist": "lognormal",
+    "mu": 0.0,
+    "sigma": 0.3
+  },
+  "censored": {
+    "block_sigma": 0.05
+  },
+  "rationale": "Weakly-informative. The channel-level prior on the true log10 IC50 is centered at 1 uM (m_0 = 3.0 log10 nM) with s_0 = 2.0 log10 nM, spanning roughly 10 pM to 100 uM, the full nM-uM range cardiac blockers occupy, so the prior is dominated by the data wherever the data identify the IC50. The between-lab spread hyperprior is HalfNormal with scale 0.5 log10 (~3.2-fold), the documented inter-laboratory / inter-platform IC50 spread (Kramer 2013; Elkins 2013; Crumb 2016); single-source channels borrow this learned spread instead of a hard-coded constant. The Hill prior is LogNormal(0, 0.3) on the dimensionless coefficient, weakly centered at 1 (mass on [0.55, 1.8]). The censored-block observation noise (block_sigma = 0.05 fractional block) sets how sharply a sub-saturating max-block measurement bounds the IC50 from below. No element of this prior encodes a risk conclusion; prior_sensitivity is reported per channel so any prior-dominated posterior is flagged (spec v0.2 sec 6, 7).",
+  "citations": ["chang-2017", "kramer-2013", "elkins-2013", "johnstone-2016"],
+  "predictive": false
+}

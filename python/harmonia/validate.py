@@ -100,7 +100,42 @@ def validate_dataset(path: Optional[str] = None) -> ValidationReport:
 
         _check_semantics(rf.name, rec, citation_keys, report)
 
+    _validate_priors(root, citation_keys, report)
     return report
+
+
+def _validate_priors(root: pathlib.Path, citation_keys: set, report: ValidationReport) -> None:
+    """Validate the v0.2 prior registry (spec v0.2 sec 7): schema-valid, every cited
+    key resolves, the id matches the filename, and no prior is predictive (a prior may
+    never carry a risk conclusion)."""
+    pdir = root / "priors"
+    if not pdir.is_dir():
+        return
+    schema_path = root / "schema" / "prior.schema.json"
+    validator = None
+    if schema_path.exists():
+        try:
+            from jsonschema import Draft202012Validator
+            validator = Draft202012Validator(json.loads(schema_path.read_text(encoding="utf-8")))
+        except Exception as exc:  # pragma: no cover
+            report.errors.append(f"could not load prior schema: {exc}")
+    for pf in sorted(pdir.glob("*.json")):
+        try:
+            pr = json.loads(pf.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            report.errors.append(f"priors/{pf.name}: invalid JSON ({exc})")
+            continue
+        if validator is not None:
+            for err in sorted(validator.iter_errors(pr), key=lambda e: e.path):
+                loc = "/".join(str(p) for p in err.path) or "(root)"
+                report.errors.append(f"priors/{pf.name}: schema [{loc}] {err.message}")
+        if pr.get("id") != pf.stem:
+            report.errors.append(f"priors/{pf.name}: id '{pr.get('id')}' != filename '{pf.stem}'")
+        if pr.get("predictive") is not False:
+            report.errors.append(f"priors/{pf.name}: a prior must declare predictive=false (sec 10)")
+        for key in pr.get("citations", []):
+            if key not in citation_keys:
+                report.errors.append(f"priors/{pf.name}: cites unknown citation key '{key}'")
 
 
 def _cited_keys(rec: dict) -> List[str]:
