@@ -39,6 +39,7 @@ def run_assess(drug, ap_model, mc, mult, seed, metric):
         "exposure": a.reference_exposure_nM, "baseline": a.baseline_apd90,
         "apd90": a.apd90, "metric": a.metric,
         "tri": a.triangulation_ms, "tri_base": a.baseline_triangulation_ms,
+        "cqinward": a.cqinward,
     }
 
 
@@ -75,6 +76,10 @@ with tab_flip:
     st.caption(f"Triangulation (APD90−APD50): **{res['tri']:.0f} ms** "
                f"(drug-free {res['tri_base']:.0f} ms) — a TRIaD proarrhythmia "
                "diagnostic that hERG block widens; a readout, never the classifier.")
+    st.caption(f"cqInward (inward-charge vs drug-free): **{res['cqinward']:.3f}** — "
+               "the CiPA INaL+ICaL charge biomarker; <1 = inward charge reduced "
+               "(ICaL/INaL block, protective), >1 = increased (AP prolongation). "
+               "A diagnostic, never the classifier.")
 
     if res["excluded"]:
         st.error("Excluded channels (unidentifiable IC50, max block < 60% → caps at "

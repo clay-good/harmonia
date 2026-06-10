@@ -343,6 +343,48 @@ def fig_disease_populations():
     plt.close(fig)
 
 
+def fig_cqinward():
+    """v0.4: the cqInward inward-charge biomarker — mechanism cases + real drugs."""
+    from harmonia.simulate import _cqinward
+    ctrl = simulate_beats(KernelParams())
+    qn0, qc0 = ctrl.q_nal, ctrl.q_cal
+
+    def cq_block(block):
+        p = KernelParams(); p.block.update(block)
+        r = simulate_beats(p)
+        return _cqinward(r.q_nal, r.q_cal, qn0, qc0)
+
+    mech = [("no drug", {}), ("ICaL 70%", {"ICaL": 0.3}), ("INaL 70%", {"INaL": 0.3}),
+            ("IKr 50%", {"IKr": 0.5}), ("IKr 80%", {"IKr": 0.2})]
+    drugs = ["verapamil", "diltiazem", "ranolazine", "dofetilide", "sotalol"]
+    fig, (axa, axb) = plt.subplots(1, 2, figsize=(11, 4.2))
+
+    labels = [m[0] for m in mech]
+    vals = [cq_block(m[1]) for m in mech]
+    cols = [GREY if abs(v - 1) < 1e-6 else (GREEN if v < 1 else RED) for v in vals]
+    axa.bar(labels, vals, color=cols)
+    axa.axhline(1.0, color="black", lw=1)
+    axa.set_ylabel("cqInward (inward charge vs drug-free)")
+    axa.set_title("Single-channel mechanism\n<1 protective (inward ↓) · >1 proarrhythmic (inward ↑)",
+                  fontsize=10)
+    axa.tick_params(axis="x", labelrotation=20)
+    axa.spines[["top", "right"]].set_visible(False)
+
+    dvals = [assess(ds, d, n_mc=0).cqinward for d in drugs]
+    dcols = [GREEN if v < 1 else RED for v in dvals]
+    axb.bar(drugs, dvals, color=dcols)
+    axb.axhline(1.0, color="black", lw=1)
+    axb.set_title("Real drugs (point, at 4× EFTPC)\nICaL blockers protective · hERG blockers proarrhythmic",
+                  fontsize=10)
+    axb.tick_params(axis="x", labelrotation=20)
+    axb.spines[["top", "right"]].set_visible(False)
+
+    fig.suptitle("cqInward — the CiPA inward-charge biomarker (a diagnostic, never the classifier)",
+                 fontsize=10.5)
+    fig.tight_layout(); fig.savefig(IMG / "cqinward.png", dpi=130)
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     fig_ap_traces()
     fig_flip_distribution()
@@ -352,5 +394,6 @@ if __name__ == "__main__":
     fig_population()
     fig_bayesian_uq()      # v0.2 Bayesian dose-response UQ
     fig_disease_populations()  # v0.3 disease/genetic backgrounds (LQTS)
+    fig_cqinward()         # v0.4 cqInward inward-charge biomarker
     # fig_training_set() / fig_validation_set() remain available for the APD90 metric
     print(f"wrote figures to {IMG}")

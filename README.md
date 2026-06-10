@@ -143,7 +143,7 @@ pop.tier                                      # "D"  (always; non-predictive)
 | **Dataset** — 68 channel-block records across the **28 CiPA compounds** (12 training + 16 validation), 28 drug-reference records (expert risk label + free Cmax + protein binding), 3 AP-model records, 4 population specs (1 variability + 3 LQTS disease backgrounds), 15 Crossref-checked citations | ✅ |
 | **Variability is first-class** — multi-source IC50s with computed fold-range / IQR; the reliability gate (max block < 60% ⇒ Tier D, unidentifiable) machine-enforced | ✅ |
 | **Bayesian dose-response UQ** (Phase C, **v0.2**) — the IC50/Hill spread is *inferred* under a declared prior, not transcribed: hierarchical posterior with dataset-learned between-lab pooling, propagated Hill uncertainty, a one-sided **censored** posterior for sub-60%-block channels, a **raw dose-response regime** (fit from concentration-block points), a prior registry with per-channel `prior_sensitivity`, variance-based (Sobol) sensitivity, and a calibrated inference (simulation-based calibration + posterior coverage). Opt-in via `uq="bayes"`; `uq="moments"` (default) reproduces every v0.1 number | ✅ |
-| **Reference kernel** — a SciPy reduced O'Hara-Rudy-lineage ventricular AP (7 currents + Na-Ca exchanger) with Hill block per current; APD90 / qNet / triangulation / EAD biomarkers | ✅ |
+| **Reference kernel** — a SciPy reduced O'Hara-Rudy-lineage ventricular AP (7 currents + Na-Ca exchanger) with Hill block per current; APD90 / qNet / triangulation / **cqInward** / EAD biomarkers | ✅ |
 | **Discriminating qNet** (Phase C) — adding a shape-dependent Na-Ca exchanger (excluded from the qNet sum) makes qNet sensitive; **qNet is now the default metric** (10/12 training, zero two-category errors over all 28 compounds); APD90 selectable | ✅ |
 | **Dynamic hERG binding** (Phase B) — Langmuir kon/koff with **trapping**; reduces to the static Hill block at steady state, captures use-dependent block (`assess(..., herg_dynamic=True)`) | ✅ |
 | **Exposure layer** (Phase D) — free ↔ total plasma conversion via protein binding (`fraction_unbound`); assess from a free or total concentration (composable with a Hypnos PK trajectory) | ✅ |
@@ -177,7 +177,7 @@ flowchart TD
     INFER --> SIM
     LOAD --> EXP["harmonia.export<br/>format builders"]
     SIM --> PERF["performance.py<br/>score vs CiPA expert labels"]
-    SIM --> REF["reference.py<br/>SciPy ORd-lineage AP kernel (+ INaCa)<br/>qNet (default) / APD90 / EAD biomarkers"]
+    SIM --> REF["reference.py<br/>SciPy ORd-lineage AP kernel (+ INaCa)<br/>qNet (default) / APD90 / triangulation / cqInward biomarkers"]
     EXP --> SPEC["model_spec.py<br/>one AST → Myokit / CellML / SBML"]
     SPEC --> CELLML["CellML 2.0"]
     SPEC --> MYOKIT["Myokit .mmt"]
@@ -296,12 +296,31 @@ green line; the asterisked drugs are the 16-compound validation set. The kernel
 also captures the *protective* multichannel mechanism: **diltiazem and verapamil's
 ICaL block** raises their qNet (lowers risk), via an L-type window current.
 
-Alongside the classifier, every assessment reports **triangulation** (APD90 −
-APD50) — the *T* in the classic TRIaD proarrhythmia profile. hERG block prolongs
-late repolarization more than early, so a torsadogenic drug widens triangulation
-above the drug-free baseline (dofetilide ≈71 ms vs ≈36 ms). It is surfaced as an
-honest *diagnostic readout*, never as a second verdict; the high/intermediate/low
-call stays with qNet (or ΔAPD90).
+Alongside the classifier, every assessment reports two more CiPA biomarkers as
+honest *diagnostic readouts*, never as a second verdict; the high/intermediate/low
+call stays with qNet (or ΔAPD90):
+
+- **triangulation** (APD90 − APD50) — the *T* in the classic TRIaD proarrhythmia
+  profile. hERG block prolongs late repolarization more than early, so a
+  torsadogenic drug widens triangulation above the drug-free baseline (dofetilide
+  ≈71 ms vs ≈36 ms).
+- **cqInward** (v0.4) — the CiPA inward-charge biomarker
+  ([Dutta et al. 2017](https://doi.org/10.3389/fphys.2017.00616)): the
+  control-normalized average of the late-sodium (INaL) and L-type-calcium (ICaL)
+  **charge** ratios, `½·(qNaL_drug/qNaL_ctrl + qCaL_drug/qCaL_ctrl)`. It isolates
+  the inward side of CiPA's inward/outward balance hypothesis — torsade is driven
+  by sustained inward plateau current. It is dimensionless and self-normalizing (1
+  at no drug, no kernel threshold needed), and it is **propagated through the same
+  Monte-Carlo as qNet**, so the assessment reports a `cqinward_distribution`. The
+  mechanism validates it: a pure **ICaL/INaL blocker reduces** inward charge
+  (cqInward < 1 — protective, the multichannel mechanism that spares verapamil,
+  measured ≈0.81), while a pure **IKr blocker prolongs** the AP and *raises* it
+  (cqInward > 1 — proarrhythmic; dofetilide ≈1.18). It completes the computable
+  half of the spec §3 biomarker list ([spec v0.4](docs/specs/v0.4-cqinward-biomarker.md));
+  EAD occurrence (structurally unreachable in the reduced kernel) and the
+  electromechanical window (needs a mechanical model) remain honestly out of reach.
+
+![cqInward inward-charge biomarker](docs/img/cqinward.png)
 
 ### Recorded classification performance (Phase B/C)
 
@@ -597,7 +616,7 @@ optional local step (they need a heavy simulation engine, so are not run in CI).
 ## Validation & testing
 
 Everything downstream of the dataset is a deterministic projection, so the test
-suite (160 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
+suite (169 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 *provable non-drift* rather than fixtures:
 
 | Guard | What it proves | Where |
@@ -610,6 +629,7 @@ suite (160 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 | **Sampler convergence + censoring** (v0.2) | every channel posterior meets `rhat < 1.01` / an `ess` floor; a sub-60%-block channel yields a wide, prior-dominated one-sided posterior and still produces a Tier-D assessment | `tests/test_infer.py` |
 | **Inference calibration** (v0.2.1, §9) | simulation-based calibration → rank-uniform posteriors; 90% credible interval covers the truth ≈90%; raw dose-response fit recovers a synthetic IC50/Hill | `tests/test_infer_raw.py` |
 | **Disease populations** (v0.3) | the `conductance_scale` mean shift is applied correctly; LQTS backgrounds raise the susceptible fraction in the textbook order; every disease assessment is Tier D / NOT FOR PREDICTION; the healthy population is byte-identical | `tests/test_disease_populations.py` |
+| **cqInward biomarker** (v0.4) | control identity (=1 at no drug); ICaL/INaL block lowers it (<1), IKr block raises it (>1); propagated as a distribution; adding it changes no qNet/flip number | `tests/test_cqinward.py` |
 | **Sobol consistency** (v0.2) | total-effect ≥ first-order per channel (within MC error); indices deterministic; standard errors reported | `tests/test_sobol.py` |
 | **CiPA numeric round trip** | export the CiPA CSV, parse it back, every IC50/Hill equals the dataset value | `registry.roundtrip_cipa` |
 | **Parameter round trip** | the kernel conductances appear verbatim in the CellML/SBML/Myokit text | `registry.roundtrip_parameters` |

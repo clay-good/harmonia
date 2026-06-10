@@ -95,12 +95,23 @@ def classify(dapd90_pct: float) -> str:
 
 @lru_cache(maxsize=128)
 def _cached_baseline(scales_items: tuple, n_beats: int) -> tuple:
-    """Drug-free baseline (APD90, triangulation=APD90-APD50) for an AP-model
-    variant, in ms. Deterministic and independent of the drug, so it is memoised
-    across the many assess() calls a performance sweep or flip view makes."""
+    """Drug-free baseline for an AP-model variant: (APD90 ms, triangulation ms,
+    control INaL charge, control ICaL charge). Deterministic and drug-free, so it is
+    memoised across the many assess() calls a performance sweep or flip view makes.
+    The control inward charges are the denominators of the cqInward biomarker (v0.4);
+    callers that only need APD90 still read element [0]."""
     scales = dict(scales_items)
     r = simulate_beats(KernelParams().with_scales(scales), n_beats=n_beats)
-    return r.apd90, r.triangulation
+    return r.apd90, r.triangulation, r.q_nal, r.q_cal
+
+
+def _cqinward(q_nal: float, q_cal: float, q_nal_ctrl: float, q_cal_ctrl: float) -> float:
+    """The cqInward biomarker (spec v0.4): the control-normalized average of the two
+    inward-current (INaL, ICaL) charge ratios. 1 at no drug; <1 = inward charge reduced
+    (ICaL/INaL block, protective); >1 = inward charge increased (AP prolongation)."""
+    a = q_nal / q_nal_ctrl if q_nal_ctrl else float("nan")
+    b = q_cal / q_cal_ctrl if q_cal_ctrl else float("nan")
+    return 0.5 * (a + b)
 
 
 def _worst_tier(tiers: Sequence[str]) -> str:
@@ -209,6 +220,12 @@ class RiskAssessment:
     censored_channels: List[str] = field(default_factory=list)        # one-sided posteriors (sec 2.3)
     prior_dominated_channels: List[str] = field(default_factory=list)  # sec 6/7 flags
 
+    # v0.4 cqInward: control-normalized inward-charge biomarker (a diagnostic, not the
+    # classifier). 1 at no drug; <1 = inward charge reduced (ICaL/INaL block, protective);
+    # >1 = inward charge increased (AP prolongation). Propagated like qNet.
+    cqinward: float = float("nan")
+    cqinward_distribution: np.ndarray = field(default_factory=lambda: np.empty(0))
+
     clinical_use: str = ("PROHIBITED — research / safety-methodology / education only; "
                          "not a regulatory determination")
 
@@ -223,6 +240,8 @@ class RiskAssessment:
             f"qNet {self.qnet:.4f}  -> [{self.metric}] point class: {self.classification.upper()}",
             f"triangulation (APD90-APD50): {self.triangulation_ms:.0f} ms "
             f"(drug-free {self.baseline_triangulation_ms:.0f} ms) — diagnostic, not the classifier",
+            f"cqInward (inward-charge vs drug-free): {self.cqinward:.3f} "
+            f"(<1 inward charge reduced / protective, >1 increased) — diagnostic, not the classifier",
             f"variability ({self.n_mc} MC draws, uq={self.uq}): {dist}",
             f"classification-flip frequency: {self.classification_flip_frequency:.0%}",
         ]
@@ -300,7 +319,8 @@ def assess(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
     scales = ap_rec.conductance_scales
 
     # drug-free baseline for this model (memoised; deterministic & drug-free)
-    baseline, baseline_tri = _cached_baseline(tuple(sorted(scales.items())), n_beats)
+    baseline, baseline_tri, q_nal_ctrl, q_cal_ctrl = _cached_baseline(
+        tuple(sorted(scales.items())), n_beats)
 
     if metric not in ("qnet", "apd90"):
         raise ValueError(f"metric must be 'qnet' or 'apd90', got {metric!r}")
@@ -325,7 +345,7 @@ def assess(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
         return _assess_bayes(
             ds, drug_l, blocks, ap_rec, scales, baseline, baseline_tri, metric,
             reference_exposure, n_mc, seed, n_beats, _herg_for, use_dynamic, tier,
-            prior)
+            prior, q_nal_ctrl, q_cal_ctrl)
 
     # ====================================================================== #
     # v0.1 method-of-moments path (default) — kept byte-identical for non-drift
@@ -360,12 +380,14 @@ def assess(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
     pt = simulate_beats(p, n_beats=n_beats, herg=_herg_for(ic50_point.get("IKr", 1e9)))
     dapd_point = 100.0 * (pt.apd90 - baseline) / baseline if baseline else float("nan")
     point_class = classify_metric(metric, dapd_point, pt.qnet)
+    cqinward_point = _cqinward(pt.q_nal, pt.q_cal, q_nal_ctrl, q_cal_ctrl)
 
     # ---- Monte-Carlo over source variability -------------------------------- #
     rng = np.random.default_rng(seed)
     dapd = np.empty(n_mc)
     apd = np.empty(n_mc)
     qn = np.empty(n_mc)
+    cqin = np.empty(n_mc)
     classes: List[str] = []
     for i in range(n_mc):
         ic50_s = {d.channel: 10 ** rng.normal(d.mu_log10, d.sigma_log10) for d in draws}
@@ -376,6 +398,7 @@ def assess(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
         apd[i] = r.apd90
         dapd[i] = 100.0 * (r.apd90 - baseline) / baseline if baseline else float("nan")
         qn[i] = r.qnet
+        cqin[i] = _cqinward(r.q_nal, r.q_cal, q_nal_ctrl, q_cal_ctrl)
         classes.append(classify_metric(metric, dapd[i], qn[i]))
 
     # n_mc == 0 means "point estimate only" (used by performance scoring); the
@@ -397,12 +420,13 @@ def assess(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
         classification_distribution=counts, classification_flip_frequency=flip_freq,
         tier=tier, warnings=warnings, excluded_channels=excluded,
         channels_used=channels_used, herg_dynamic=use_dynamic, uq="moments",
+        cqinward=cqinward_point, cqinward_distribution=cqin,
     )
 
 
 def _assess_bayes(ds, drug_l, blocks, ap_rec, scales, baseline, baseline_tri, metric,
                   reference_exposure, n_mc, seed, n_beats, _herg_for, use_dynamic, tier,
-                  prior):
+                  prior, q_nal_ctrl, q_cal_ctrl):
     """The v0.2 Bayesian posterior-predictive path of :func:`assess`.
 
     Per channel (identifiable *and* censored), infer the ``(IC50, Hill)`` posterior
@@ -456,9 +480,10 @@ def _assess_bayes(ds, drug_l, blocks, ap_rec, scales, baseline, baseline_tri, me
     pt = _run(ic50_point, hill_point)
     dapd_point = 100.0 * (pt.apd90 - baseline) / baseline if baseline else float("nan")
     point_class = classify_metric(metric, dapd_point, pt.qnet)
+    cqinward_point = _cqinward(pt.q_nal, pt.q_cal, q_nal_ctrl, q_cal_ctrl)
 
     def _mc(predictive: bool):
-        dapd = np.empty(n_mc); apd = np.empty(n_mc); qn = np.empty(n_mc)
+        dapd = np.empty(n_mc); apd = np.empty(n_mc); qn = np.empty(n_mc); cqin = np.empty(n_mc)
         classes = []
         for i in range(n_mc):
             ic50_s = {ch: (p.predictive_ic50_samples()[i] if predictive
@@ -468,17 +493,18 @@ def _assess_bayes(ds, drug_l, blocks, ap_rec, scales, baseline, baseline_tri, me
             apd[i] = r.apd90
             dapd[i] = 100.0 * (r.apd90 - baseline) / baseline if baseline else float("nan")
             qn[i] = r.qnet
+            cqin[i] = _cqinward(r.q_nal, r.q_cal, q_nal_ctrl, q_cal_ctrl)
             classes.append(classify_metric(metric, dapd[i], qn[i]))
-        return dapd, apd, qn, classes
+        return dapd, apd, qn, cqin, classes
 
     if n_mc:
-        dapd, apd, qn, classes = _mc(predictive=False)
+        dapd, apd, qn, cqin, classes = _mc(predictive=False)
         counts = {lab: classes.count(lab) / n_mc for lab in RISK_LABELS}
         flip_freq = float(np.mean([c != point_class for c in classes]))
-        _, _, _, repro_classes = _mc(predictive=True)
+        _, _, _, _, repro_classes = _mc(predictive=True)
         repro_flip = float(np.mean([c != point_class for c in repro_classes]))
     else:
-        dapd = np.empty(0); apd = np.empty(0); qn = np.empty(0)
+        dapd = np.empty(0); apd = np.empty(0); qn = np.empty(0); cqin = np.empty(0)
         counts = {lab: (1.0 if lab == point_class else 0.0) for lab in RISK_LABELS}
         flip_freq = 0.0
         repro_flip = float("nan")
@@ -493,6 +519,7 @@ def _assess_bayes(ds, drug_l, blocks, ap_rec, scales, baseline, baseline_tri, me
         tier=tier, warnings=warnings, excluded_channels=[], channels_used=channels_used,
         herg_dynamic=use_dynamic, uq="bayes", reproducibility_flip_frequency=repro_flip,
         censored_channels=censored_channels, prior_dominated_channels=prior_dominated,
+        cqinward=cqinward_point, cqinward_distribution=cqin,
     )
 
 

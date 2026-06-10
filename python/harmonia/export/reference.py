@@ -263,6 +263,8 @@ class BeatResult:
     triangulation: float
     ead: bool
     cl: float
+    q_nal: float = float("nan")             # INaL charge over the beat (µC/µF), inward (<0)
+    q_cal: float = float("nan")             # ICaL charge over the beat (µC/µF), inward (<0)
     herg_bound_mean: float = float("nan")   # dynamic-binding diagnostics
     herg_bound_max: float = float("nan")
 
@@ -342,11 +344,18 @@ def _analyse(t, V, cur, cl) -> BeatResult:
     inet = sum(cur[name] for name in QNET_CURRENTS)
     qnet = float(trapezoid(inet, t) / 1000.0)
 
+    # Inward charge carried by the two main inward plateau currents (late Na, L-Ca),
+    # in (µA/µF)·s = µC/µF. Both are inward (negative); the drug-vs-control ratio is
+    # the cqInward biomarker, computed at the assess level (spec v0.4).
+    q_nal = float(trapezoid(cur["INaL"], t) / 1000.0)
+    q_cal = float(trapezoid(cur["ICaL"], t) / 1000.0)
+
     ead = _detect_ead(t, V)
 
     return BeatResult(t=t, V=V, currents=cur, apd90=apd90, apd50=apd50,
                       vrest=vrest, vpeak=vpeak, dvdt_max=dvdt_max, qnet=qnet,
-                      triangulation=triangulation, ead=ead, cl=cl)
+                      triangulation=triangulation, ead=ead, cl=cl,
+                      q_nal=q_nal, q_cal=q_cal)
 
 
 def _detect_ead(t, V, rise_mv: float = 4.0, t_start: float = 150.0) -> bool:

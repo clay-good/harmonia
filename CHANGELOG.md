@@ -6,6 +6,36 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-06-09
+
+### Added — the cqInward inward-charge biomarker, completing the computable spec §3 metrics (spec v0.4)
+spec.md §3 names six TdP-risk biomarkers; Harmonia shipped qNet (the classifier), APD90,
+triangulation, and EAD detection, but **cqInward — named in the spec and listed as a kernel
+biomarker — was never actually computed.** v0.4 implements it and corrects the docs. It is a
+diagnostic, not a classifier, so it adds no threshold and disturbs no calibrated number
+(every existing qNet/APD/flip value is byte-identical).
+
+- **cqInward** (`RiskAssessment.cqinward` + `cqinward_distribution`) — the CiPA inward-charge
+  biomarker ([Dutta et al. 2017](https://doi.org/10.3389/fphys.2017.00616): "the change in the
+  amount of charge carried by INaL and ICaL"): the control-normalized average of the two
+  inward-current charge ratios, `½·(qNaL_drug/qNaL_ctrl + qCaL_drug/qCaL_ctrl)`, where
+  `qX = ∫ I_X dt` over the beat. It isolates the *inward* side of CiPA's inward/outward
+  balance hypothesis. Dimensionless and self-normalizing (1 at no drug; no kernel threshold),
+  and **propagated through the same Monte-Carlo as qNet**, so the assessment reports a
+  distribution, not a point.
+- The mechanism validates it: a pure **ICaL/INaL blocker reduces** inward charge (cqInward < 1
+  — the protective multichannel mechanism; verapamil ≈0.81), a pure **IKr blocker prolongs**
+  the AP and *raises* it (cqInward > 1; dofetilide ≈1.18). Surfaced in the `RiskAssessment`
+  summary, the CLI `simulate` output, and the Streamlit dashboard alongside triangulation —
+  always a diagnostic readout, never the verdict.
+- The reference kernel now computes the per-beat INaL/ICaL charges (`BeatResult.q_nal`,
+  `q_cal`); `_cached_baseline` carries the drug-free control charges (the cqInward
+  denominators). EAD occurrence (structurally unreachable in the reduced kernel) and the
+  electromechanical window (needs a mechanical model) remain honestly out of reach.
+- Spec [`docs/specs/v0.4-cqinward-biomarker.md`]; tests `tests/test_cqinward.py` (control
+  identity, ICaL/INaL/IKr block signs, distribution propagation under both uq engines, and a
+  non-drift guard); dashboard data-contract extended; README biomarker section + kernel rows.
+
 ## [0.3.0] — 2026-06-09
 
 ### Added — disease & genetic population backgrounds (LQTS), completing spec §3 (spec v0.3)
@@ -291,7 +321,8 @@ end, covering roadmap phases A–E:
 - **E — Populations (hypothesis-tier):** population-of-models risk spread,
   shipped non-predictive (Tier D, "NOT FOR PREDICTION").
 
-[Unreleased]: https://github.com/clay-good/harmonia/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/clay-good/harmonia/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/clay-good/harmonia/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/clay-good/harmonia/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/clay-good/harmonia/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/clay-good/harmonia/compare/v0.1.0...v0.2.0
