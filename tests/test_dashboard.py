@@ -19,6 +19,7 @@ from harmonia.simulate import (assess, flip_view, flip_sensitivity, dose_respons
                                assess_combination,
                                THRESH_LOW_PCT, THRESH_HIGH_PCT, RISK_LABELS,
                                QNET_THRESH_LOW, QNET_THRESH_HIGH)
+from harmonia.populations import assess_population
 
 APP = pathlib.Path(__file__).resolve().parents[1] / "dashboard" / "app.py"
 
@@ -69,6 +70,37 @@ def test_flip_tab_contract(ds):
         c.channel, c.n_sources, c.single_source, c.fold_range
         c.solo_flip_frequency, c.frozen_flip_frequency
     sens.dominant_channel
+
+    # the Bayesian-UQ toggle reads three extra fields off the assessment
+    ab = assess(ds, "verapamil", ap_model="cipaordv1.0", n_mc=8, metric="qnet", uq="bayes")
+    assert ab.uq == "bayes"
+    ab.reproducibility_flip_frequency
+    ab.censored_channels
+    ab.prior_dominated_channels
+
+
+def test_population_tab_contract(ds):
+    """Every field the 'Population-of-models' tab reads must exist, for an
+    uncalibrated, a disease-background, and a calibrated population."""
+    pops = [p.id.split(".", 1)[1] for p in ds.populations]
+    assert "illustrative_v0" in pops
+    for population in ("illustrative_v0", "lqt2", "calibrated_v0"):
+        assert population in pops
+        p = assess_population(ds, "dofetilide", population=population,
+                              ap_model="cipaordv1.0", n_models=6, exposure_multiple=4.0,
+                              metric="qnet", seed=0)
+        for attr in ("qnet_distribution", "dapd90_distribution",
+                     "classification_distribution", "susceptible_fraction", "tier",
+                     "n_models", "metric", "reference_exposure_nM", "warnings",
+                     "excluded_channels", "repolarization_failures",
+                     "conductance_scale", "calibrated", "acceptance_rate",
+                     "n_candidates", "rejection_reasons"):
+            getattr(p, attr)
+        assert p.tier == "D"   # populations are always Tier D / non-predictive
+        assert set(p.classification_distribution).issubset(set(RISK_LABELS) | {"low", "intermediate", "high"})
+    # the disease background exposes its mean shift; the calibrated one its acceptance
+    assert assess_population(ds, "dofetilide", population="lqt2", n_models=6).conductance_scale
+    assert assess_population(ds, "dofetilide", population="calibrated_v0", n_models=6).calibrated
 
 
 def test_combination_tab_contract(ds):

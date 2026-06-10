@@ -187,7 +187,7 @@ flowchart TD
     EXP --> SEDML["SED-ML"] --> OMEX["COMBINE .omex"]
     CELLML --> OMEX
     LOAD --> CLI["harmonia CLI"]
-    LOAD --> DASH["Streamlit dashboard"]
+    LOAD --> DASH["Streamlit dashboard<br/>flip view · combinations · population-of-models · browse"]
 ```
 
 Every model export is generated from **one** renderer-agnostic
@@ -518,6 +518,26 @@ headline analysis is reproduced (and asserted) in the executable notebook
 [`notebooks/01_flip_frequency.ipynb`](notebooks/01_flip_frequency.ipynb), run in
 CI under `nbmake`.
 
+### The dashboard — the honest-uncertainty view, interactively
+
+`streamlit run dashboard/app.py` opens the spec-§6 headline view. It is a pure
+presentation layer over the dataset and **never shows a bare verdict** — every
+panel is a distribution, a flip frequency, or a population spread, with
+unidentifiable channels flagged and hypothesis-tier surfaces banner-stamped. Five
+tabs cover the full analysis surface:
+
+| Tab | What it shows |
+| --- | --- |
+| **Risk-uncertainty (flip) view** | the qNet/ΔAPD90 distribution under IC50 variability, the classification-flip frequency, triangulation + cqInward diagnostics, stability across the three AP-model variants, the per-channel sensitivity attribution, and a dose–response curve. A **Bayesian dose-response UQ** toggle (v0.2) swaps the moments sampler for the hierarchical posterior and adds the true-value vs new-lab (reproducibility) flip split and the censored / prior-dominated channel flags. |
+| **Drug combinations** | polypharmacy: joint IC50 variability, the interaction term, the combined-class flip frequency, single agents vs the combination. |
+| **Population-of-models** | *physiological* (between-heart) variability: the susceptible fraction and class spread across a population of virtual myocytes — including the **LQTS disease backgrounds** (v0.3 mean shift) and the **experimentally-calibrated** population (v0.5 drug-free-plausibility acceptance, with its acceptance rate and per-biomarker rejection counts). Banner-stamped **Tier D / NOT FOR PREDICTION**. |
+| **Browse dataset** | every channel-block record with its IC50, tier, max-block, identifiability, source count, fold-range, and review status. |
+| **About / safety** | the guardrails, restated. |
+
+Its data contract (every field, function, and dict key the UI reads) is asserted
+in `tests/test_dashboard.py`, so a drift in the `simulate` / `populations` API
+fails in CI rather than in front of a user.
+
 ---
 
 ## v0.2 — Bayesian dose-response uncertainty quantification
@@ -654,7 +674,7 @@ optional local step (they need a heavy simulation engine, so are not run in CI).
 ## Validation & testing
 
 Everything downstream of the dataset is a deterministic projection, so the test
-suite (180 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
+suite (181 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 *provable non-drift* rather than fixtures:
 
 | Guard | What it proves | Where |
@@ -680,7 +700,7 @@ suite (180 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 | **SED-ML reference resolution** | every task→model/sim, variable→task, curve→dataGenerator reference resolves; the model `source` points at a file that exists | `sedml.reference_violations` |
 | **OMEX manifest consistency** | the COMBINE manifest lists exactly the archive's files, with one master | `combine.manifest_violations` |
 | **Executable notebook** | the headline flip-frequency analysis runs clean and its assertions hold | `nbmake notebooks/` |
-| **Dashboard data contract** | the headline UI's data API (every field it reads) still exists | `tests/test_dashboard.py` |
+| **Dashboard data contract** | the headline UI's data API — every field, function, and dict key each of the five tabs reads (flip + Bayesian-UQ toggle, combinations, population-of-models incl. disease/calibrated, browse) still exists | `tests/test_dashboard.py` |
 | **Recorded performance** | the honest, live confusion matrix vs CiPA expert labels — never hidden behind one accuracy number | `harmonia performance` |
 
 `harmonia export --all` runs all of these checks (the three round trips, CellML
@@ -729,9 +749,9 @@ harmonia/
 │       ├── model_spec.py        # one expression AST → Myokit / CellML / SBML
 │       ├── cellml.py · myokit.py · sbml.py · sedml.py · cipa_inputs.py
 │       ├── csv_bibtex.py · annotate.py · combine.py · registry.py
-├── dashboard/app.py             # Streamlit: browse + risk-uncertainty (flip) view
+├── dashboard/app.py             # Streamlit: flip view (+ Bayesian UQ) · combinations · population-of-models · browse
 ├── notebooks/                   # executable analyses, run in CI under nbmake
-├── tests/                       # 180 tests: dataset, kernel, qNet, simulate, dynamic binding, exposure, combinations, populations (incl. calibrated), performance, Bayesian UQ, exports (round trips + unit conformance + SED-ML/OMEX integrity), CLI, dashboard contract
+├── tests/                       # 181 tests: dataset, kernel, qNet, simulate, dynamic binding, exposure, combinations, populations (incl. calibrated), performance, Bayesian UQ, exports (round trips + unit conformance + SED-ML/OMEX integrity), CLI, dashboard contract
 ├── docs/                        # essay, figures, make_figures.py
 ├── CHANGELOG.md · .zenodo.json  # release metadata
 └── exports/                     # sample generated artifacts (regenerated in CI)

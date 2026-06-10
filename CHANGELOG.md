@@ -6,6 +6,32 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.2] — 2026-06-10
+
+### Added — the dashboard now surfaces the whole shipped feature set
+The Streamlit dashboard (the spec-§6 headline presentation layer) had drifted
+behind the library: it exposed the flip view, combinations, and browse, but **not**
+the population-of-models subsystem (v0.1 Phase E), the **LQTS disease backgrounds**
+(v0.3), the **experimentally-calibrated** population (v0.5), or the **Bayesian
+dose-response UQ** engine (v0.2) — all shipped, tested, and figured in the README,
+yet unreachable from the headline UI. This release closes that gap (presentation
+only — no library, dataset, or kernel change).
+
+- **New "Population-of-models" tab** — pick a drug and a `population` (the
+  illustrative variability cloud, the three LQTS backgrounds, or the calibrated
+  population) and see the susceptible fraction and class spread across virtual
+  myocytes. A disease background shows its mean conductance shift; the calibrated
+  population shows its acceptance rate and per-biomarker rejection counts. The tab
+  is banner-stamped **Tier D / NOT FOR PREDICTION**, matching the library guardrail.
+- **Bayesian dose-response UQ toggle** on the flip tab — switches `assess` to
+  `uq="bayes"` and surfaces the true-value vs new-lab (reproducibility) flip split
+  and the censored / prior-dominated channel flags.
+- `tests/test_dashboard.py` gains a population-tab data contract (uncalibrated,
+  disease, and calibrated populations, all asserted Tier D) and the three Bayesian
+  fields, so the broadened UI cannot drift from the API silently. Suite 180 → 181.
+- README: a new dashboard section documents all five tabs; the architecture
+  diagram and repo-layout dashboard references updated to match.
+
 ## [0.5.1] — 2026-06-10
 
 ### Changed — type-safety hardening: the `py.typed` contract is now enforced in CI

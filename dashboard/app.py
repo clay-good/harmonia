@@ -16,6 +16,7 @@ import harmonia
 from harmonia.simulate import (assess, flip_view, flip_sensitivity, dose_response,
                                THRESH_LOW_PCT, THRESH_HIGH_PCT, RISK_LABELS,
                                QNET_THRESH_LOW, QNET_THRESH_HIGH)
+from harmonia.populations import assess_population
 
 st.set_page_config(page_title="Harmonia — proarrhythmia risk uncertainty", layout="wide")
 
@@ -26,10 +27,10 @@ def get_dataset():
 
 
 @st.cache_data
-def run_assess(drug, ap_model, mc, mult, seed, metric):
+def run_assess(drug, ap_model, mc, mult, seed, metric, uq="moments"):
     ds = get_dataset()
     a = assess(ds, drug, ap_model=ap_model, n_mc=mc, exposure_multiple=mult,
-               seed=seed, metric=metric)
+               seed=seed, metric=metric, uq=uq)
     return {
         "dapd90": a.dapd90_distribution, "qnet_dist": a.qnet_distribution,
         "point": a.dapd90_pct, "qnet": a.qnet,
@@ -39,7 +40,27 @@ def run_assess(drug, ap_model, mc, mult, seed, metric):
         "exposure": a.reference_exposure_nM, "baseline": a.baseline_apd90,
         "apd90": a.apd90, "metric": a.metric,
         "tri": a.triangulation_ms, "tri_base": a.baseline_triangulation_ms,
-        "cqinward": a.cqinward,
+        "cqinward": a.cqinward, "uq": a.uq,
+        "repro_flip": a.reproducibility_flip_frequency,
+        "censored": a.censored_channels, "prior_dom": a.prior_dominated_channels,
+    }
+
+
+@st.cache_data
+def run_population(drug, population, ap_model, n_models, mult, metric, seed):
+    ds = get_dataset()
+    p = assess_population(ds, drug, population=population, ap_model=ap_model,
+                          n_models=n_models, exposure_multiple=mult, metric=metric,
+                          seed=seed)
+    return {
+        "qnet_dist": p.qnet_distribution, "dapd90_dist": p.dapd90_distribution,
+        "dist": p.classification_distribution, "susceptible": p.susceptible_fraction,
+        "tier": p.tier, "n_models": p.n_models, "metric": p.metric,
+        "exposure": p.reference_exposure_nM, "warnings": p.warnings,
+        "excluded": p.excluded_channels, "repol_failures": p.repolarization_failures,
+        "conductance_scale": p.conductance_scale, "calibrated": p.calibrated,
+        "acceptance_rate": p.acceptance_rate, "n_candidates": p.n_candidates,
+        "rejection_reasons": p.rejection_reasons,
     }
 
 
@@ -50,9 +71,9 @@ st.caption("Cardiac ion-channel drug-block data → in-silico proarrhythmia risk
            "**distribution**. NOT a clinical tool, NOT a regulatory determination, "
            "NOT a safety verdict — a risk distribution with its full input uncertainty.")
 
-tab_flip, tab_combo, tab_browse, tab_about = st.tabs(
-    ["Risk-uncertainty (flip) view", "Drug combinations", "Browse dataset",
-     "About / safety"])
+tab_flip, tab_combo, tab_pop, tab_browse, tab_about = st.tabs(
+    ["Risk-uncertainty (flip) view", "Drug combinations", "Population-of-models",
+     "Browse dataset", "About / safety"])
 
 # --------------------------------------------------------------------------- #
 with tab_flip:
@@ -64,8 +85,14 @@ with tab_flip:
     metric = c3.selectbox("Risk metric", ["qnet", "apd90"], index=0)
     mc = c4.slider("Monte-Carlo draws", 20, 400, 120, step=20)
     mult = c5.slider("Exposure (× EFTPC)", 1.0, 25.0, 4.0, step=1.0)
+    bayes = st.checkbox(
+        "Bayesian dose-response UQ (v0.2) — infer the IC50/Hill posterior under a "
+        "declared prior instead of transcribing the spread (single-source channels "
+        "borrow the dataset-learned between-lab SD; sub-60%-block channels become a "
+        "one-sided censored posterior)", value=False)
+    uq = "bayes" if bayes else "moments"
 
-    res = run_assess(drug, ap_model, mc, mult, 0, metric)
+    res = run_assess(drug, ap_model, mc, mult, 0, metric, uq)
 
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Point classification", res["classification"].upper())
@@ -86,6 +113,21 @@ with tab_flip:
                  f"Tier D): {', '.join(res['excluded'])}")
     for w in res["warnings"]:
         st.warning(w)
+
+    if res["uq"] == "bayes":
+        b1, b2 = st.columns(2)
+        b1.metric("True-value flip frequency", f"{res['flip']:.0%}",
+                  help="Samples the posterior of the drug's IC50 (μ): 'what is the value?'")
+        rf = res["repro_flip"]
+        b2.metric("New-lab (reproducibility) flip", "—" if rf != rf else f"{rf:.0%}",
+                  help="Samples the new-lab predictive (adds between-lab spread τ): "
+                       "'how much would a fresh replication move the call?'")
+        if res["censored"]:
+            st.warning("Censored (one-sided, sub-60%-block) posteriors — wide and "
+                       "prior-shaped, still Tier-D-capped: " + ", ".join(res["censored"]))
+        if res["prior_dom"]:
+            st.info("Prior-dominated channels (posterior mostly reflects the prior, "
+                    "not the data — go measure them): " + ", ".join(res["prior_dom"]))
 
     if metric == "qnet":
         st.subheader("Distribution of qNet under input (IC50) variability")
@@ -177,6 +219,70 @@ with tab_combo:
         centers = 0.5 * (hist[1][:-1] + hist[1][1:])
         st.bar_chart(pd.DataFrame({"count": hist[0]},
                                   index=np.round(centers, 4 if cmetric == "qnet" else 1)))
+
+# --------------------------------------------------------------------------- #
+with tab_pop:
+    import pandas as pd
+    st.error("**HYPOTHESIS-TIER — Tier D, NOT FOR PREDICTION.** Conductance "
+             "variability (and any disease mean-shift) is *illustrative*, not "
+             "calibrated to patient data; the qNet/APD thresholds stay the healthy "
+             "reference. This is a methodology view of *physiological* (between-heart) "
+             "variability — never a per-patient or per-genotype safety claim.")
+    st.caption("Where the flip view propagates *input* (IC50) variability, this "
+               "propagates *physiological* variability: a population of virtual "
+               "myocytes (per-channel conductance draws). Disease backgrounds shift a "
+               "current's mean (reduced repolarization reserve); the calibrated "
+               "population (Britton 2013) admits only drug-free-plausible myocytes.")
+
+    pops = ds.populations
+    pop_ids = [p.id.split(".", 1)[1] for p in pops]
+    pop_labels = {p.id.split(".", 1)[1]: p.name for p in pops}
+    default_pop = pop_ids.index("illustrative_v0") if "illustrative_v0" in pop_ids else 0
+
+    pc1, pc2, pc3, pc4, pc5 = st.columns(5)
+    pdrug = pc1.selectbox("Drug", ds.drugs(), index=ds.drugs().index("dofetilide"),
+                          key="pop_drug")
+    population = pc2.selectbox("Population", pop_ids, index=default_pop,
+                               format_func=lambda k: pop_labels.get(k, k), key="pop_sel")
+    pmetric = pc3.selectbox("Metric", ["qnet", "apd90"], index=0, key="pop_metric")
+    n_models = pc4.slider("Virtual myocytes", 20, 200, 100, step=20, key="pop_n")
+    pmult = pc5.slider("Exposure (× EFTPC)", 1.0, 25.0, 4.0, step=1.0, key="pop_mult")
+
+    pr = run_population(pdrug, population, "cipaordv1.0", n_models, pmult, pmetric, 0)
+
+    p1, p2, p3, p4 = st.columns(4)
+    p1.metric("Susceptible fraction (classified high)", f"{pr['susceptible']:.0%}")
+    p2.metric("Population size", pr["n_models"])
+    p3.metric("Propagated tier", pr["tier"])
+    p4.metric("Reference exposure", f"{pr['exposure']:.1f} nM")
+
+    if pr["conductance_scale"]:
+        shift = ", ".join(f"{k}×{v:g}" for k, v in pr["conductance_scale"].items())
+        st.warning(f"**Disease/genetic background** — mean conductance shift: {shift} "
+                   "(illustrative heterozygous-scale, NOT genotype-calibrated).")
+    if pr["calibrated"]:
+        rej = ", ".join(f"{k} {v}" for k, v in pr["rejection_reasons"].items() if v) or "none"
+        st.info(f"**Experimentally-calibrated** (Britton 2013): "
+                f"{pr['n_models']}/{pr['n_candidates']} candidates accepted "
+                f"({pr['acceptance_rate']:.0%}) — drug-free-plausible myocytes only. "
+                f"Rejected by biomarker: {rej}. Acceptance ranges are kernel-plausibility "
+                "bounds, not a fit to patient data.")
+    if pr["excluded"]:
+        st.error("Excluded channels (unidentifiable IC50): " + ", ".join(pr["excluded"]))
+
+    st.subheader(f"Distribution of {pmetric} across the population")
+    pdata = pr["qnet_dist"] if pmetric == "qnet" else pr["dapd90_dist"]
+    phist = np.histogram(pdata, bins=24)
+    pcenters = 0.5 * (phist[1][:-1] + phist[1][1:])
+    st.bar_chart(pd.DataFrame({"count": phist[0]},
+                              index=np.round(pcenters, 4 if pmetric == "qnet" else 1)))
+    st.caption("Population class mix: "
+               + ", ".join(f"{k} {pr['dist'].get(k, 0):.0%}" for k in RISK_LABELS)
+               + (f" · repolarization failures: {pr['repol_failures']}/{pr['n_models']}"
+                  if pr["repol_failures"] else ""))
+    st.caption("A spread of classifications across virtual hearts — never a verdict, "
+               "never a prediction.")
+
 
 # --------------------------------------------------------------------------- #
 with tab_browse:
