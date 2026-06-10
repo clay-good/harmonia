@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -26,7 +26,7 @@ from .load import Dataset
 from .records import ChannelBlock, Population
 from .exposure import resolve_free_exposure
 from .export.reference import KernelParams, simulate_beats, hill_block_factor, BLOCKABLE
-from .simulate import (RISK_LABELS, classify_metric, DEFAULT_METRIC,
+from .simulate import (RISK_LABELS, classify_metric, DEFAULT_METRIC, flip_ci,
                        _channel_draws, _resolve_ap_model, REFERENCE_EXPOSURE_MULTIPLE)
 
 NOT_FOR_PREDICTION = ("HYPOTHESIS-TIER — NOT FOR PREDICTION. Illustrative "
@@ -35,6 +35,14 @@ NOT_FOR_PREDICTION_CALIBRATED = (
     "HYPOTHESIS-TIER — NOT FOR PREDICTION. Drug-free-plausibility-calibrated "
     "population (Britton 2013 method) with KERNEL-plausibility acceptance ranges, "
     "NOT a fit to patient data; Tier D.")
+
+
+def _fmt_susceptible(frac: float, ci: Tuple[float, float], n: int) -> str:
+    """Render the susceptible-fraction line with its Wilson CI over n myocytes (v0.7)."""
+    lo, hi = ci
+    if n <= 0 or math.isnan(lo):
+        return f"{frac:.0%}"
+    return f"{frac:.0%} (95% CI {lo:.0%}–{hi:.0%}, {n} myocytes)"
 
 
 # v0.5 — biomarker accessors for the calibration acceptance test, in the kernel's
@@ -70,6 +78,8 @@ class PopulationAssessment:
     dapd90_distribution: np.ndarray
     classification_distribution: Dict[str, float]   # fraction of the population in each class
     susceptible_fraction: float                      # fraction classified "high"
+    # v0.7 — Wilson 95% CI of the susceptible fraction over the n_models myocytes.
+    susceptible_fraction_ci: Tuple[float, float]
     repolarization_failures: int
     tier: str = "D"                                  # always capped at D (non-predictive)
     conductance_scale: Dict[str, float] = field(default_factory=dict)  # v0.3 disease mean shift
@@ -96,7 +106,8 @@ class PopulationAssessment:
             header,
             f"reference exposure = {self.reference_exposure_nM:g} nM",
             f"{self.n_models} virtual myocytes  [{self.metric}] class mix: {dist}",
-            f"SUSCEPTIBLE fraction (classified high): {self.susceptible_fraction:.0%}",
+            f"SUSCEPTIBLE fraction (classified high): "
+            f"{_fmt_susceptible(self.susceptible_fraction, self.susceptible_fraction_ci, self.n_models)}",
         ]
         if self.calibrated:
             rej = ", ".join(f"{k} {v}" for k, v in self.rejection_reasons.items() if v) or "none"
@@ -305,6 +316,7 @@ def assess_population(ds: Dataset, drug: str, population: str = "illustrative_v0
         reference_exposure_nM=reference_exposure, metric=metric, n_models=n,
         qnet_distribution=qn, dapd90_distribution=dapd,
         classification_distribution=counts, susceptible_fraction=counts.get("high", 0.0),
+        susceptible_fraction_ci=flip_ci(counts.get("high", 0.0), n),
         repolarization_failures=failures, tier="D", warnings=warnings,
         excluded_channels=excluded, conductance_scale=dict(scale),
         calibrated=cal_result is not None,

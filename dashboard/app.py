@@ -35,13 +35,14 @@ def run_assess(drug, ap_model, mc, mult, seed, metric, uq="moments"):
         "dapd90": a.dapd90_distribution, "qnet_dist": a.qnet_distribution,
         "point": a.dapd90_pct, "qnet": a.qnet,
         "classification": a.classification, "dist": a.classification_distribution,
-        "flip": a.classification_flip_frequency, "tier": a.tier,
+        "flip": a.classification_flip_frequency, "flip_ci": a.flip_ci, "tier": a.tier,
         "warnings": a.warnings, "excluded": a.excluded_channels,
         "exposure": a.reference_exposure_nM, "baseline": a.baseline_apd90,
         "apd90": a.apd90, "metric": a.metric,
         "tri": a.triangulation_ms, "tri_base": a.baseline_triangulation_ms,
         "cqinward": a.cqinward, "uq": a.uq,
         "repro_flip": a.reproducibility_flip_frequency,
+        "repro_flip_ci": a.reproducibility_flip_ci,
         "censored": a.censored_channels, "prior_dom": a.prior_dominated_channels,
     }
 
@@ -55,6 +56,7 @@ def run_population(drug, population, ap_model, n_models, mult, metric, seed):
     return {
         "qnet_dist": p.qnet_distribution, "dapd90_dist": p.dapd90_distribution,
         "dist": p.classification_distribution, "susceptible": p.susceptible_fraction,
+        "susceptible_ci": p.susceptible_fraction_ci,
         "tier": p.tier, "n_models": p.n_models, "metric": p.metric,
         "exposure": p.reference_exposure_nM, "warnings": p.warnings,
         "excluded": p.excluded_channels, "repol_failures": p.repolarization_failures,
@@ -96,10 +98,20 @@ with tab_flip:
 
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Point classification", res["classification"].upper())
-    m2.metric("Classification-flip frequency", f"{res['flip']:.0%}")
+    flo, fhi = res["flip_ci"]
+    m2.metric("Classification-flip frequency", f"{res['flip']:.0%}",
+              help=("Monte-Carlo estimate over {} draws; Wilson 95% CI {:.0%}–{:.0%}. "
+                    "The flip frequency is itself a binomial proportion with sampling "
+                    "error that shrinks only as you add draws.").format(mc, flo, fhi)
+                   if flo == flo else "point estimate only (no Monte-Carlo draws)")
     m3.metric("Propagated tier", res["tier"])
     m4.metric("qNet (point)" if metric == "qnet" else "ΔAPD90 (point)",
               f"{res['qnet']:.4f}" if metric == "qnet" else f"{res['point']:+.1f}%")
+    if flo == flo:   # not NaN
+        st.caption(f"Flip-frequency **Monte-Carlo 95% CI: {flo:.0%}–{fhi:.0%}** "
+                   f"({mc} draws). The headline flip frequency is a binomial proportion "
+                   "with its own sampling error — wider here means add draws before "
+                   "comparing two drugs' flip rates.")
     st.caption(f"Triangulation (APD90−APD50): **{res['tri']:.0f} ms** "
                f"(drug-free {res['tri_base']:.0f} ms) — a TRIaD proarrhythmia "
                "diagnostic that hERG block widens; a readout, never the classifier.")
@@ -119,9 +131,11 @@ with tab_flip:
         b1.metric("True-value flip frequency", f"{res['flip']:.0%}",
                   help="Samples the posterior of the drug's IC50 (μ): 'what is the value?'")
         rf = res["repro_flip"]
+        rlo, rhi = res["repro_flip_ci"]
         b2.metric("New-lab (reproducibility) flip", "—" if rf != rf else f"{rf:.0%}",
-                  help="Samples the new-lab predictive (adds between-lab spread τ): "
-                       "'how much would a fresh replication move the call?'")
+                  help=("Samples the new-lab predictive (adds between-lab spread τ): "
+                        "'how much would a fresh replication move the call?'"
+                        + ("" if rlo != rlo else f"  Wilson 95% CI {rlo:.0%}–{rhi:.0%}.")))
         if res["censored"]:
             st.warning("Censored (one-sided, sub-60%-block) posteriors — wide and "
                        "prior-shaped, still Tier-D-capped: " + ", ".join(res["censored"]))
@@ -251,7 +265,11 @@ with tab_pop:
     pr = run_population(pdrug, population, "cipaordv1.0", n_models, pmult, pmetric, 0)
 
     p1, p2, p3, p4 = st.columns(4)
-    p1.metric("Susceptible fraction (classified high)", f"{pr['susceptible']:.0%}")
+    slo, shi = pr["susceptible_ci"]
+    p1.metric("Susceptible fraction (classified high)", f"{pr['susceptible']:.0%}",
+              help=(f"Wilson 95% CI {slo:.0%}–{shi:.0%} over {pr['n_models']} virtual "
+                    "myocytes — the susceptible fraction is a binomial proportion with "
+                    "sampling error.") if slo == slo else None)
     p2.metric("Population size", pr["n_models"])
     p3.metric("Propagated tier", pr["tier"])
     p4.metric("Reference exposure", f"{pr['exposure']:.1f} nM")

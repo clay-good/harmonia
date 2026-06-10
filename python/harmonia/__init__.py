@@ -8,7 +8,7 @@ uncertainty; it never issues a bare "safe/unsafe" verdict. See spec.md §10.
 """
 from __future__ import annotations
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 
 from .load import Dataset, load, find_dataset_dir
 from .validate import validate_dataset, ValidationReport
@@ -19,7 +19,7 @@ from . import filter, records
 from .simulate import (assess, assess_combination, flip_view, flip_sensitivity,
                        RiskAssessment, CombinationAssessment, FlipView,
                        FlipSensitivity, ChannelSensitivity, SobolSensitivity,
-                       SobolChannel)
+                       SobolChannel, wilson_interval, flip_ci)
 from .populations import (assess_population, PopulationAssessment,
                           calibrate_population, CalibrationResult)
 from .exposure import free_from_total, total_from_free
@@ -56,6 +56,8 @@ __all__ = [
     "ChannelSensitivity",
     "SobolSensitivity",
     "SobolChannel",
+    "wilson_interval",
+    "flip_ci",
     "free_from_total",
     "total_from_free",
     "posterior",

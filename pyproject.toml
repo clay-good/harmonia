@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "harmonia"
-version = "0.6.0"
+version = "0.7.0"
 description = "Curated, citation-backed, variability-aware dataset of cardiac ion-channel drug-block parameters and the in-silico ventricular AP models that turn them into a torsade-de-pointes (proarrhythmia) risk distribution, with hierarchical-Bayesian dose-response uncertainty quantification."
 readme = "README.md"
 requires-python = ">=3.9"

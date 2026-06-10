@@ -47,9 +47,11 @@ by Monte-Carlo, and shows how often the high/intermediate/low classification
 
 A near-pure hERG blocker like **dofetilide** lands tightly in HIGH (2% flip under
 qNet). A balanced multichannel blocker like **verapamil** straddles the
-low/intermediate boundary — its classification flips on **~36%** of draws. The
-same drug, different believed sources, different safety call. That is the finding
-the uncertainty-quantification literature
+low/intermediate boundary — its classification flips on **~36%** of draws (Wilson
+95% CI 30–43% at 200 Monte-Carlo draws; the flip frequency is itself an estimate,
+and **v0.7** reports its sampling interval, §[flip-frequency CI](#the-flip-frequency-is-itself-an-estimate-v07)).
+The same drug, different believed sources, different safety call. That is the
+finding the uncertainty-quantification literature
 ([Chang et al. 2017](https://doi.org/10.3389/fphys.2017.00917)) demonstrated and
 that no dataset operationalized — until this one. (The metric is **qNet**, the
 CiPA net-charge biomarker; lower qNet means higher risk.)
@@ -153,6 +155,7 @@ pop.tier                                      # "D"  (always; non-predictive)
 | **Disease / genetic backgrounds** (**v0.3**) — the three congenital long-QT channelopathies (LQT1 IKs↓, LQT2 IKr↓, LQT3 INaL↑) as population records: a per-current *mean* conductance shift recenters the variability cloud on a reduced-repolarization-reserve background, so a drug's risk distribution can be re-evaluated against a susceptible subpopulation. **Hypothesis-tier, Tier D, NOT FOR PREDICTION** | ✅ |
 | **Experimentally-calibrated populations** (**v0.5**) — the Britton-2013 calibration-by-rejection: a virtual myocyte enters the population only if its *drug-free* AP biomarkers (APD90, rest/peak potential, triangulation) are physiologically plausible, removing the abnormal-repolarization tail of the raw prior. Acceptance ranges are kernel-plausibility bounds (not patient-fit), so it stays **Tier D, NOT FOR PREDICTION** | ✅ |
 | **Risk distribution + flip frequency** — Monte-Carlo over source variability; classification-flip frequency; worst-tier propagation | ✅ |
+| **Flip-frequency confidence interval** (**v0.7**) — the headline flip frequency is a Monte-Carlo binomial proportion, so it now carries a **Wilson 95% CI** (`flip_ci`) derived from `n_mc`; same for the combination flip, the all-vary flip sensitivity, the new-lab reproducibility flip, and the population susceptible fraction. The project's own "never a number without its uncertainty" rule, applied to its own headline number. Purely additive — no previously-reported value moves | ✅ |
 | **Flip sensitivity** — `flip_sensitivity` attributes the flip to each channel's IC50 spread (solo / frozen effects), surfacing the dominant uncertain input to pin down first | ✅ |
 | **Recorded classification performance** (Phase B) — `harmonia performance` scores either metric vs CiPA expert labels on training / validation / all, with the full confusion matrix | ✅ |
 | **Exports** — CellML 2.0, Myokit `.mmt`, SBML L3v2, SED-ML, CiPA inputs (CSV/JSON), CSV, BibTeX, COMBINE `.omex` — all carrying `clinicalUse = PROHIBITED`, tier, and DOI RDF | ✅ |
@@ -570,6 +573,44 @@ headline analysis is reproduced (and asserted) in the executable notebook
 [`notebooks/01_flip_frequency.ipynb`](notebooks/01_flip_frequency.ipynb), run in
 CI under `nbmake`.
 
+### The flip frequency is itself an estimate (v0.7)
+
+The flip frequency is computed by counting how often the classification changes
+over `n_mc` Monte-Carlo draws — so it is a **binomial proportion** `k / n_mc` with
+its own sampling error, which shrinks only as you add draws. Reporting it as a
+bare number invites over-trust in a noisy estimate, which is exactly the failure
+mode the whole project exists to prevent. So v0.7 turns the project's own rule on
+its own headline number: every reported flip frequency now carries a **Wilson
+score 95% confidence interval**.
+
+```python
+res = harmonia.assess(ds, "verapamil", n_mc=200)
+res.classification_flip_frequency        # 0.365
+res.flip_ci                              # (0.30, 0.43)  Wilson 95% CI at n_mc=200
+
+# the helpers are public and pure
+harmonia.wilson_interval(0, 200)         # (0.0, 0.019)  — NOT (0, 0): an honest upper bound
+harmonia.flip_ci(0.365, 200)             # (0.30, 0.43)
+```
+
+```
+classification-flip frequency: 36% (95% CI 30%–43%, 200 MC draws)
+```
+
+The **Wilson** interval (not the normal/Wald approximation) is used deliberately:
+it stays inside `[0, 1]` and is non-degenerate at the extremes `k = 0` and
+`k = n` — exactly where flip frequencies live. A tight HIGH blocker that flips
+`0 / 200` times has a Wilson CI of `[0, 1.9%]`, an honest upper bound; the Wald
+interval would report a misleading `[0, 0]`. The same interval is attached to the
+combination flip (`CombinationAssessment.flip_ci`), the all-channels-vary flip
+sensitivity (`FlipSensitivity.all_vary_flip_ci`), the new-lab reproducibility flip
+under `uq="bayes"` (`reproducibility_flip_ci`), and the population susceptible
+fraction (`PopulationAssessment.susceptible_fraction_ci`). It is **purely
+additive**: every previously-reported value — flip frequencies, class
+probabilities, qNet/ΔAPD90, the calibrated thresholds — is byte-identical, and the
+`n_mc = 0` point-estimate path reports `(nan, nan)` (no sampling, no interval). See
+[spec v0.7](docs/specs/v0.7-flip-frequency-ci.md).
+
 ### The dashboard — the honest-uncertainty view, interactively
 
 `streamlit run dashboard/app.py` opens the spec-§6 headline view. It is a pure
@@ -733,7 +774,7 @@ optional local step (they need a heavy simulation engine, so are not run in CI).
 ## Validation & testing
 
 Everything downstream of the dataset is a deterministic projection, so the test
-suite (188 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
+suite (211 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 *provable non-drift* rather than fixtures:
 
 | Guard | What it proves | Where |
@@ -752,6 +793,7 @@ suite (188 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 | **cqInward biomarker** (v0.4) | control identity (=1 at no drug); ICaL/INaL block lowers it (<1), IKr block raises it (>1); propagated as a distribution; adding it changes no qNet/flip number | `tests/test_cqinward.py` |
 | **CiPA dynamic-hERG kinetics** (v0.6) | the 12 CiPA dynamic-fit compounds carry `cipa_binding` (the rest don't); zero-drug ⇒ no block; block rises with concentration; the trapping phenotype (dofetilide retains ≫ verapamil washes out); the opt-in path leaves the default classification unchanged | `tests/test_cipa_binding.py` |
 | **Sobol consistency** (v0.2) | total-effect ≥ first-order per channel (within MC error); indices deterministic; standard errors reported | `tests/test_sobol.py` |
+| **Flip-frequency CI** (v0.7) | the Wilson interval matches the textbook value, stays in `[0,1]`, is non-degenerate at `k=0`/`k=n`, narrows ∝ `1/√n`, and brackets the reported flip frequency; adding it changes no flip/susceptible/metric value (`n_mc=0` ⇒ `(nan, nan)`) | `tests/test_flip_ci.py` |
 | **CiPA numeric round trip** | export the CiPA CSV, parse it back, every IC50/Hill equals the dataset value | `registry.roundtrip_cipa` |
 | **Parameter round trip** | the kernel conductances appear verbatim in the CellML/SBML/Myokit text | `registry.roundtrip_parameters` |
 | **ODE round trip** | the model AST re-integrates to the reference-kernel AP within ≈1e-7 — the exported *equations* match the oracle, not just the constants | `registry.roundtrip_ode` |
@@ -812,7 +854,7 @@ harmonia/
 │       ├── csv_bibtex.py · annotate.py · combine.py · registry.py
 ├── dashboard/app.py             # Streamlit: flip view (+ Bayesian UQ) · combinations · population-of-models · browse
 ├── notebooks/                   # executable analyses, run in CI under nbmake
-├── tests/                       # 188 tests: dataset, kernel, qNet, simulate, dynamic binding, CiPA hERG kinetics, exposure, combinations, populations (incl. calibrated), performance, Bayesian UQ, exports (round trips + unit conformance + SED-ML/OMEX integrity), CLI, dashboard contract
+├── tests/                       # 211 tests: dataset, kernel, qNet, simulate, dynamic binding, CiPA hERG kinetics, flip-frequency CIs, exposure, combinations, populations (incl. calibrated), performance, Bayesian UQ, exports (round trips + unit conformance + SED-ML/OMEX integrity), CLI, dashboard contract
 ├── docs/                        # essay, figures, make_figures.py
 ├── CHANGELOG.md · .zenodo.json  # release metadata
 └── exports/                     # sample generated artifacts (regenerated in CI)
@@ -847,9 +889,15 @@ feature does not get built.
 | **A — CiPA spine** | Channel block + ORd kernel + risk metric for the 12 training drugs, end to end, with exports, validation, and the flip view | ✅ |
 | **B — Dynamic hERG + validation** | Dynamic (Langmuir + trapping) hERG binding; the 16 validation drugs (28 CiPA compounds total); recorded classification performance | ✅ |
 | **C — Variability layer** | **Discriminating qNet via a shape-dependent Na-Ca exchanger ✅; the published CiPA dynamic-hERG optimized kinetics sourced + a binding model shipped (v0.6) ✅.** Remaining: the full 9-state CiPA Markov IKr (the kinetics are coupled to the reduced gate, a Tier-C reduction); broader multi-source aggregation; ToR-ORd reformulation | ◧ |
-| **D — Exposure layer** | Free ↔ total plasma conc + protein binding (composable with Hypnos); drug-combination assessment | ✅ **this release** |
+| **D — Exposure layer** | Free ↔ total plasma conc + protein binding (composable with Hypnos); drug-combination assessment | ✅ |
 | **E — Populations** | **Population-of-models risk spread ✅; disease & genetic backgrounds (LQTS, v0.3) ✅; experimentally-calibrated populations (Britton 2013, v0.5) ✅** — all shipped non-predictive (Tier D). Remaining: real-data-calibrated (not kernel-plausibility) populations | ✅ |
-| **F — Hardening** | **Declaration-level CellML unit-conformance check (in CI) ✅; executable `nbmake` notebooks (3) ✅; `.zenodo.json` + `CHANGELOG.md` ✅.** Remaining: full dimensional validation + the Myokit/OpenCOR cross-check against the *canonical* ORd CellML (optional local step); minted Zenodo DOI on first tagged release | ◧ |
+| **F — Hardening** | **Declaration-level CellML unit-conformance check (in CI) ✅; executable `nbmake` notebooks (3) ✅; `.zenodo.json` + `CHANGELOG.md` ✅; Wilson 95% CIs on every Monte-Carlo flip frequency (v0.7) ✅.** Remaining: full dimensional validation + the Myokit/OpenCOR cross-check against the *canonical* ORd CellML (optional local step); minted Zenodo DOI on first tagged release | ◧ |
+
+**This release (v0.7):** the headline flip frequency — the number the whole
+dataset exists to compute — now carries its own **Wilson 95% confidence
+interval**, because it is a Monte-Carlo estimate and the project's rule is *never a
+number without its uncertainty.* Purely additive; no previously-reported value
+moves. See [spec v0.7](docs/specs/v0.7-flip-frequency-ci.md).
 
 ---
 

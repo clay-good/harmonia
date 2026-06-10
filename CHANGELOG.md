@@ -6,6 +6,38 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-06-10
+
+### Added — Monte-Carlo confidence intervals on the flip frequency (spec v0.7)
+Harmonia's thesis is *never report a number without its uncertainty* — yet the headline
+**classification-flip frequency**, the number the whole dataset exists to compute, was
+itself reported as a bare point estimate. It is a Monte-Carlo **binomial proportion**
+`k/n_mc` with sampling error that shrinks only as draws are added, so v0.7 turns the
+project's own rule on its own output: every reported flip frequency now carries a
+**Wilson score 95% confidence interval**. (The Sobol indices already reported bootstrap
+SEs; the headline number now matches that standard.)
+
+- **`wilson_interval(k, n, z=Z95)` and `flip_ci(freq, n)`** — public, pure helpers
+  (`harmonia.wilson_interval`, `harmonia.flip_ci`). The **Wilson** interval is used
+  deliberately over the normal/Wald approximation: it stays inside `[0, 1]` and is
+  non-degenerate at the extremes `k=0` / `k=n`, exactly where flip frequencies live (a
+  tight HIGH blocker flips `0/200` ⇒ CI `[0, 1.9%]`, an honest upper bound, not `[0,0]`).
+  `n ≤ 0` ⇒ `(nan, nan)`.
+- **CI on every reported Monte-Carlo proportion:** `RiskAssessment.flip_ci`,
+  `RiskAssessment.reproducibility_flip_ci` (`uq="bayes"`), `CombinationAssessment.flip_ci`,
+  `FlipSensitivity.all_vary_flip_ci`, and `PopulationAssessment.susceptible_fraction_ci`.
+  Each `summary()` prints it inline (`36% (95% CI 30%–43%, 200 MC draws)`); the CLI,
+  dashboard (metric tooltips + caption), and notebook `01_flip_frequency.ipynb` surface it.
+- **Purely additive — provable non-drift.** `classification_flip_frequency`,
+  `susceptible_fraction`, the class-probability distribution, every qNet/ΔAPD90/cqInward
+  value, and all calibrated thresholds are byte-identical with v0.6.x; the `n_mc=0`
+  point-estimate path reports `(nan, nan)`. `tests/test_flip_ci.py` (23 tests): Wilson
+  math vs textbook, bounds, extremes, `1/√n` convergence, point-bracketing on every
+  surface, and the non-drift guarantee. Suite 188 → 211.
+- Spec `docs/specs/v0.7-flip-frequency-ci.md`; README section "The flip frequency is
+  itself an estimate"; no dataset, model, or threshold change (exports move only the
+  `datasetVersion` stamp to 0.7.0).
+
 ## [0.6.0] — 2026-06-10
 
 ### Added — the published CiPA dynamic-hERG binding kinetics (spec v0.6)

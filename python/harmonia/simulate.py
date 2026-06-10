@@ -28,6 +28,7 @@ accuracy.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
@@ -62,6 +63,49 @@ RISK_LABELS = ("low", "intermediate", "high")
 
 # Order of model tiers (worse = larger index) for worst-wins propagation.
 _TIER_ORDER = {"A": 0, "B": 1, "C": 2, "D": 3}
+
+# 95% standard-normal quantile, for the Monte-Carlo confidence intervals (spec v0.7).
+Z95 = 1.959963984540054
+
+
+def wilson_interval(k: int, n: int, z: float = Z95) -> Tuple[float, float]:
+    """Wilson score confidence interval for a binomial proportion ``k/n`` (spec v0.7).
+
+    Returns ``(nan, nan)`` for ``n <= 0`` (no sample, no interval). Chosen over the
+    normal (Wald) approximation because it stays inside ``[0, 1]`` and is
+    non-degenerate at the extremes ``k=0`` / ``k=n`` — exactly where flip
+    frequencies live (a tight HIGH blocker flips 0 of n draws; Wald would report a
+    misleading zero-width interval, Wilson an honest upper bound). ``z`` is the
+    standard-normal quantile (default 95%).
+    """
+    if n <= 0:
+        return (float("nan"), float("nan"))
+    phat = k / n
+    z2 = z * z
+    denom = 1.0 + z2 / n
+    center = (phat + z2 / (2.0 * n)) / denom
+    half = (z / denom) * math.sqrt(phat * (1.0 - phat) / n + z2 / (4.0 * n * n))
+    return (max(0.0, center - half), min(1.0, center + half))
+
+
+def flip_ci(freq: float, n: int, z: float = Z95) -> Tuple[float, float]:
+    """Wilson 95% CI for a Monte-Carlo flip frequency (spec v0.7).
+
+    ``freq`` is ``k/n`` for ``k`` observed flips in ``n`` draws; the count is
+    recovered exactly as ``round(freq * n)``. Returns ``(nan, nan)`` when there was
+    no sampling (``n <= 0``) or the frequency is undefined."""
+    if n <= 0 or math.isnan(freq):
+        return (float("nan"), float("nan"))
+    return wilson_interval(int(round(freq * n)), n, z)
+
+
+def _fmt_ci(freq: float, ci: Tuple[float, float], n: int) -> str:
+    """Render a flip-frequency line fragment with its Wilson CI (spec v0.7).
+    Falls back to the bare percentage when there was no sampling (n_mc == 0)."""
+    lo, hi = ci
+    if n <= 0 or math.isnan(lo):
+        return f"{freq:.0%}"
+    return f"{freq:.0%} (95% CI {lo:.0%}–{hi:.0%}, {n} MC draws)"
 
 
 def classify_apd90(dapd90_pct: float) -> str:
@@ -212,11 +256,16 @@ class RiskAssessment:
     channels_used: List[str] = field(default_factory=list)
     herg_dynamic: bool = False
 
+    # v0.7 — Monte-Carlo sampling uncertainty of the headline flip frequency: the
+    # Wilson 95% CI for the binomial proportion k/n_mc. (nan, nan) when n_mc == 0.
+    flip_ci: Tuple[float, float] = (float("nan"), float("nan"))
+
     # v0.2 Bayesian uncertainty quantification (spec v0.2). Defaults keep the v0.1
     # moments path unchanged: uq="moments" reports no reproducibility flip and no
     # censored/prior-dominated channels.
     uq: str = "moments"
     reproducibility_flip_frequency: float = float("nan")   # new-lab predictive (sec 2.4)
+    reproducibility_flip_ci: Tuple[float, float] = (float("nan"), float("nan"))  # v0.7
     censored_channels: List[str] = field(default_factory=list)        # one-sided posteriors (sec 2.3)
     prior_dominated_channels: List[str] = field(default_factory=list)  # sec 6/7 flags
 
@@ -243,11 +292,12 @@ class RiskAssessment:
             f"cqInward (inward-charge vs drug-free): {self.cqinward:.3f} "
             f"(<1 inward charge reduced / protective, >1 increased) — diagnostic, not the classifier",
             f"variability ({self.n_mc} MC draws, uq={self.uq}): {dist}",
-            f"classification-flip frequency: {self.classification_flip_frequency:.0%}",
+            f"classification-flip frequency: "
+            f"{_fmt_ci(self.classification_flip_frequency, self.flip_ci, self.n_mc)}",
         ]
         if self.uq == "bayes" and not np.isnan(self.reproducibility_flip_frequency):
             lines.append(f"reproducibility-flip frequency (new-lab predictive): "
-                         f"{self.reproducibility_flip_frequency:.0%}")
+                         f"{_fmt_ci(self.reproducibility_flip_frequency, self.reproducibility_flip_ci, self.n_mc)}")
         if self.excluded_channels:
             lines.append(f"EXCLUDED (unidentifiable IC50, max block < 60%): "
                          f"{', '.join(self.excluded_channels)}")
@@ -443,6 +493,7 @@ def assess(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
         n_mc=n_mc,
         dapd90_distribution=dapd, apd90_distribution=apd, qnet_distribution=qn,
         classification_distribution=counts, classification_flip_frequency=flip_freq,
+        flip_ci=flip_ci(flip_freq, n_mc),
         tier=tier, warnings=warnings, excluded_channels=excluded,
         channels_used=channels_used, herg_dynamic=use_dynamic, uq="moments",
         cqinward=cqinward_point, cqinward_distribution=cqin,
@@ -541,8 +592,10 @@ def _assess_bayes(ds, drug_l, blocks, ap_rec, scales, baseline, baseline_tri, me
         triangulation_ms=pt.triangulation, baseline_triangulation_ms=baseline_tri,
         n_mc=n_mc, dapd90_distribution=dapd, apd90_distribution=apd, qnet_distribution=qn,
         classification_distribution=counts, classification_flip_frequency=flip_freq,
+        flip_ci=flip_ci(flip_freq, n_mc),
         tier=tier, warnings=warnings, excluded_channels=[], channels_used=channels_used,
         herg_dynamic=use_dynamic, uq="bayes", reproducibility_flip_frequency=repro_flip,
+        reproducibility_flip_ci=flip_ci(repro_flip, n_mc),
         censored_channels=censored_channels, prior_dominated_channels=prior_dominated,
         cqinward=cqinward_point, cqinward_distribution=cqin,
     )
@@ -568,6 +621,8 @@ class CombinationAssessment:
     classification_distribution: Dict[str, float]
     classification_flip_frequency: float
     tier: str
+    # v0.7 — Wilson 95% CI of the joint-variability flip frequency.
+    flip_ci: Tuple[float, float] = (float("nan"), float("nan"))
     # the extra prolongation of the combination beyond the worst single agent
     interaction_dapd90_pct: float = float("nan")
     warnings: List[str] = field(default_factory=list)
@@ -587,7 +642,8 @@ class CombinationAssessment:
             f"interaction (extra dAPD90 beyond the worst single agent): "
             f"{self.interaction_dapd90_pct:+.1f}%",
             f"variability ({self.n_mc} MC draws): {dist}",
-            f"classification-flip frequency: {self.classification_flip_frequency:.0%}",
+            f"classification-flip frequency: "
+            f"{_fmt_ci(self.classification_flip_frequency, self.flip_ci, self.n_mc)}",
         ]
         if self.excluded_channels:
             lines.append(f"EXCLUDED (unidentifiable IC50): {', '.join(self.excluded_channels)}")
@@ -698,7 +754,7 @@ def assess_combination(ds: Dataset, drugs: Sequence[str], ap_model: str = "cipao
         qnet=pt.qnet, apd90=pt.apd90, baseline_apd90=baseline, dapd90_pct=dapd_point,
         classification=point_class, n_mc=n_mc, qnet_distribution=qn,
         dapd90_distribution=dapd, classification_distribution=counts,
-        classification_flip_frequency=flip, tier=tier,
+        classification_flip_frequency=flip, flip_ci=flip_ci(flip, n_mc), tier=tier,
         interaction_dapd90_pct=interaction, warnings=warnings, excluded_channels=excluded,
     )
 
@@ -787,6 +843,8 @@ class FlipSensitivity:
     n_mc: int
     channels: List[ChannelSensitivity]   # sorted by solo_flip_frequency, descending
     tier: str
+    # v0.7 — Wilson 95% CI of the all-channels-vary flip frequency.
+    all_vary_flip_ci: Tuple[float, float] = (float("nan"), float("nan"))
     warnings: List[str] = field(default_factory=list)
     excluded_channels: List[str] = field(default_factory=list)
     clinical_use: str = ("PROHIBITED — research / safety-methodology / education only; "
@@ -801,8 +859,8 @@ class FlipSensitivity:
             f"flip-sensitivity  drug={self.drug}  ap_model={self.ap_model}  "
             f"tier={self.tier}",
             f"point class: {self.classification.upper()}   "
-            f"all-vary flip frequency: {self.all_vary_flip_frequency:.0%} "
-            f"({self.n_mc} MC draws)",
+            f"all-vary flip frequency: "
+            f"{_fmt_ci(self.all_vary_flip_frequency, self.all_vary_flip_ci, self.n_mc)}",
             "  channel   sources  fold   solo-flip  frozen-flip",
         ]
         for c in self.channels:
@@ -1150,6 +1208,7 @@ def flip_sensitivity(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
     return FlipSensitivity(
         drug=drug_l, ap_model=ap_rec.id, metric=metric, classification=point_class,
         all_vary_flip_frequency=all_vary, n_mc=n_mc, channels=chans, tier=tier,
+        all_vary_flip_ci=flip_ci(all_vary, n_mc),
         warnings=warnings, excluded_channels=excluded)
 
 

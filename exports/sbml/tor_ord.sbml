@@ -144,7 +144,7 @@ Primary sources: https://doi.org/10.7554/eLife.48890
         <rdf:Description rdf:about="#harmonia_tor_ord">
           <harmonia:clinicalUse>PROHIBITED — research / safety-methodology / education only; not a regulatory determination</harmonia:clinicalUse>
           <harmonia:confidenceTier>C</harmonia:confidenceTier>
-          <harmonia:datasetVersion>0.6.0</harmonia:datasetVersion>
+          <harmonia:datasetVersion>0.7.0</harmonia:datasetVersion>
             <bqbiol:isDescribedBy rdf:resource="https://doi.org/10.7554/eLife.48890"/>
         </rdf:Description>
       </rdf:RDF>

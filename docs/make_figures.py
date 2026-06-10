@@ -58,8 +58,10 @@ def fig_flip_distribution():
         ax.axvline(QNET_THRESH_HIGH, color=RED, ls="--", lw=1.2)    # below -> high risk
         ax.axvline(QNET_THRESH_LOW, color=GREEN, ls="--", lw=1.2)   # above -> low risk
         ax.axvline(a.qnet, color="black", lw=1.6)
+        lo, hi = a.flip_ci   # Wilson 95% CI of the flip frequency (v0.7)
         ax.set_title(f"{drug}  (tier {a.tier})\npoint={a.classification.upper()}, "
-                     f"flip={a.classification_flip_frequency:.0%}", fontsize=10)
+                     f"flip={a.classification_flip_frequency:.0%} "
+                     f"(95% CI {lo:.0%}–{hi:.0%})", fontsize=10)
         ax.set_xlabel("qNet (µC/µF) at 4× EFTPC")
         ax.spines[["top", "right"]].set_visible(False)
     axes[0].set_ylabel("Monte-Carlo draws")
