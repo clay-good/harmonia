@@ -319,6 +319,30 @@ def fig_bayesian_uq():
     plt.close(fig)
 
 
+def fig_disease_populations():
+    """v0.3: a drug's susceptible fraction across healthy vs LQTS disease backgrounds."""
+    from harmonia.populations import assess_population
+    pops = [("healthy", "illustrative_v0"), ("LQT1\n(IKs x0.5)", "lqt1"),
+            ("LQT2\n(IKr x0.5)", "lqt2"), ("LQT3\n(INaL x2)", "lqt3")]
+    drugs = ["ranolazine", "sotalol", "ondansetron"]
+    fig, ax = plt.subplots(figsize=(8.4, 4.4))
+    x = np.arange(len(pops)); w = 0.25
+    colors = [BLUE, "#8e44ad", RED]
+    for j, drug in enumerate(drugs):
+        frac = [assess_population(ds, drug, population=pid, n_models=120, seed=0).susceptible_fraction
+                for _, pid in pops]
+        ax.bar(x + (j - 1) * w, frac, w, color=colors[j], label=drug)
+    ax.set_xticks(x); ax.set_xticklabels([lbl for lbl, _ in pops], fontsize=9)
+    ax.set_ylabel("susceptible fraction (classified high)")
+    ax.set_title("Reduced repolarization reserve raises drug susceptibility across a population\n"
+                 "HYPOTHESIS-TIER · Tier D · NOT FOR PREDICTION (illustrative magnitudes)",
+                 fontsize=10)
+    ax.legend(fontsize=8, frameon=False, title="drug")
+    ax.spines[["top", "right"]].set_visible(False)
+    fig.tight_layout(); fig.savefig(IMG / "disease_populations.png", dpi=130)
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     fig_ap_traces()
     fig_flip_distribution()
@@ -327,5 +351,6 @@ if __name__ == "__main__":
     fig_combination()
     fig_population()
     fig_bayesian_uq()      # v0.2 Bayesian dose-response UQ
+    fig_disease_populations()  # v0.3 disease/genetic backgrounds (LQTS)
     # fig_training_set() / fig_validation_set() remain available for the APD90 metric
     print(f"wrote figures to {IMG}")

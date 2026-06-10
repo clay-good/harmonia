@@ -255,6 +255,11 @@
           "additionalProperties": { "type": "number", "minimum": 0 },
           "description": "channel/conductance -> coefficient of variation (lognormal) for the population"
         },
+        "conductance_scale": {
+          "type": "object",
+          "additionalProperties": { "type": "number", "exclusiveMinimum": 0 },
+          "description": "v0.3 disease/genetic background: channel/conductance -> MEAN multiplier (default 1), applied under the conductance_cv spread. Illustrative, hypothesis-tier (Tier D), NOT predictive."
+        },
         "predictive": { "const": false }
       }
     }

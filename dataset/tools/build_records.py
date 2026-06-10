@@ -111,6 +111,12 @@ CITATIONS_TABLE = [
          authors="Elkins RC, Davies MR, Brough SJ, Gavaghan DJ, Cui Y, Abi-Gerges N, Mirams GR",
          journal="Journal of Pharmacological and Toxicological Methods", year=2013,
          doi="10.1016/j.vascn.2013.04.007", pmid="23651875"),
+    # v0.3 (disease/genetic population backgrounds) mechanism reference.
+    dict(key="moss-2005", type="article",
+         title="Long QT syndrome: from channels to cardiac arrhythmias",
+         authors="Moss AJ, Kass RS",
+         journal="Journal of Clinical Investigation", year=2005,
+         doi="10.1172/JCI25537", pmid="16075042"),
 ]
 
 # --------------------------------------------------------------------------- #
@@ -551,13 +557,34 @@ def build_ap_models():
     return models
 
 
+# shared illustrative inter-individual CVs (loosely inspired by Britton 2013 / Passini
+# 2017; deliberately round, NOT calibrated). The disease populations recenter this same
+# spread on a diseased mean (spec v0.3 §2).
+_POP_CV = {"IKr": 0.22, "IKs": 0.28, "ICaL": 0.18, "INaL": 0.25,
+           "Ito": 0.30, "IK1": 0.15, "INaCa": 0.20}
+
+# v0.3 congenital long-QT channelopathies: (gene/mechanism, per-current MEAN shift).
+# Illustrative heterozygous-scale magnitudes, NOT genotype-calibrated (spec v0.3 §2).
+_LQTS = [
+    ("lqt1", "Congenital LQT1 (KCNQ1 loss of function) — illustrative",
+     "KCNQ1 loss of function reduces the slow delayed-rectifier IKs",
+     {"IKs": 0.5}),
+    ("lqt2", "Congenital LQT2 (KCNH2/hERG loss of function) — illustrative",
+     "KCNH2 (hERG) loss of function reduces the rapid delayed-rectifier IKr",
+     {"IKr": 0.5}),
+    ("lqt3", "Congenital LQT3 (SCN5A gain of function) — illustrative",
+     "SCN5A gain of function increases the late sodium current INaL",
+     {"INaL": 2.0}),
+]
+
+
 def build_populations():
     """Population-of-models specs. HYPOTHESIS-TIER (Tier D) — illustrative
-    inter-individual conductance variability, NOT calibrated to human data and
-    NOT for prediction (spec.md §3, §10). The CVs are loosely inspired by the
-    population-of-models literature (Britton 2013; Passini 2017) but are
-    deliberately round, illustrative numbers."""
-    return [{
+    inter-individual conductance variability and (v0.3) illustrative disease/genetic
+    backgrounds, NOT calibrated to human data and NOT for prediction (spec.md §3, §10;
+    spec v0.3). The CVs and disease mean shifts are deliberately round, illustrative
+    numbers inspired by the literature (Britton 2013; Passini 2017; Moss & Kass 2005)."""
+    pops = [{
         "id": "population.illustrative_v0",
         "kind": "population",
         "subsystem": "populations",
@@ -566,10 +593,7 @@ def build_populations():
         "population": {
             "name": "Illustrative inter-individual conductance variability (v0)",
             "n_default": 100,
-            "conductance_cv": {
-                "IKr": 0.22, "IKs": 0.28, "ICaL": 0.18, "INaL": 0.25,
-                "Ito": 0.30, "IK1": 0.15, "INaCa": 0.20,
-            },
+            "conductance_cv": dict(_POP_CV),
             "predictive": False,
         },
         "extraction": {
@@ -585,6 +609,39 @@ def build_populations():
                  "calibrated to human data; every population assessment is capped at "
                  "Tier D and labelled non-predictive.",
     }]
+    for pid, name, mechanism, scale in _LQTS:
+        shift = ", ".join(f"{c}x{v:g}" for c, v in scale.items())
+        pops.append({
+            "id": f"population.{pid}",
+            "kind": "population",
+            "subsystem": "populations",
+            "tier": "D",
+            "primary_citation": "moss-2005",
+            "population": {
+                "name": name,
+                "n_default": 100,
+                "conductance_cv": dict(_POP_CV),
+                "conductance_scale": scale,
+                "predictive": False,
+            },
+            "extraction": {
+                "review_status": "unverified",
+                "method": "illustrative congenital long-QT background: the dominant "
+                          "channel defect applied as a mean conductance shift under the "
+                          "shared illustrative CVs",
+                "verified_by": [],
+                "notes": "Heterozygous-scale, illustrative magnitude — NOT genotype-calibrated.",
+            },
+            "notes": f"HYPOTHESIS-TIER — DO NOT USE FOR PREDICTION. {mechanism} "
+                     f"(mean shift {shift}), here recentering the illustrative population "
+                     f"spread on a reduced-repolarization-reserve background. The magnitude "
+                     f"is an illustrative heterozygous-scale shift, NOT a genotype-calibrated "
+                     f"parameter; qNet/APD thresholds remain the HEALTHY reference. A "
+                     f"mechanism demonstration of the gene-drug repolarization-reserve "
+                     f"interaction, never a per-patient or per-genotype safety claim. Every "
+                     f"assessment is capped at Tier D and labelled non-predictive.",
+        })
+    return pops
 
 
 def write_json(path, obj):

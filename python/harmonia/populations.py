@@ -46,6 +46,7 @@ class PopulationAssessment:
     susceptible_fraction: float                      # fraction classified "high"
     repolarization_failures: int
     tier: str = "D"                                  # always capped at D (non-predictive)
+    conductance_scale: Dict[str, float] = field(default_factory=dict)  # v0.3 disease mean shift
     warnings: List[str] = field(default_factory=list)
     excluded_channels: List[str] = field(default_factory=list)
     clinical_use: str = ("PROHIBITED — research / safety-methodology / education only; "
@@ -54,9 +55,12 @@ class PopulationAssessment:
     def summary(self) -> str:
         dist = ", ".join(f"{k} {self.classification_distribution.get(k, 0):.0%}"
                          for k in RISK_LABELS)
+        header = (f"population assessment  drug={self.drug}  ap_model={self.ap_model}  "
+                  f"population={self.population}  tier={self.tier}")
+        if self.conductance_scale:
+            header += f"  [DISEASE background: mean shift {self.conductance_scale}]"
         lines = [
-            f"population assessment  drug={self.drug}  ap_model={self.ap_model}  "
-            f"population={self.population}  tier={self.tier}",
+            header,
             f"reference exposure = {self.reference_exposure_nM:g} nM",
             f"{self.n_models} virtual myocytes  [{self.metric}] class mix: {dist}",
             f"SUSCEPTIBLE fraction (classified high): {self.susceptible_fraction:.0%}",
@@ -102,6 +106,7 @@ def assess_population(ds: Dataset, drug: str, population: str = "illustrative_v0
     pop = _population_record(ds, population)
     n = n_models or pop.n_default
     cv = pop.conductance_cv
+    scale = pop.conductance_scale     # v0.3 disease MEAN shift (default 1 per channel)
 
     ref = ds.drug_reference(drug_l)
     reference_exposure = resolve_free_exposure(
@@ -123,18 +128,22 @@ def assess_population(ds: Dataset, drug: str, population: str = "illustrative_v0
             bf[ch] = hill_block_factor(reference_exposure, c50, hill_by[ch])
 
     rng = np.random.default_rng(seed)
-    channels = list(cv.keys())
+    # iterate cv channels first (RNG order preserved for backward compat), then any
+    # disease-only channels that carry a mean shift but no variability
+    channels = list(cv.keys()) + [c for c in scale if c not in cv]
     qn = np.empty(n)
     apd = np.empty(n)
     dapd = np.empty(n)
     classes: List[str] = []
     failures = 0
     for i in range(n):
-        # lognormal multiplier per conductance: exp(N(0, ln(1+cv^2))) keeps mean ~1
+        # disease MEAN shift s_c times the lognormal inter-individual draw
+        # exp(N(0, ln(1+cv^2))) (mean ~1): g = s_c * lambda * g_healthy  (spec v0.3 §2)
         mult = {}
         for ch in channels:
-            sigma = np.sqrt(np.log(1.0 + cv[ch] ** 2))
-            mult[ch] = float(np.exp(rng.normal(0.0, sigma)))
+            cvv = cv.get(ch, 0.0)
+            draw = float(np.exp(rng.normal(0.0, np.sqrt(np.log(1.0 + cvv ** 2))))) if cvv > 0 else 1.0
+            mult[ch] = scale.get(ch, 1.0) * draw
         base = KernelParams().with_scales(scales).with_conductance_multipliers(mult)
         p = KernelParams(base.gNa, base.gNaL, base.gto, base.gCaL, base.gKr,
                          base.gKs, base.gK1, base.gNaCa, dict(base.block))
@@ -155,6 +164,11 @@ def assess_population(ds: Dataset, drug: str, population: str = "illustrative_v0
 
     counts = {lab: classes.count(lab) / n for lab in RISK_LABELS}
     warnings = [f"population CVs are illustrative (uncalibrated): {cv}"]
+    if scale:
+        warnings.append(
+            f"DISEASE/GENETIC background — illustrative mean conductance shift {scale} "
+            f"(heterozygous-scale, NOT genotype-calibrated). qNet/APD thresholds are the "
+            f"HEALTHY reference. Mechanism demonstration, never a per-patient/genotype claim.")
     if excluded:
         warnings.append(f"unidentifiable channels excluded: {excluded}")
 
@@ -164,5 +178,5 @@ def assess_population(ds: Dataset, drug: str, population: str = "illustrative_v0
         qnet_distribution=qn, dapd90_distribution=dapd,
         classification_distribution=counts, susceptible_fraction=counts.get("high", 0.0),
         repolarization_failures=failures, tier="D", warnings=warnings,
-        excluded_channels=excluded,
+        excluded_channels=excluded, conductance_scale=dict(scale),
     )

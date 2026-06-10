@@ -6,6 +6,39 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-06-09
+
+### Added — disease & genetic population backgrounds (LQTS), completing spec §3 (spec v0.3)
+v0.1's `populations` subsystem propagated inter-individual **variability** (a cloud of
+conductance CVs around the healthy mean) but never the other half spec.md §3 names: a
+disease or genetic **background** — a systematic *shift* of a current. v0.3 adds it as the
+minimal honest field and ships the three canonical congenital long-QT channelopathies.
+Fully backward-compatible: the variability-only `illustrative_v0` population is
+byte-identical (the disease shift defaults to 1 and consumes no RNG).
+
+- **`conductance_scale`** (optional, on a `population` record): a per-current **mean**
+  multiplier applied *under* the existing `conductance_cv` spread —
+  `g = s_c · λ · g_healthy` (spec v0.3 §2). The clinical basis is **repolarization
+  reserve** ([Moss & Kass 2005](https://doi.org/10.1172/JCI25537)): a latent channelopathy
+  has already spent the redundancy that makes single-current block tolerable, so the same
+  drug block can be torsadogenic against the disease background.
+- **Three disease population records**: `lqt1` (*KCNQ1* → IKs ×0.5), `lqt2` (*KCNH2*/hERG →
+  IKr ×0.5), `lqt3` (*SCN5A* → INaL ×2.0). `harmonia population <drug> --population lqt2`
+  re-evaluates a drug's risk distribution against the reduced-reserve background. The
+  reduced kernel reproduces the textbook ordering — LQT2 prolongs the AP most (direct IKr
+  loss), LQT3 lowers qNet most (the inward INaL shift) — so the *mechanism*, not a tuned
+  number, does the work. A low-risk drug like ranolazine goes from ~5% susceptible (healthy)
+  to ~24–39% (LQTS); dofetilide on LQT2 reaches ~88%.
+- **Strictly hypothesis-tier, never predictive.** The magnitudes are illustrative
+  heterozygous-scale shifts (NOT genotype-calibrated); the qNet/APD thresholds stay the
+  *healthy* reference; every disease-population assessment is **Tier D** and stamped
+  NOT FOR PREDICTION, with an explicit disease-background warning. The schema pins
+  `predictive: false`.
+- Citation minted: `moss-2005`. New `tests/test_disease_populations.py` (mean-shift
+  correctness, channelopathy ordering, susceptibility increase, Tier-D / non-prediction
+  guard, healthy-population backward-compat). README + figure
+  (`docs/img/disease_populations.png`) + spec [`docs/specs/v0.3-disease-populations.md`].
+
 ## [0.2.1] — 2026-06-09
 
 ### Added — raw dose-response regime + calibration of the inference (completes spec v0.2 C-UQ-5, §9)
@@ -258,7 +291,8 @@ end, covering roadmap phases A–E:
 - **E — Populations (hypothesis-tier):** population-of-models risk spread,
   shipped non-predictive (Tier D, "NOT FOR PREDICTION").
 
-[Unreleased]: https://github.com/clay-good/harmonia/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/clay-good/harmonia/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/clay-good/harmonia/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/clay-good/harmonia/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/clay-good/harmonia/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/clay-good/harmonia/releases/tag/v0.1.0

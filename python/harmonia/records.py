@@ -279,6 +279,15 @@ class Population(Record):
         return _get(self.raw, "population", "conductance_cv", default={})
 
     @property
+    def conductance_scale(self) -> Dict[str, float]:
+        """v0.3 disease/genetic background: per-channel MEAN multiplier (default 1)."""
+        return _get(self.raw, "population", "conductance_scale", default={})
+
+    @property
+    def is_disease(self) -> bool:
+        return bool(self.conductance_scale)
+
+    @property
     def predictive(self) -> bool:
         return bool(_get(self.raw, "population", "predictive", default=False))
 

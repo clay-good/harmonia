@@ -318,7 +318,9 @@ def build_parser() -> argparse.ArgumentParser:
     pop = sub.add_parser("population",
                          help="population-of-models spread (HYPOTHESIS-TIER, not for prediction)")
     pop.add_argument("drug")
-    pop.add_argument("--population", default="illustrative_v0")
+    pop.add_argument("--population", default="illustrative_v0",
+                     help="illustrative_v0 (variability) or a disease background: "
+                          "lqt1 / lqt2 / lqt3 (v0.3, hypothesis-tier)")
     pop.add_argument("--ap-model", default="cipaordv1.0", dest="ap_model")
     pop.add_argument("--metric", default="qnet", choices=["qnet", "apd90"])
     pop.add_argument("--n", type=int, default=None, help="number of virtual myocytes")

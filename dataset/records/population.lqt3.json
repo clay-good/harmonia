@@ -1,0 +1,31 @@
+{
+  "id": "population.lqt3",
+  "kind": "population",
+  "subsystem": "populations",
+  "tier": "D",
+  "primary_citation": "moss-2005",
+  "population": {
+    "name": "Congenital LQT3 (SCN5A gain of function) — illustrative",
+    "n_default": 100,
+    "conductance_cv": {
+      "IKr": 0.22,
+      "IKs": 0.28,
+      "ICaL": 0.18,
+      "INaL": 0.25,
+      "Ito": 0.3,
+      "IK1": 0.15,
+      "INaCa": 0.2
+    },
+    "conductance_scale": {
+      "INaL": 2.0
+    },
+    "predictive": false
+  },
+  "extraction": {
+    "review_status": "unverified",
+    "method": "illustrative congenital long-QT background: the dominant channel defect applied as a mean conductance shift under the shared illustrative CVs",
+    "verified_by": [],
+    "notes": "Heterozygous-scale, illustrative magnitude — NOT genotype-calibrated."
+  },
+  "notes": "HYPOTHESIS-TIER — DO NOT USE FOR PREDICTION. SCN5A gain of function increases the late sodium current INaL (mean shift INaLx2), here recentering the illustrative population spread on a reduced-repolarization-reserve background. The magnitude is an illustrative heterozygous-scale shift, NOT a genotype-calibrated parameter; qNet/APD thresholds remain the HEALTHY reference. A mechanism demonstration of the gene-drug repolarization-reserve interaction, never a per-patient or per-genotype safety claim. Every assessment is capped at Tier D and labelled non-predictive."
+}

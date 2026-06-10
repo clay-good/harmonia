@@ -140,7 +140,7 @@ pop.tier                                      # "D"  (always; non-predictive)
 
 | Layer | Status |
 | --- | --- |
-| **Dataset** — 68 channel-block records across the **28 CiPA compounds** (12 training + 16 validation), 28 drug-reference records (expert risk label + free Cmax + protein binding), 3 AP-model records, 1 population spec, 14 Crossref-checked citations | ✅ |
+| **Dataset** — 68 channel-block records across the **28 CiPA compounds** (12 training + 16 validation), 28 drug-reference records (expert risk label + free Cmax + protein binding), 3 AP-model records, 4 population specs (1 variability + 3 LQTS disease backgrounds), 15 Crossref-checked citations | ✅ |
 | **Variability is first-class** — multi-source IC50s with computed fold-range / IQR; the reliability gate (max block < 60% ⇒ Tier D, unidentifiable) machine-enforced | ✅ |
 | **Bayesian dose-response UQ** (Phase C, **v0.2**) — the IC50/Hill spread is *inferred* under a declared prior, not transcribed: hierarchical posterior with dataset-learned between-lab pooling, propagated Hill uncertainty, a one-sided **censored** posterior for sub-60%-block channels, a **raw dose-response regime** (fit from concentration-block points), a prior registry with per-channel `prior_sensitivity`, variance-based (Sobol) sensitivity, and a calibrated inference (simulation-based calibration + posterior coverage). Opt-in via `uq="bayes"`; `uq="moments"` (default) reproduces every v0.1 number | ✅ |
 | **Reference kernel** — a SciPy reduced O'Hara-Rudy-lineage ventricular AP (7 currents + Na-Ca exchanger) with Hill block per current; APD90 / qNet / triangulation / EAD biomarkers | ✅ |
@@ -149,6 +149,7 @@ pop.tier                                      # "D"  (always; non-predictive)
 | **Exposure layer** (Phase D) — free ↔ total plasma conversion via protein binding (`fraction_unbound`); assess from a free or total concentration (composable with a Hypnos PK trajectory) | ✅ |
 | **Drug combinations** (Phase D) — `assess_combination` propagates *joint* IC50 variability; independent block multiplies per channel; reports the interaction and how often the combined class flips | ✅ |
 | **Population-of-models** (Phase E) — `assess_population` samples a population of virtual myocytes (per-conductance variability) to spread a drug's risk across individuals. **Hypothesis-tier, Tier D, NOT FOR PREDICTION** | ✅ |
+| **Disease / genetic backgrounds** (**v0.3**) — the three congenital long-QT channelopathies (LQT1 IKs↓, LQT2 IKr↓, LQT3 INaL↑) as population records: a per-current *mean* conductance shift recenters the variability cloud on a reduced-repolarization-reserve background, so a drug's risk distribution can be re-evaluated against a susceptible subpopulation. **Hypothesis-tier, Tier D, NOT FOR PREDICTION** | ✅ |
 | **Risk distribution + flip frequency** — Monte-Carlo over source variability; classification-flip frequency; worst-tier propagation | ✅ |
 | **Flip sensitivity** — `flip_sensitivity` attributes the flip to each channel's IC50 spread (solo / frozen effects), surfacing the dominant uncertain input to pin down first | ✅ |
 | **Recorded classification performance** (Phase B) — `harmonia performance` scores either metric vs CiPA expert labels on training / validation / all, with the full confusion matrix | ✅ |
@@ -383,6 +384,50 @@ is capped at **Tier D** and stamped **NOT FOR PREDICTION**. It is a
 hypothesis-generating methodology view, never a per-patient or population safety
 claim. Experimentally-calibrated populations are deferred to a later phase.
 
+### Disease / genetic backgrounds (v0.3) — LQTS channelopathies
+
+v0.1's population layer spread a cloud of conductance *variability* around the
+healthy mean. v0.3 adds the other half the spec §3 names — a disease or genetic
+**background**, a systematic *shift* of a current. The clinical fact behind it is
+**repolarization reserve** ([Moss & Kass 2005](https://doi.org/10.1172/JCI25537)):
+the healthy ventricle repolarizes through redundant currents, so blocking one is
+usually tolerated; a patient with a latent channelopathy has already spent that
+reserve, and the *same* drug block that is benign in a healthy myocyte can be
+torsadogenic against the disease background.
+
+A `population` record gains an optional `conductance_scale` — a per-current **mean**
+multiplier applied *under* the existing variability cloud (`g = s_c · λ · g_healthy`).
+Three congenital long-QT channelopathies ship as records:
+
+| Population | Gene (mechanism) | Shift | `conductance_scale` |
+| --- | --- | --- | --- |
+| `lqt1` | *KCNQ1* loss of function | IKs ↓ ~50% | `{"IKs": 0.5}` |
+| `lqt2` | *KCNH2* / hERG loss of function | IKr ↓ ~50% | `{"IKr": 0.5}` |
+| `lqt3` | *SCN5A* gain of function | late INa (INaL) ↑ ~100% | `{"INaL": 2.0}` |
+
+![Disease backgrounds raise drug susceptibility](docs/img/disease_populations.png)
+
+The same drug, re-assessed against a reduced-reserve background, crosses into the
+high-risk class far more often. **ranolazine** — a low-risk, mostly-INaL blocker —
+is high in ~5% of the healthy population but ~24–39% against the LQTS backgrounds
+(most under LQT3, whose enhanced INaL compounds ranolazine's own inward effect);
+**dofetilide** on the IKr-deficient LQT2 background is high in ~88%. The reduced
+kernel reproduces the textbook ordering — LQT2 prolongs the AP most (direct IKr
+loss), LQT3 lowers qNet most (the inward-current shift) — which is the validation
+that the *mechanism*, not a tuned number, is doing the work.
+
+```bash
+harmonia population dofetilide --population lqt2     # re-assess against an LQT2 background
+```
+
+**Still strictly hypothesis-tier and never predictive.** The magnitudes are
+illustrative heterozygous-scale shifts, **not** genotype-calibrated parameters; the
+qNet/APD thresholds remain the *healthy* reference; every disease-population
+assessment is capped at **Tier D** and stamped NOT FOR PREDICTION. It makes the
+gene–drug repolarization-reserve interaction visible and quantitative — a mechanism
+demonstration, never a per-patient or per-genotype safety claim
+([spec v0.3](docs/specs/v0.3-disease-populations.md)).
+
 ### Which input drives the flip? (sensitivity attribution)
 
 The flip frequency says *whether* a safety call is unstable; the obvious next
@@ -552,7 +597,7 @@ optional local step (they need a heavy simulation engine, so are not run in CI).
 ## Validation & testing
 
 Everything downstream of the dataset is a deterministic projection, so the test
-suite (154 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
+suite (160 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 *provable non-drift* rather than fixtures:
 
 | Guard | What it proves | Where |
@@ -564,6 +609,7 @@ suite (154 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 | **Bayesian reduction / non-drift** (v0.2) | the posterior mean → log-geomean for a multi-source channel; the moments path is byte-identical, so `uq="moments"` reproduces v0.1 exactly | `tests/test_infer.py`, `tests/test_uq_assess.py` |
 | **Sampler convergence + censoring** (v0.2) | every channel posterior meets `rhat < 1.01` / an `ess` floor; a sub-60%-block channel yields a wide, prior-dominated one-sided posterior and still produces a Tier-D assessment | `tests/test_infer.py` |
 | **Inference calibration** (v0.2.1, §9) | simulation-based calibration → rank-uniform posteriors; 90% credible interval covers the truth ≈90%; raw dose-response fit recovers a synthetic IC50/Hill | `tests/test_infer_raw.py` |
+| **Disease populations** (v0.3) | the `conductance_scale` mean shift is applied correctly; LQTS backgrounds raise the susceptible fraction in the textbook order; every disease assessment is Tier D / NOT FOR PREDICTION; the healthy population is byte-identical | `tests/test_disease_populations.py` |
 | **Sobol consistency** (v0.2) | total-effect ≥ first-order per channel (within MC error); indices deterministic; standard errors reported | `tests/test_sobol.py` |
 | **CiPA numeric round trip** | export the CiPA CSV, parse it back, every IC50/Hill equals the dataset value | `registry.roundtrip_cipa` |
 | **Parameter round trip** | the kernel conductances appear verbatim in the CellML/SBML/Myokit text | `registry.roundtrip_parameters` |

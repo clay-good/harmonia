@@ -1,0 +1,31 @@
+{
+  "id": "population.lqt1",
+  "kind": "population",
+  "subsystem": "populations",
+  "tier": "D",
+  "primary_citation": "moss-2005",
+  "population": {
+    "name": "Congenital LQT1 (KCNQ1 loss of function) — illustrative",
+    "n_default": 100,
+    "conductance_cv": {
+      "IKr": 0.22,
+      "IKs": 0.28,
+      "ICaL": 0.18,
+      "INaL": 0.25,
+      "Ito": 0.3,
+      "IK1": 0.15,
+      "INaCa": 0.2
+    },
+    "conductance_scale": {
+      "IKs": 0.5
+    },
+    "predictive": false
+  },
+  "extraction": {
+    "review_status": "unverified",
+    "method": "illustrative congenital long-QT background: the dominant channel defect applied as a mean conductance shift under the shared illustrative CVs",
+    "verified_by": [],
+    "notes": "Heterozygous-scale, illustrative magnitude — NOT genotype-calibrated."
+  },
+  "notes": "HYPOTHESIS-TIER — DO NOT USE FOR PREDICTION. KCNQ1 loss of function reduces the slow delayed-rectifier IKs (mean shift IKsx0.5), here recentering the illustrative population spread on a reduced-repolarization-reserve background. The magnitude is an illustrative heterozygous-scale shift, NOT a genotype-calibrated parameter; qNet/APD thresholds remain the HEALTHY reference. A mechanism demonstration of the gene-drug repolarization-reserve interaction, never a per-patient or per-genotype safety claim. Every assessment is capped at Tier D and labelled non-predictive."
+}
