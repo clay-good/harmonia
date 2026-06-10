@@ -88,6 +88,24 @@
         "citation": { "type": ["string", "null"] }
       }
     },
+    "cipa_binding": {
+      "type": "object",
+      "description": "Published CiPA dynamic-hERG binding kinetics (Li 2017 IKr-Markov drug-binding model): binding rate Kmax*Ku*D^n/(D^n+halfmax), unbinding Ku, voltage-dependent trapping via Kt and Vhalf. FDA/CiPA repository optimal fits.",
+      "additionalProperties": false,
+      "required": ["Kmax", "Ku", "n", "halfmax", "Vhalf"],
+      "properties": {
+        "Kmax": { "type": "number", "exclusiveMinimum": 0, "description": "maximum binding-rate scale (dimensionless)" },
+        "Ku": { "type": "number", "exclusiveMinimum": 0, "description": "unbinding rate, 1/ms" },
+        "n": { "type": "number", "exclusiveMinimum": 0, "description": "Hill coefficient of the concentration-dependent binding rate" },
+        "halfmax": { "type": "number", "exclusiveMinimum": 0, "description": "n-th power of the half-maximal concentration, nM^n" },
+        "Vhalf": { "type": "number", "description": "trapping half-voltage, mV (near 0 => trapped; very negative => washes out)" },
+        "Kt": { "type": "number", "exclusiveMinimum": 0, "description": "fixed closed-channel trapping rate, 1/ms (3.5e-5)" },
+        "model": { "type": "string" },
+        "source": { "type": "string" },
+        "citation": { "type": ["string", "null"] },
+        "validation_citation": { "type": ["string", "null"] }
+      }
+    },
     "assay_context": {
       "type": "object",
       "additionalProperties": false,

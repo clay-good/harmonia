@@ -89,5 +89,17 @@
     "method": "literature table transcribed by maintainer; values from CiPA-era patch-clamp datasets",
     "verified_by": [],
     "notes": "Values are literature-derived (see primary_citation / source_values). No source PDF has been confirmed inside Harmonia; review_status stays unverified per spec §9."
+  },
+  "cipa_binding": {
+    "Kmax": 102200.0,
+    "Ku": 7.788e-05,
+    "n": 0.6502,
+    "halfmax": 409500.0,
+    "Vhalf": -81.63,
+    "Kt": 3.5e-05,
+    "model": "CiPA IKr-Markov drug binding (Li 2017), saturating + voltage-dependent trapping",
+    "source": "FDA/CiPA hERG_fitting optimal fit (github.com/FDA/CiPA, hERG_fitting/results/<drug>/pars.txt)",
+    "citation": "li-2017",
+    "validation_citation": "li-2019"
   }
 }

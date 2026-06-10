@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Dict, Optional
+from typing import Dict
 
 import numpy as np
 from scipy.integrate import solve_ivp, trapezoid
@@ -211,6 +211,9 @@ class HERGDynamic:
     koff: float
     trapping: bool = False
 
+    # generic hERG-binding interface (one bound state ``b``)
+    n_states: int = 1
+
     @property
     def ic50_nm(self) -> float:
         return self.koff / self.kon
@@ -219,8 +222,66 @@ class HERGDynamic:
         open_factor = xr if self.trapping else 1.0
         return self.kon * self.conc_nm * (1.0 - b) - self.koff * open_factor * b
 
+    def init_states(self):
+        return [0.0]
 
-def _rhs(t, y, p: KernelParams, cl: float, herg: Optional["HERGDynamic"] = None):
+    def bound_fraction(self, states):
+        return states[0]
+
+    def derivs(self, states, xr, V):
+        return np.array([self.db_dt(states[0], xr)])
+
+
+@dataclass
+class CiPABinding:
+    """The published CiPA dynamic-hERG binding kinetics (Li et al. 2017 IKr-Markov
+    drug-binding model; spec v0.6), coupled to the reduced kernel's IKr open gate.
+
+    Two drug-bound sub-states are tracked — ``ob`` (bound while the channel is
+    open-accessible) and ``cb`` (bound and *trapped* in the closed conformation):
+
+        on   = Kmax*Ku*D^n / (D^n + halfmax)            # binding to the open channel
+        ktv  = Kt / (1 + exp(-(V - Vhalf)/6.789))        # voltage-dependent un-trapping
+        d(ob)/dt = on*xr*(1-ob-cb) - Ku*ob - Kt*ob + ktv*cb
+        d(cb)/dt = Kt*ob - ktv*cb
+
+    and the drug-bound fraction ``b = ob + cb`` scales IKr down by ``(1 - b)``.
+
+    This is a Tier-C **reduction** of the full 9-state CiPA Markov coupling (the
+    published parameters were fit to the Markov IKr): it applies the exact CiPA
+    *binding* equations to the kernel's HH IKr gate. The binding equilibrates slowly
+    (on-rates ~1e-5 ms^-1), so this is a research/demonstration path (it surfaces the
+    trapping phenotype and use-dependence), NOT the calibrated default classifier.
+
+    Units: rates ms^-1; ``conc_nm`` and the implied concentration in nM; ``vhalf`` mV.
+    """
+    conc_nm: float
+    kmax: float
+    ku: float
+    n: float
+    halfmax: float
+    vhalf: float
+    kt: float = 3.5e-05
+
+    n_states: int = 2
+
+    def init_states(self):
+        return [0.0, 0.0]
+
+    def bound_fraction(self, states):
+        return states[0] + states[1]
+
+    def derivs(self, states, xr, V):
+        ob, cb = states[0], states[1]
+        D = self.conc_nm
+        on = self.kmax * self.ku * D ** self.n / (D ** self.n + self.halfmax) if D > 0 else 0.0
+        ktv = self.kt / (1.0 + np.exp(-(V - self.vhalf) / 6.789))
+        d_ob = on * xr * (1.0 - ob - cb) - self.ku * ob - self.kt * ob + ktv * cb
+        d_cb = self.kt * ob - ktv * cb
+        return np.array([d_ob, d_cb])
+
+
+def _rhs(t, y, p: KernelParams, cl: float, herg=None):
     V = y[0]
     if herg is None:
         Iion = sum(currents(V, y, p))
@@ -228,24 +289,26 @@ def _rhs(t, y, p: KernelParams, cl: float, herg: Optional["HERGDynamic"] = None)
         dy = (inf - y) / tau
         dy[0] = -(Iion + _stim(t, cl))
         return dy
-    # dynamic-hERG path: y has one extra state, the bound fraction b (index 12)
-    b = y[12]
+    # dynamic-hERG path: y has herg.n_states extra bound states from index 12 on.
+    nb = herg.n_states
+    extra = y[12:12 + nb]
+    b = herg.bound_fraction(extra)
     Iion = sum(currents(V, y[:12], p, b_ikr=b))
     inf, tau = gating_targets(V)
     dy = np.empty_like(y)
     dy[:12] = (inf - y[:12]) / tau
     dy[0] = -(Iion + _stim(t, cl))
-    dy[12] = herg.db_dt(b, y[10])   # y[10] == xr
+    dy[12:12 + nb] = herg.derivs(extra, y[10], V)   # y[10] == xr
     return dy
 
 
-def _initial_state(herg: Optional["HERGDynamic"] = None):
+def _initial_state(herg=None):
     y0 = np.zeros(len(_STATE))
     y0[0] = -85.0
     inf, _ = gating_targets(-85.0)
     y0[1:] = inf[1:]
     if herg is not None:
-        y0 = np.append(y0, 0.0)   # bound fraction starts at 0 (drug-naive)
+        y0 = np.append(y0, herg.init_states())   # bound states start at 0 (drug-naive)
     return y0
 
 
@@ -275,7 +338,7 @@ class BeatResult:
 
 def simulate_beats(p: KernelParams, cl: float = 2000.0, n_beats: int = 3,
                    max_step: float = 2.0, dt_record: float = 1.0,
-                   rtol: float = 1e-6, herg: Optional["HERGDynamic"] = None) -> BeatResult:
+                   rtol: float = 1e-6, herg=None) -> BeatResult:
     """Pace to (approximate) steady state; analyse the final beat.
 
     With fixed ionic concentrations the AP reaches steady state within ~2-3
@@ -302,14 +365,14 @@ def simulate_beats(p: KernelParams, cl: float = 2000.0, n_beats: int = 3,
     V = Y[0]
 
     # vectorised current evaluation over the whole trace
-    b_ikr = Y[12] if herg is not None else None
+    b_ikr = herg.bound_fraction(Y[12:12 + herg.n_states]) if herg is not None else None
     vals = currents(V, Y[:12] if herg is not None else Y, p, b_ikr=b_ikr)
     cur_arrays = {name: np.asarray(val) for name, val in zip(CURRENT_NAMES, vals)}
 
     res = _analyse(t, V, cur_arrays, cl)
-    if herg is not None:
-        res.herg_bound_mean = float(np.mean(Y[12]))
-        res.herg_bound_max = float(np.max(Y[12]))
+    if herg is not None and b_ikr is not None:
+        res.herg_bound_mean = float(np.mean(b_ikr))
+        res.herg_bound_max = float(np.max(b_ikr))
     return res
 
 

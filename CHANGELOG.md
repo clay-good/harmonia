@@ -6,6 +6,50 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-06-10
+
+### Added — the published CiPA dynamic-hERG binding kinetics (spec v0.6)
+The most prominent remaining roadmap thread was "full CiPA Markov hERG + published
+optimized kinetics." v0.6 sources the **real** kinetics — the
+[Li et al. 2017](https://doi.org/10.1161/CIRCEP.116.004628) IKr-Markov drug-binding
+model, optimized per drug and validated in
+[Li et al. 2019](https://doi.org/10.1161/CIRCULATIONAHA.118.035230) — for the **12 CiPA
+compounds with published Milnes-protocol fits**, straight from the
+[FDA/CiPA repository](https://github.com/FDA/CiPA), and implements the binding kinetics
+as an opt-in kernel path. Scrupulously bounded: the data are authoritative; the model is
+an honest Tier-C reduction that touches no calibrated number.
+
+- **`cipa_binding` dataset field** (new, optional, IKr records) carrying the published
+  `Kmax`/`Ku`/`n`/`halfmax`/`Vhalf` plus the shared fixed `Kt = 3.5×10⁻⁵ ms⁻¹`, for
+  bepridil, chlorpromazine, cisapride, diltiazem, dofetilide, mexiletine, ondansetron,
+  quinidine, ranolazine, sotalol, terfenadine, verapamil. The other 16 CiPA compounds
+  have no published dynamic data and keep static Hill block — **no fabricated kinetics**.
+  Values are the FDA/CiPA repository optimal fits; cited to li-2017 (model) + li-2019
+  (validation); shipped **`unverified`** (§9). Schema + `build_records.py` updated;
+  cross-checked against the published trapping phenotype (dofetilide −1 mV ≫ terfenadine
+  −82 > verapamil −97).
+- **`CiPABinding` kernel model** implementing the exact CiPA binding kinetics
+  (`on = Kmax·Ku·Dⁿ/(Dⁿ+halfmax)`, unbind `Ku`, trap `Kt`, voltage-dependent un-trap
+  `Kt/(1+exp(−(V−Vhalf)/6.789))`) via two drug-bound sub-states (open-bound,
+  closed-bound) coupled to the reduced IKr gate. Opt in with `assess(..., herg_dynamic="cipa")`.
+  The hERG-binding state handling in `reference.py` was generalized to N bound states
+  (the v0.1 Langmuir path stays byte-identical at 1 state).
+- **Reproduces the trapping phenotype** at matched concentration without a tuned number:
+  a near-zero-`Vhalf` blocker (dofetilide) accumulates and retains block beat-over-beat;
+  a strongly-negative-`Vhalf` blocker (verapamil) washes out. New figure
+  `docs/img/cipa_binding.png`; spec `docs/specs/v0.6-cipa-dynamic-herg.md`; README section.
+- `tests/test_cipa_binding.py` (7 tests): data present for exactly the 12 (absent
+  otherwise), unverified, zero-drug ⇒ no block, concentration-monotone, trapping
+  phenotype, opt-in runs, **default path unaffected**. Suite 181 → 188.
+
+### Honesty boundary (declared)
+The **full 9-state CiPA Markov IKr** (the structure the parameters were fit to) is **not**
+implemented — v0.6 couples the CiPA *binding* sub-model to the reduced HH IKr gate, a
+Tier-C approximation; the full Markov + AP re-validation is future work. Because the
+kinetics equilibrate slowly (~1000 beats in the official protocol), the CiPA path is a
+research/demonstration surface and is **opt-in**: it changes no default qNet/ΔAPD90
+metric, threshold, or recorded performance number.
+
 ## [0.5.4] — 2026-06-10
 
 ### Added — an executable notebook for the population-of-models subsystem

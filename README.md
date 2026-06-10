@@ -146,6 +146,7 @@ pop.tier                                      # "D"  (always; non-predictive)
 | **Reference kernel** — a SciPy reduced O'Hara-Rudy-lineage ventricular AP (7 currents + Na-Ca exchanger) with Hill block per current; APD90 / qNet / triangulation / **cqInward** / EAD biomarkers | ✅ |
 | **Discriminating qNet** (Phase C) — adding a shape-dependent Na-Ca exchanger (excluded from the qNet sum) makes qNet sensitive; **qNet is now the default metric** (10/12 training, zero two-category errors over all 28 compounds); APD90 selectable | ✅ |
 | **Dynamic hERG binding** (Phase B) — Langmuir kon/koff with **trapping**; reduces to the static Hill block at steady state, captures use-dependent block (`assess(..., herg_dynamic=True)`) | ✅ |
+| **CiPA dynamic-hERG kinetics** (**v0.6**) — the real published Li-2017 IKr-Markov binding parameters (`Kmax`/`Ku`/`halfmax`/`n`/`Vhalf`) for the **12 CiPA dynamic-fit compounds**, sourced from the FDA/CiPA repository as a citation-backed `cipa_binding` field; a faithful binding model reproducing the **trapping phenotype** (`assess(..., herg_dynamic="cipa")`). Data authoritative (shipped `unverified`); model an opt-in Tier-C reduction that touches no default number | ✅ |
 | **Exposure layer** (Phase D) — free ↔ total plasma conversion via protein binding (`fraction_unbound`); assess from a free or total concentration (composable with a Hypnos PK trajectory) | ✅ |
 | **Drug combinations** (Phase D) — `assess_combination` propagates *joint* IC50 variability; independent block multiplies per channel; reports the interaction and how often the combined class flips | ✅ |
 | **Population-of-models** (Phase E) — `assess_population` samples a population of virtual myocytes (per-conductance variability) to spread a drug's risk across individuals. **Hypothesis-tier, Tier D, NOT FOR PREDICTION** | ✅ |
@@ -352,6 +353,51 @@ prototypical trapped blocker, accumulates more block over successive beats and
 prolongs the AP further than the static estimate.
 
 ![Dynamic hERG binding with trapping](docs/img/dynamic_binding.png)
+
+### CiPA dynamic-hERG binding kinetics (v0.6) — the real published parameters
+
+The Phase-B Langmuir above was a placeholder. v0.6 sources the **actual published CiPA
+dynamic-hERG binding kinetics** — the [Li et al. 2017](https://doi.org/10.1161/CIRCEP.116.004628)
+IKr-Markov drug-binding model, optimized per drug against Milnes-protocol data and
+validated in [Li et al. 2019](https://doi.org/10.1161/CIRCULATIONAHA.118.035230) — for the
+**12 CiPA compounds that have them**, straight from the
+[FDA/CiPA repository](https://github.com/FDA/CiPA) optimal fits. They live on the hERG
+records as a first-class, citation-backed `cipa_binding` block
+([spec v0.6](docs/specs/v0.6-cipa-dynamic-herg.md)):
+
+| Parameter | Meaning |
+| --- | --- |
+| `Kmax` | maximum binding-rate scale (dimensionless) |
+| `Ku` | unbinding rate (ms⁻¹) |
+| `n` | Hill coefficient of the concentration-dependent binding rate |
+| `halfmax` | nᵗʰ power of the half-maximal concentration (nMⁿ) |
+| `Vhalf` | **trapping** half-voltage (mV) — near 0 ⇒ trapped; very negative ⇒ washes out |
+| `Kt` | shared fixed closed-channel trapping rate, `3.5×10⁻⁵ ms⁻¹` |
+
+The binding model is `on = Kmax·Ku·Dⁿ/(Dⁿ + halfmax)` to the open channel, unbinding at
+`Ku`, with voltage-dependent trapping `Kt/(1+exp(−(V−Vhalf)/6.789))` governing whether
+drug bound at depolarization stays trapped through diastole. Opt in with
+`assess(..., herg_dynamic="cipa")`; it is coupled to the reduced kernel's IKr gate via
+open-bound/closed-bound sub-states.
+
+![CiPA dynamic-hERG trapping phenotype](docs/img/cipa_binding.png)
+
+The mechanism reproduces the **experimentally-reported trapping phenotype** without a
+tuned number: at a matched concentration a near-zero-`Vhalf` blocker (dofetilide, −1 mV)
+accumulates and *retains* block beat-over-beat, while a strongly-negative-`Vhalf` blocker
+(verapamil, −97 mV) washes out of the closed channel — the published ordering
+dofetilide ≫ terfenadine > verapamil falls straight out of the fitted `Vhalf`.
+
+> **What this is, and is not.** The **data** are authoritative published values (shipped
+> `unverified` per §9 — promotion is a contributor confirming them against the source).
+> The **model** is an honest **Tier-C reduction**: it applies the exact CiPA *binding*
+> kinetics to the reduced kernel's IKr gate, **not** the full 9-state CiPA Markov IKr
+> (that — and re-validating the AP against it — is declared future work). Because the
+> kinetics equilibrate slowly (the official protocol paces ~1000 beats), the CiPA path is
+> a **research/demonstration** surface; it is **opt-in and changes no default qNet/ΔAPD90
+> number, threshold, or recorded performance result.** Only the 12 compounds with
+> published dynamic data get `cipa_binding` — Harmonia never fabricates kinetics for the
+> other 16.
 
 ### Exposure layer & drug combinations (Phase D)
 
@@ -687,7 +733,7 @@ optional local step (they need a heavy simulation engine, so are not run in CI).
 ## Validation & testing
 
 Everything downstream of the dataset is a deterministic projection, so the test
-suite (181 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
+suite (188 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 *provable non-drift* rather than fixtures:
 
 | Guard | What it proves | Where |
@@ -704,6 +750,7 @@ suite (181 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 | **Disease populations** (v0.3) | the `conductance_scale` mean shift is applied correctly; LQTS backgrounds raise the susceptible fraction in the textbook order; every disease assessment is Tier D / NOT FOR PREDICTION; the healthy population is byte-identical | `tests/test_disease_populations.py` |
 | **Calibrated populations** (v0.5) | every accepted myocyte's drug-free biomarkers are in range; the abnormal-repolarization tail is rejected (triangulation-dominated); the calibrated assessment is Tier D / NOT FOR PREDICTION; the uncalibrated path is byte-identical (shared RNG draw) | `tests/test_calibrated_populations.py` |
 | **cqInward biomarker** (v0.4) | control identity (=1 at no drug); ICaL/INaL block lowers it (<1), IKr block raises it (>1); propagated as a distribution; adding it changes no qNet/flip number | `tests/test_cqinward.py` |
+| **CiPA dynamic-hERG kinetics** (v0.6) | the 12 CiPA dynamic-fit compounds carry `cipa_binding` (the rest don't); zero-drug ⇒ no block; block rises with concentration; the trapping phenotype (dofetilide retains ≫ verapamil washes out); the opt-in path leaves the default classification unchanged | `tests/test_cipa_binding.py` |
 | **Sobol consistency** (v0.2) | total-effect ≥ first-order per channel (within MC error); indices deterministic; standard errors reported | `tests/test_sobol.py` |
 | **CiPA numeric round trip** | export the CiPA CSV, parse it back, every IC50/Hill equals the dataset value | `registry.roundtrip_cipa` |
 | **Parameter round trip** | the kernel conductances appear verbatim in the CellML/SBML/Myokit text | `registry.roundtrip_parameters` |
@@ -765,7 +812,7 @@ harmonia/
 │       ├── csv_bibtex.py · annotate.py · combine.py · registry.py
 ├── dashboard/app.py             # Streamlit: flip view (+ Bayesian UQ) · combinations · population-of-models · browse
 ├── notebooks/                   # executable analyses, run in CI under nbmake
-├── tests/                       # 181 tests: dataset, kernel, qNet, simulate, dynamic binding, exposure, combinations, populations (incl. calibrated), performance, Bayesian UQ, exports (round trips + unit conformance + SED-ML/OMEX integrity), CLI, dashboard contract
+├── tests/                       # 188 tests: dataset, kernel, qNet, simulate, dynamic binding, CiPA hERG kinetics, exposure, combinations, populations (incl. calibrated), performance, Bayesian UQ, exports (round trips + unit conformance + SED-ML/OMEX integrity), CLI, dashboard contract
 ├── docs/                        # essay, figures, make_figures.py
 ├── CHANGELOG.md · .zenodo.json  # release metadata
 └── exports/                     # sample generated artifacts (regenerated in CI)
@@ -799,7 +846,7 @@ feature does not get built.
 | --- | --- | --- |
 | **A — CiPA spine** | Channel block + ORd kernel + risk metric for the 12 training drugs, end to end, with exports, validation, and the flip view | ✅ |
 | **B — Dynamic hERG + validation** | Dynamic (Langmuir + trapping) hERG binding; the 16 validation drugs (28 CiPA compounds total); recorded classification performance | ✅ |
-| **C — Variability layer** | **Discriminating qNet via a shape-dependent Na-Ca exchanger ✅.** Remaining: full CiPA Markov hERG + published optimized kinetics; broader multi-source aggregation; ToR-ORd reformulation | ◧ |
+| **C — Variability layer** | **Discriminating qNet via a shape-dependent Na-Ca exchanger ✅; the published CiPA dynamic-hERG optimized kinetics sourced + a binding model shipped (v0.6) ✅.** Remaining: the full 9-state CiPA Markov IKr (the kinetics are coupled to the reduced gate, a Tier-C reduction); broader multi-source aggregation; ToR-ORd reformulation | ◧ |
 | **D — Exposure layer** | Free ↔ total plasma conc + protein binding (composable with Hypnos); drug-combination assessment | ✅ **this release** |
 | **E — Populations** | **Population-of-models risk spread ✅; disease & genetic backgrounds (LQTS, v0.3) ✅; experimentally-calibrated populations (Britton 2013, v0.5) ✅** — all shipped non-predictive (Tier D). Remaining: real-data-calibrated (not kernel-plausibility) populations | ✅ |
 | **F — Hardening** | **Declaration-level CellML unit-conformance check (in CI) ✅; executable `nbmake` notebooks (3) ✅; `.zenodo.json` + `CHANGELOG.md` ✅.** Remaining: full dimensional validation + the Myokit/OpenCOR cross-check against the *canonical* ORd CellML (optional local step); minted Zenodo DOI on first tagged release | ◧ |

@@ -344,6 +344,37 @@ def assign_tier(n_sources, fold_range, max_block):
     return "C"
 
 
+# --------------------------------------------------------------------------- #
+# CiPA dynamic-hERG binding kinetics (spec v0.6).
+# The optimized per-drug parameters of the Li et al. 2017 IKr-Markov drug-binding
+# model (saturating, voltage-dependent trapping), validated in Li et al. 2019.
+# Values are the FDA/CiPA repository optimal fits
+# (https://github.com/FDA/CiPA, hERG_fitting/results/<drug>/pars.txt):
+#   Kmax     max binding-rate scale (dimensionless)
+#   Ku       unbinding rate (ms^-1)
+#   n        Hill coefficient of the concentration-dependent binding rate
+#   halfmax  n-th power of the half-maximal concentration (nM^n)
+#   Vhalf    trapping half-voltage (mV); near 0 => trapped, very negative => washes out
+# Kt (the closed-channel trapping rate) is fixed at 3.5e-5 ms^-1 for all drugs.
+# ONLY the 12 CiPA compounds with published Milnes-protocol dynamic fits appear here;
+# the other 16 have no dynamic data and keep static Hill block (never fabricated).
+CIPA_KT = 3.5e-05
+CIPA_HERG = {
+    "dofetilide":     dict(Kmax=35.1,      Ku=1.816e-05, n=1.08,   halfmax=216.6,       Vhalf=-1.0),
+    "bepridil":       dict(Kmax=5594000.0, Ku=0.0001719, n=0.9374, halfmax=147200000.0, Vhalf=-61.34),
+    "cisapride":      dict(Kmax=10.22,     Ku=0.0004161, n=0.9615, halfmax=42.32,       Vhalf=-167.4),
+    "chlorpromazine": dict(Kmax=157900.0,  Ku=0.04671,   n=0.8871, halfmax=43510000.0,  Vhalf=-14.45),
+    "diltiazem":      dict(Kmax=182500.0,  Ku=0.282,     n=0.9382, halfmax=667700000.0, Vhalf=-90.65),
+    "mexiletine":     dict(Kmax=15.0,      Ku=0.07114,   n=1.139,  halfmax=723000.0,    Vhalf=-87.51),
+    "ondansetron":    dict(Kmax=172000.0,  Ku=0.02324,   n=0.891,  halfmax=52240000.0,  Vhalf=-82.2),
+    "quinidine":      dict(Kmax=275.7,     Ku=0.004103,  n=0.8488, halfmax=53830.0,     Vhalf=-61.35),
+    "ranolazine":     dict(Kmax=52.84,     Ku=0.02035,   n=0.9532, halfmax=143000.0,    Vhalf=-94.99),
+    "sotalol":        dict(Kmax=96190.0,   Ku=0.02225,   n=0.7513, halfmax=385600000.0, Vhalf=-51.5),
+    "terfenadine":    dict(Kmax=102200.0,  Ku=7.788e-05, n=0.6502, halfmax=409500.0,    Vhalf=-81.63),
+    "verapamil":      dict(Kmax=1694000.0, Ku=0.0008165, n=1.043,  halfmax=335600000.0, Vhalf=-97.08),
+}
+
+
 def build_channel_block(drug, dmeta, channel, cmeta):
     primary = cmeta["primary"]
     max_block = cmeta.get("max_block")
@@ -432,6 +463,15 @@ def build_channel_block(drug, dmeta, channel, cmeta):
         rec["dynamic_binding"] = {
             "kon": dyn["kon"], "koff": dyn["koff"], "trapping": dyn["trapping"],
             "citation": dyn.get("citation", "li-2017"),
+        }
+    if channel == "IKr" and drug in CIPA_HERG:
+        rec["cipa_binding"] = {
+            **CIPA_HERG[drug], "Kt": CIPA_KT,
+            "model": "CiPA IKr-Markov drug binding (Li 2017), saturating + "
+                     "voltage-dependent trapping",
+            "source": "FDA/CiPA hERG_fitting optimal fit "
+                      "(github.com/FDA/CiPA, hERG_fitting/results/<drug>/pars.txt)",
+            "citation": "li-2017", "validation_citation": "li-2019",
         }
     if tier == "D":
         rec["notes"] = ("Max block observed < 60% — the IC50 is UNIDENTIFIABLE. The value stored "

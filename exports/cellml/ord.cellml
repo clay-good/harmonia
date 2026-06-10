@@ -141,7 +141,7 @@ Primary sources: https://doi.org/10.1371/journal.pcbi.1002061
     <rdf:Description rdf:about="#harmonia_ord">
       <harmonia:clinicalUse>PROHIBITED — research / safety-methodology / education only; not a regulatory determination</harmonia:clinicalUse>
       <harmonia:confidenceTier>C</harmonia:confidenceTier>
-      <harmonia:datasetVersion>0.5.4</harmonia:datasetVersion>
+      <harmonia:datasetVersion>0.6.0</harmonia:datasetVersion>
         <bqbiol:isDescribedBy rdf:resource="https://doi.org/10.1371/journal.pcbi.1002061"/>
     </rdf:Description>
   </rdf:RDF>

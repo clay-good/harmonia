@@ -88,5 +88,17 @@
     "koff": 5e-05,
     "trapping": true,
     "citation": "li-2017"
+  },
+  "cipa_binding": {
+    "Kmax": 35.1,
+    "Ku": 1.816e-05,
+    "n": 1.08,
+    "halfmax": 216.6,
+    "Vhalf": -1.0,
+    "Kt": 3.5e-05,
+    "model": "CiPA IKr-Markov drug binding (Li 2017), saturating + voltage-dependent trapping",
+    "source": "FDA/CiPA hERG_fitting optimal fit (github.com/FDA/CiPA, hERG_fitting/results/<drug>/pars.txt)",
+    "citation": "li-2017",
+    "validation_citation": "li-2019"
   }
 }

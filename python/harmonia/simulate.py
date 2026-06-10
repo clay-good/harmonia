@@ -38,7 +38,7 @@ from .load import Dataset
 from .records import APModel, ChannelBlock
 from .exposure import resolve_free_exposure
 from .export.reference import (BLOCKABLE, KernelParams, simulate_beats,
-                               hill_block_factor, HERGDynamic)
+                               hill_block_factor, HERGDynamic, CiPABinding)
 
 # --- classifier calibration (reduced kernel; see module docstring) ---------- #
 REFERENCE_EXPOSURE_MULTIPLE = 4.0     # x EFTPC (free Cmax)
@@ -268,7 +268,7 @@ def assess(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
            exposure_nM: Optional[float] = None, exposure_kind: str = "free",
            exposure_multiple: float = REFERENCE_EXPOSURE_MULTIPLE,
            metric: str = DEFAULT_METRIC, n_mc: int = 200, seed: int = 0,
-           n_beats: int = 3, herg_dynamic: bool = False,
+           n_beats: int = 3, herg_dynamic: object = False,
            n_beats_dynamic: int = 10, uq: str = "moments",
            prior: Optional[object] = None) -> RiskAssessment:
     """Assess a drug's proarrhythmia-metric *distribution* under input variability.
@@ -277,11 +277,19 @@ def assess(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
     frequency, with the propagated tier and unidentifiable-channel flags. It is
     not, and must not be presented as, a safety determination.
 
-    If ``herg_dynamic`` is True and the drug's hERG record carries
-    ``dynamic_binding`` kinetics, hERG block is simulated with the time-dependent
-    (CiPA-style) binding ODE instead of a static Hill factor — capturing
-    use-dependent trapping. The binding equilibrates slowly, so the dynamic path
-    paces ``n_beats_dynamic`` beats.
+    ``herg_dynamic`` selects the hERG block model (opt-in; neither dynamic path
+    changes any default/recorded number):
+
+    - ``False`` (default) — static Hill block.
+    - ``True`` — the v0.1 Langmuir ``dynamic_binding`` (kon/koff/trapping) ODE,
+      where present (dofetilide, verapamil), capturing use-dependent trapping.
+    - ``"cipa"`` — the published **CiPA Li-2017 binding kinetics** (``cipa_binding``:
+      Kmax/Ku/halfmax/n/Vhalf) for the 12 CiPA dynamic-fit compounds (spec v0.6),
+      coupled to the reduced IKr gate. The CiPA kinetics equilibrate slowly, so this
+      research path benefits from a larger ``n_beats_dynamic``.
+
+    Either dynamic path paces ``n_beats_dynamic`` beats (the binding equilibrates
+    slowly).
 
     ``uq`` selects the uncertainty-propagation engine (spec v0.2):
 
@@ -302,9 +310,16 @@ def assess(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
     if not blocks:
         raise KeyError(f"no channel-block records for drug '{drug}'")
 
-    # dynamic-hERG kinetics, if requested and available
-    herg_rec = next((b for b in blocks if b.channel == "IKr" and b.dynamic_binding), None)
-    use_dynamic = herg_dynamic and herg_rec is not None
+    # dynamic-hERG kinetics, if requested and available. ``herg_dynamic`` is False
+    # (static Hill, default), True (the v0.1 Langmuir kon/koff path), or "cipa" (the
+    # published CiPA Li-2017 binding kinetics, spec v0.6 — opt-in, does not change any
+    # default/recorded number).
+    cipa_mode = herg_dynamic == "cipa"
+    if cipa_mode:
+        herg_rec = next((b for b in blocks if b.channel == "IKr" and b.cipa_binding), None)
+    else:
+        herg_rec = next((b for b in blocks if b.channel == "IKr" and b.dynamic_binding), None)
+    use_dynamic = bool(herg_dynamic) and herg_rec is not None
     if use_dynamic:
         n_beats = n_beats_dynamic
 
@@ -332,10 +347,18 @@ def assess(ds: Dataset, drug: str, ap_model: str = "cipaordv1.0",
     tier = _worst_tier([ap_rec.tier] + [b.tier for b in blocks])
 
     def _herg_for(ic50_nm: float):
-        """Build a HERGDynamic at the reference exposure with kon set so the
-        binding IC50 (koff/kon) tracks the sampled hERG IC50."""
+        """Build the dynamic-hERG binding model at the reference exposure. In the
+        legacy Langmuir path the binding IC50 (koff/kon) tracks the sampled hERG
+        IC50; in the CiPA path the published Li-2017 kinetics are fixed (the binding
+        kinetics carry no multi-source spread), so the sampled IC50 is not used."""
         if not use_dynamic or herg_rec is None:
             return None
+        if cipa_mode:
+            cb = herg_rec.cipa_binding
+            assert cb is not None  # cipa_mode + use_dynamic implies the record carries it
+            return CiPABinding(conc_nm=reference_exposure, kmax=cb["Kmax"], ku=cb["Ku"],
+                               n=cb["n"], halfmax=cb["halfmax"], vhalf=cb["Vhalf"],
+                               kt=cb.get("Kt", 3.5e-05))
         kinetics = herg_rec.dynamic_binding
         assert kinetics is not None  # use_dynamic implies the hERG record carries kinetics
         koff = kinetics["koff"]

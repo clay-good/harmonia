@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 
 import harmonia
 from harmonia.export.reference import (KernelParams, simulate_beats, HERGDynamic,
-                                       hill_block_factor)
+                                       CiPABinding, hill_block_factor)
 from harmonia.simulate import (assess, assess_combination, THRESH_LOW_PCT,
                                THRESH_HIGH_PCT, QNET_THRESH_LOW, QNET_THRESH_HIGH,
                                RISK_LABELS)
@@ -452,6 +452,52 @@ def fig_cqinward():
     plt.close(fig)
 
 
+def fig_cipa_binding():
+    """v0.6 CiPA dynamic-hERG kinetics: the published trapping phenotype.
+
+    Left: the drug-bound hERG fraction accumulating over beats at a matched
+    concentration — a trapped blocker (dofetilide, Vhalf~0) builds and retains block,
+    a washout blocker (verapamil, Vhalf<<0) does not. Right: the fitted trapping
+    half-voltage Vhalf for all 12 CiPA dynamic-fit compounds (the trapping gradient).
+    """
+    drugs = ["dofetilide", "bepridil", "cisapride", "chlorpromazine", "diltiazem",
+             "mexiletine", "ondansetron", "quinidine", "ranolazine", "sotalol",
+             "terfenadine", "verapamil"]
+    pars = {d: ds[f"channel_block.{d}.ikr"].cipa_binding for d in drugs}
+
+    def beatwise_bound(cb, conc, n_beats=26):
+        fr = []
+        for nb in range(2, n_beats, 3):
+            r = simulate_beats(KernelParams(), n_beats=nb, herg=CiPABinding(
+                conc_nm=conc, kmax=cb["Kmax"], ku=cb["Ku"], n=cb["n"],
+                halfmax=cb["halfmax"], vhalf=cb["Vhalf"]))
+            fr.append((nb, r.herg_bound_max))
+        return np.array(fr)
+
+    conc = 50.0
+    fig, (axL, axR) = plt.subplots(1, 2, figsize=(11, 4.2))
+    for d, color in (("dofetilide", RED), ("terfenadine", "#e08e0b"), ("verapamil", BLUE)):
+        tr = beatwise_bound(pars[d], conc)
+        axL.plot(tr[:, 0], tr[:, 1], "-o", ms=3, color=color,
+                 label=f"{d} (Vhalf={pars[d]['Vhalf']:.0f} mV)")
+    axL.set_xlabel("beats paced"); axL.set_ylabel("peak drug-bound hERG fraction")
+    axL.set_title(f"Trapping phenotype at matched {conc:.0f} nM:\n"
+                  "dofetilide accumulates & is trapped; verapamil washes out", fontsize=9.5)
+    axL.legend(fontsize=8, frameon=False); axL.spines[["top", "right"]].set_visible(False)
+
+    order = sorted(drugs, key=lambda d: pars[d]["Vhalf"])
+    vh = [pars[d]["Vhalf"] for d in order]
+    cols = [RED if v > -40 else (BLUE if v < -85 else GREY) for v in vh]
+    axR.barh(range(len(order)), vh, color=cols)
+    axR.set_yticks(range(len(order))); axR.set_yticklabels(order, fontsize=8)
+    axR.set_xlabel("fitted trapping half-voltage Vhalf (mV)")
+    axR.set_title("Vhalf-trap, 12 CiPA dynamic-fit compounds\n"
+                  "(near 0 = trapped → washes out as Vhalf ↓)", fontsize=9.5)
+    axR.axvline(0, color="k", lw=0.6); axR.spines[["top", "right"]].set_visible(False)
+    fig.tight_layout(); fig.savefig(IMG / "cipa_binding.png", dpi=130)
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     fig_ap_traces()
     fig_flip_distribution()
@@ -463,5 +509,6 @@ if __name__ == "__main__":
     fig_disease_populations()  # v0.3 disease/genetic backgrounds (LQTS)
     fig_cqinward()         # v0.4 cqInward inward-charge biomarker
     fig_calibrated_populations()  # v0.5 experimentally-calibrated populations (Britton 2013)
+    fig_cipa_binding()     # v0.6 CiPA dynamic-hERG kinetics (trapping phenotype)
     # fig_training_set() / fig_validation_set() remain available for the APD90 metric
     print(f"wrote figures to {IMG}")

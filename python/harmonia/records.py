@@ -198,6 +198,12 @@ class ChannelBlock(Record):
         return self.raw.get("dynamic_binding")
 
     @property
+    def cipa_binding(self) -> Optional[Dict[str, Any]]:
+        """Published CiPA dynamic-hERG binding kinetics (Kmax/Ku/n/halfmax/Vhalf/Kt),
+        if present (spec v0.6). The Li-2017 IKr-Markov drug-binding parameters."""
+        return self.raw.get("cipa_binding")
+
+    @property
     def identifiable(self) -> bool:
         return self.assay_context.identifiable
 
