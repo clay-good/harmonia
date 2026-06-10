@@ -8,7 +8,7 @@ uncertainty; it never issues a bare "safe/unsafe" verdict. See spec.md §10.
 """
 from __future__ import annotations
 
-__version__ = "0.5.3"
+__version__ = "0.5.4"
 
 from .load import Dataset, load, find_dataset_dir
 from .validate import validate_dataset, ValidationReport

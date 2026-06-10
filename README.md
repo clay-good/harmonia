@@ -156,7 +156,7 @@ pop.tier                                      # "D"  (always; non-predictive)
 | **Recorded classification performance** (Phase B) — `harmonia performance` scores either metric vs CiPA expert labels on training / validation / all, with the full confusion matrix | ✅ |
 | **Exports** — CellML 2.0, Myokit `.mmt`, SBML L3v2, SED-ML, CiPA inputs (CSV/JSON), CSV, BibTeX, COMBINE `.omex` — all carrying `clinicalUse = PROHIBITED`, tier, and DOI RDF | ✅ |
 | **CLI · Streamlit dashboard · CI** | ✅ |
-| **Release hardening** (Phase F) — declaration-level CellML unit-conformance check, an executable `nbmake` notebook, `.zenodo.json`, `CHANGELOG.md` | ✅ |
+| **Release hardening** (Phase F) — declaration-level CellML unit-conformance check, three executable `nbmake` notebooks, `.zenodo.json`, `CHANGELOG.md` | ✅ |
 | Full CiPA Markov hERG + published optimized kinetics, ToR-ORd reformulation, broader multi-source aggregation, full dimensional/OpenCOR cross-check | Phase C/F (roadmap below) |
 
 ---
@@ -485,6 +485,12 @@ against the *healthy* qNet/APD thresholds, while the assessment additionally rep
 the acceptance rate and per-biomarker rejection counts
 ([spec v0.5](docs/specs/v0.5-calibrated-populations.md)).
 
+All three population layers — the variability cloud, the LQTS disease backgrounds,
+and the calibrated population — are reproduced (and asserted Tier-D / NOT-FOR-PREDICTION)
+in the executable notebook
+[`notebooks/03_populations.ipynb`](notebooks/03_populations.ipynb), run in CI under
+`nbmake`.
+
 ### Which input drives the flip? (sensitivity attribution)
 
 The flip frequency says *whether* a safety call is unstable; the obvious next
@@ -707,7 +713,7 @@ suite (181 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 | **SBML validity (canonical)** | the exported SBML passes libSBML `checkConsistency` with zero errors; every parameter declares units | `sbml.consistency_violations` |
 | **SED-ML reference resolution** | every task→model/sim, variable→task, curve→dataGenerator reference resolves; the model `source` points at a file that exists | `sedml.reference_violations` |
 | **OMEX manifest consistency** | the COMBINE manifest lists exactly the archive's files, with one master | `combine.manifest_violations` |
-| **Executable notebook** | the headline flip-frequency analysis runs clean and its assertions hold | `nbmake notebooks/` |
+| **Executable notebooks** | the three analyses (flip-frequency, Bayesian UQ, population-of-models) run clean and every inline assertion holds | `nbmake notebooks/` |
 | **Dashboard data contract** | the headline UI's data API — every field, function, and dict key each of the five tabs reads (flip + Bayesian-UQ toggle, combinations, population-of-models incl. disease/calibrated, browse) still exists | `tests/test_dashboard.py` |
 | **Recorded performance** | the honest, live confusion matrix vs CiPA expert labels — never hidden behind one accuracy number | `harmonia performance` |
 
@@ -796,7 +802,7 @@ feature does not get built.
 | **C — Variability layer** | **Discriminating qNet via a shape-dependent Na-Ca exchanger ✅.** Remaining: full CiPA Markov hERG + published optimized kinetics; broader multi-source aggregation; ToR-ORd reformulation | ◧ |
 | **D — Exposure layer** | Free ↔ total plasma conc + protein binding (composable with Hypnos); drug-combination assessment | ✅ **this release** |
 | **E — Populations** | **Population-of-models risk spread ✅; disease & genetic backgrounds (LQTS, v0.3) ✅; experimentally-calibrated populations (Britton 2013, v0.5) ✅** — all shipped non-predictive (Tier D). Remaining: real-data-calibrated (not kernel-plausibility) populations | ✅ |
-| **F — Hardening** | **Declaration-level CellML unit-conformance check (in CI) ✅; executable `nbmake` notebook ✅; `.zenodo.json` + `CHANGELOG.md` ✅.** Remaining: full dimensional validation + the Myokit/OpenCOR cross-check against the *canonical* ORd CellML (optional local step); minted Zenodo DOI on first tagged release | ◧ |
+| **F — Hardening** | **Declaration-level CellML unit-conformance check (in CI) ✅; executable `nbmake` notebooks (3) ✅; `.zenodo.json` + `CHANGELOG.md` ✅.** Remaining: full dimensional validation + the Myokit/OpenCOR cross-check against the *canonical* ORd CellML (optional local step); minted Zenodo DOI on first tagged release | ◧ |
 
 ---
 

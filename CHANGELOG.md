@@ -6,6 +6,33 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.4] — 2026-06-10
+
+### Added — an executable notebook for the population-of-models subsystem
+The populations subsystem spans three releases of work (the v0.1 Phase-E variability
+cloud, the v0.3 LQTS disease backgrounds, the v0.5 Britton-2013 calibrated population)
+and had README prose + static figures, but — unlike the flip-frequency (nb 01) and
+Bayesian-UQ (nb 02) threads — **no executable, CI-asserted notebook**. This adds one,
+closing the gap and giving the subsystem the same runnable-documentation guarantee.
+
+- **`notebooks/03_populations.ipynb`** — deterministic (seeded), run in CI under
+  `nbmake`, with inline assertions that double as tests: the variability-cloud
+  susceptible fraction (a spread, not a point); the LQTS backgrounds each raising the
+  susceptible fraction for a borderline drug (reduced repolarization reserve, textbook
+  ordering); and the calibrated population's acceptance bookkeeping (rejection happens,
+  triangulation is the dominant filter). Every section asserts the **Tier-D /
+  NOT-FOR-PREDICTION** guardrail.
+
+### Fixed
+- `notebooks/README.md` was stale — it documented only notebook 01, omitting
+  `02_bayesian_uq.ipynb` (which has shipped and run in CI since v0.2). Now lists all
+  three with accurate summaries.
+- README: the validation table, the "what's in the box" table, and the Phase-F
+  roadmap row said "an executable notebook" (singular); corrected to three, with a
+  pointer to nb 03 from the populations section.
+- Committed `exports/` regenerated for the version bump (the v0.5.3 export-freshness
+  CI gate requires it).
+
 ## [0.5.3] — 2026-06-10
 
 ### Fixed — committed exports were stale; the "never hand-edited" guarantee is now enforced
