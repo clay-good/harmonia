@@ -142,7 +142,7 @@ pop.tier                                      # "D"  (always; non-predictive)
 | --- | --- |
 | **Dataset** — 68 channel-block records across the **28 CiPA compounds** (12 training + 16 validation), 28 drug-reference records (expert risk label + free Cmax + protein binding), 3 AP-model records, 1 population spec, 14 Crossref-checked citations | ✅ |
 | **Variability is first-class** — multi-source IC50s with computed fold-range / IQR; the reliability gate (max block < 60% ⇒ Tier D, unidentifiable) machine-enforced | ✅ |
-| **Bayesian dose-response UQ** (Phase C, **v0.2**) — the IC50/Hill spread is *inferred* under a declared prior, not transcribed: hierarchical posterior with dataset-learned between-lab pooling, propagated Hill uncertainty, a one-sided **censored** posterior for sub-60%-block channels, a prior registry with per-channel `prior_sensitivity`, and variance-based (Sobol) sensitivity. Opt-in via `uq="bayes"`; `uq="moments"` (default) reproduces every v0.1 number | ✅ |
+| **Bayesian dose-response UQ** (Phase C, **v0.2**) — the IC50/Hill spread is *inferred* under a declared prior, not transcribed: hierarchical posterior with dataset-learned between-lab pooling, propagated Hill uncertainty, a one-sided **censored** posterior for sub-60%-block channels, a **raw dose-response regime** (fit from concentration-block points), a prior registry with per-channel `prior_sensitivity`, variance-based (Sobol) sensitivity, and a calibrated inference (simulation-based calibration + posterior coverage). Opt-in via `uq="bayes"`; `uq="moments"` (default) reproduces every v0.1 number | ✅ |
 | **Reference kernel** — a SciPy reduced O'Hara-Rudy-lineage ventricular AP (7 currents + Na-Ca exchanger) with Hill block per current; APD90 / qNet / triangulation / EAD biomarkers | ✅ |
 | **Discriminating qNet** (Phase C) — adding a shape-dependent Na-Ca exchanger (excluded from the qNet sum) makes qNet sensitive; **qNet is now the default metric** (10/12 training, zero two-category errors over all 28 compounds); APD90 selectable | ✅ |
 | **Dynamic hERG binding** (Phase B) — Langmuir kon/koff with **trapping**; reduces to the static Hill block at steady state, captures use-dependent block (`assess(..., herg_dynamic=True)`) | ✅ |
@@ -440,6 +440,7 @@ information in three places. v0.2 closes all three:
 | **Spread is a point estimate from 2–3 numbers**, and a single-source channel carries a magic `DEFAULT_SINGLE_SOURCE_SIGMA`. | A **hierarchical posterior** whose between-lab SD `tau_pop` is *learned across every multi-source channel in the dataset* (`learn_tau_pop`) and **borrowed** by sparse channels — a constant becomes an inferred, citable quantity that sharpens as the dataset grows. |
 | **The Hill coefficient is fixed**, even when sources disagree on block steepness. | A joint `(IC50, Hill)` posterior; Hill uncertainty now propagates into the block factor. |
 | **Sub-60%-block is a binary exclusion** — a "45% block at the top dose" measurement is thrown away entirely. | A **one-sided censored posterior**: the max-block observation becomes a probit likelihood that bounds the IC50 from below near the recovered top tested dose, with the Hill marginalized over its prior — a proper but wide, heavy-right-tailed posterior. The Tier-D gate is **preserved**; v0.2 only stops discarding the information. |
+| **The summary IC50 is transcribed** as a point with an *assumed* spread, even when raw concentration-block points exist. | **Raw regime** (v0.2.1): a source carrying raw `(concentration, fractional_block)` points has its `(IC50, Hill)` and the *genuine* fit uncertainty inferred from the curve (`harmonia.fit_dose_response`), weighted into the hierarchical pooling by its actual precision. Reduces exactly to the summary path when no raw data is present. |
 
 **The non-drift guarantee.** In the well-identified, multi-source, agreed-Hill
 limit the posterior mean of `log10(IC50)` converges to the log-geomean and the
@@ -483,6 +484,13 @@ each with a bootstrap Monte-Carlo standard error. The dominant-driver recommenda
 becomes interaction-aware: a channel can be the dominant *total-effect* driver while
 having a small *solo* effect — exactly the case OAT misses. The cheap OAT readout
 remains the default.
+
+**The inference is calibrated, not just plausible.** Two synthetic-by-construction §9
+gates prove the implementation is correct: **simulation-based calibration** — data drawn
+from the prior and re-inferred yields rank-uniform posteriors (chi-square uniformity
+p ≈ 0.6) — and **posterior coverage** — the 90% credible interval covers the truth ≈ 90%
+of the time (measured 0.905). Run them with `python dataset/tools/build_posteriors.py
+--validate` or `harmonia.simulation_based_calibration` / `harmonia.posterior_coverage`.
 
 **Implementation choices** (and why), in the family tradition:
 
@@ -544,7 +552,7 @@ optional local step (they need a heavy simulation engine, so are not run in CI).
 ## Validation & testing
 
 Everything downstream of the dataset is a deterministic projection, so the test
-suite (147 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
+suite (154 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 *provable non-drift* rather than fixtures:
 
 | Guard | What it proves | Where |
@@ -555,6 +563,7 @@ suite (147 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 | **Prior registry validity** (v0.2) | every prior schema-validates, its id matches its filename, every cited key resolves, and `predictive == false` (no prior carries a risk conclusion) | `harmonia validate` |
 | **Bayesian reduction / non-drift** (v0.2) | the posterior mean → log-geomean for a multi-source channel; the moments path is byte-identical, so `uq="moments"` reproduces v0.1 exactly | `tests/test_infer.py`, `tests/test_uq_assess.py` |
 | **Sampler convergence + censoring** (v0.2) | every channel posterior meets `rhat < 1.01` / an `ess` floor; a sub-60%-block channel yields a wide, prior-dominated one-sided posterior and still produces a Tier-D assessment | `tests/test_infer.py` |
+| **Inference calibration** (v0.2.1, §9) | simulation-based calibration → rank-uniform posteriors; 90% credible interval covers the truth ≈90%; raw dose-response fit recovers a synthetic IC50/Hill | `tests/test_infer_raw.py` |
 | **Sobol consistency** (v0.2) | total-effect ≥ first-order per channel (within MC error); indices deterministic; standard errors reported | `tests/test_sobol.py` |
 | **CiPA numeric round trip** | export the CiPA CSV, parse it back, every IC50/Hill equals the dataset value | `registry.roundtrip_cipa` |
 | **Parameter round trip** | the kernel conductances appear verbatim in the CellML/SBML/Myokit text | `registry.roundtrip_parameters` |

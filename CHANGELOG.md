@@ -6,6 +6,37 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-06-09
+
+### Added — raw dose-response regime + calibration of the inference (completes spec v0.2 C-UQ-5, §9)
+Closes the last open piece of the Bayesian dose-response thread: the raw regime and
+the two §9 calibration gates that v0.2.0 deferred. Fully backward-compatible — every
+record carrying no raw data is left on the byte-identical v0.2.0 summary path
+(confirmed: dofetilide hERG posterior unchanged at 0.7121 ± 0.1109).
+
+- **Raw regime** (`harmonia.fit_dose_response`, spec §2.1): a source carrying raw
+  `(concentration, fractional_block, sem)` points now has its `(IC50, Hill)` —and the
+  *genuine* fit uncertainty—**inferred from the curve** via a 2-D grid Bayesian fit
+  (truncated-normal or beta likelihood, stable logistic Hill form), instead of
+  transcribing a fitted IC50 as a point with an assumed spread. Recovers a synthetic
+  IC50/Hill to within a few percent.
+- **Heteroscedastic hierarchical pooling**: the collapsed between-lab marginal is
+  generalized (Sherman-Morrison) to per-source variances `tau^2 + v_s`, so a
+  precisely-fit raw source and a loosely-transcribed summary source are weighted by
+  their *actual* uncertainty. Reduces exactly to the homoscedastic form when every
+  `v_s = 0`, so the existing 68 records do not drift. The optional per-source
+  `fit_sd_log10` (summary regime) now feeds this too.
+- **Simulation-based calibration** (`harmonia.simulation_based_calibration`, §9): data
+  simulated from the prior and re-inferred yields **rank-uniform** posteriors
+  (chi-square uniformity p ≈ 0.6) — the standard proof that the inference is correctly
+  *implemented*, not merely plausible.
+- **Posterior coverage** (`harmonia.posterior_coverage`, §9): the 90% credible interval
+  covers the truth ~90% of the time (measured 0.905) on synthetic data; the 50%
+  interval covers ~50% (0.512).
+- `python dataset/tools/build_posteriors.py --validate` runs both gates as a CLI
+  diagnostic. New tests in `tests/test_infer_raw.py` (raw recovery, noise→width
+  monotonicity, end-to-end raw inference, SBC uniformity, coverage, backward-compat).
+
 ## [0.2.0] — 2026-06-09
 
 ### Added — Bayesian dose-response uncertainty quantification (spec v0.2, roadmap Phase C)
@@ -227,6 +258,7 @@ end, covering roadmap phases A–E:
 - **E — Populations (hypothesis-tier):** population-of-models risk spread,
   shipped non-predictive (Tier D, "NOT FOR PREDICTION").
 
-[Unreleased]: https://github.com/clay-good/harmonia/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/clay-good/harmonia/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/clay-good/harmonia/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/clay-good/harmonia/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/clay-good/harmonia/releases/tag/v0.1.0

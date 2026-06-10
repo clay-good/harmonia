@@ -245,28 +245,84 @@ def _tau_log_marginal(tau: np.ndarray, d: np.ndarray, s0: float,
     return log_lik + log_prior
 
 
-def _infer_identifiable(block: ChannelBlock, prior: Prior, tau_pop: float,
+def _tau_log_marginal_het(tau: np.ndarray, y: np.ndarray, v: np.ndarray, m0: float,
+                          s0: float, tau_scale: float) -> np.ndarray:
+    """Heteroscedastic generalization of :func:`_tau_log_marginal`: each observation
+    ``y_s`` has its *own* extra variance ``v_s`` (the raw-regime per-source fit
+    variance, sec 2.1), so the noise is ``Normal(mu, tau^2 + v_s)``. By Sherman-Morrison
+    the marginal over ``y ~ Normal(m0 1, D + s0^2 J)`` with ``D = diag(tau^2 + v_s)`` is
+    closed-form. It reduces exactly to the homoscedastic form when every ``v_s = 0``
+    (the existing summary regime), which is why a record carrying no raw data is left on
+    the byte-identical path."""
+    r = y - m0
+    out = np.empty_like(tau)
+    s02 = s0 * s0
+    for i, t in enumerate(tau):
+        d = t * t + v                       # per-source total variance
+        a = 1.0 / d
+        sum_a = float(np.sum(a))
+        sum_ra = float(np.sum(r * a))
+        sum_r2a = float(np.sum(r * r * a))
+        logdet = float(np.sum(np.log(d))) + np.log(1.0 + s02 * sum_a)
+        quad = sum_r2a - s02 * sum_ra * sum_ra / (1.0 + s02 * sum_a)
+        out[i] = -0.5 * (logdet + quad) - 0.5 * (t / tau_scale) ** 2
+    return out
+
+
+def _infer_summary_core(y: np.ndarray, v: np.ndarray, prior: Prior, tau_pop: float,
                         n_draws: int, rng: np.random.Generator):
-    """Summary-regime posterior for an identifiable channel: tau from its collapsed
-    marginal, mu | tau conjugate Normal, Hill conjugate in log-space."""
-    y = np.log10(np.asarray(block.source_ic50s_nm, dtype=float))
-    d = y - prior.m0
-    # the learned between-lab spread tau_pop is the HalfNormal scale for this channel
-    # grid over tau covering the prior and the data spread
+    """The hierarchical summary-regime draw of (mu, tau): tau from its collapsed
+    marginal, then mu | tau conjugate Normal. ``v`` are per-source extra variances
+    (zero in the pure-summary regime). Returns (mu, pred, tau)."""
+    homoscedastic = not np.any(v > 0)
     tau_hi = max(4.0 * tau_pop, 3.0 * (np.std(y, ddof=1) if y.size >= 2 else tau_pop), 0.5)
     grid = np.linspace(_TAU_FLOOR, tau_hi, 400)
-    tau = _grid_sample(rng, grid, _tau_log_marginal(grid, d, prior.s0, tau_pop), n_draws)
-    tau = np.maximum(tau, _TAU_FLOOR)
+    if homoscedastic:
+        # byte-identical to the v0.2 path for every record carrying no raw data
+        logp = _tau_log_marginal(grid, y - prior.m0, prior.s0, tau_pop)
+    else:
+        logp = _tau_log_marginal_het(grid, y, v, prior.m0, prior.s0, tau_pop)
+    tau = np.maximum(_grid_sample(rng, grid, logp, n_draws), _TAU_FLOOR)
 
-    # mu | tau, y  ~  Normal (conjugate)
-    n = y.size
-    ybar = float(np.mean(y))
-    prec = 1.0 / prior.s0 ** 2 + n / tau ** 2
-    mu_mean = (prior.m0 / prior.s0 ** 2 + n * ybar / tau ** 2) / prec
+    # mu | tau, y  ~  Normal (conjugate), heteroscedastic precision
+    a = 1.0 / (tau[:, None] ** 2 + v[None, :])      # (n_draws, n_sources)
+    prec = 1.0 / prior.s0 ** 2 + np.sum(a, axis=1)
+    mu_mean = (prior.m0 / prior.s0 ** 2 + np.sum(a * y[None, :], axis=1)) / prec
     mu_sd = 1.0 / np.sqrt(prec)
     mu = mu_mean + mu_sd * rng.standard_normal(n_draws)
     pred = mu + tau * rng.standard_normal(n_draws)          # new-lab predictive (sec 2.4)
-    hill = _hill_posterior(block, prior, n_draws, rng)
+    return mu, pred, tau
+
+
+def _gather_sources(block: ChannelBlock, prior: Prior):
+    """Per-source observations for the hierarchical fit. A source carrying raw
+    ``dose_response`` points is *fitted* (raw regime, sec 2.1): its log-IC50 estimate,
+    that estimate's genuine fit variance, and a fitted Hill come from the points. A
+    source without raw points contributes its transcribed log-IC50 with an optional
+    ``fit_sd_log10`` (summary regime). Returns (y, v, hills)."""
+    y, v, hills = [], [], []
+    for s in block.source_values:
+        dr = s.get("dose_response")
+        if dr:
+            mu_m, mu_sd, h_m, _ = fit_dose_response(
+                dr.get("concentration_nm", []), dr.get("fractional_block", []),
+                dr.get("sem"), prior, likelihood=dr.get("likelihood", "truncated_normal"))
+            y.append(mu_m); v.append(mu_sd ** 2); hills.append(h_m)
+        else:
+            y.append(float(np.log10(s["ic50_nm"])))
+            fs = s.get("fit_sd_log10")
+            v.append(float(fs) ** 2 if fs else 0.0)
+            if s.get("hill"):
+                hills.append(float(s["hill"]))
+    return np.asarray(y, dtype=float), np.asarray(v, dtype=float), hills
+
+
+def _infer_identifiable(block: ChannelBlock, prior: Prior, tau_pop: float,
+                        n_draws: int, rng: np.random.Generator):
+    """Summary- or raw-regime posterior for an identifiable channel (sec 2.1-2.2)."""
+    y, v, hills = _gather_sources(block, prior)
+    mu, pred, tau = _infer_summary_core(y, v, prior, tau_pop, n_draws, rng)
+    hill = _hill_posterior(block, prior, n_draws, rng, hills=hills or None)
     return mu, pred, tau, hill
 
 
@@ -336,10 +392,12 @@ def _grid_sample_2d(rng: np.random.Generator, mu_grid: np.ndarray, h_grid: np.nd
 
 
 def _hill_posterior(block: ChannelBlock, prior: Prior, n_draws: int,
-                    rng: np.random.Generator) -> np.ndarray:
+                    rng: np.random.Generator, hills=None) -> np.ndarray:
     """Conjugate log-Normal posterior for the Hill coefficient (gap #2): combine the
-    lognormal prior with the source Hill values, so Hill uncertainty propagates."""
-    hills = [s.get("hill") for s in block.source_values if s.get("hill")]
+    lognormal prior with the source Hill values, so Hill uncertainty propagates.
+    ``hills`` overrides the transcribed source Hills with raw-regime fitted Hills."""
+    if not hills:
+        hills = [s.get("hill") for s in block.source_values if s.get("hill")]
     if not hills:
         hills = [block.hill]
     logh = np.log(np.asarray(hills, dtype=float))
@@ -348,6 +406,72 @@ def _hill_posterior(block: ChannelBlock, prior: Prior, n_draws: int,
     mean = (prior.hill_mu / prior.hill_sigma ** 2 + n * float(np.mean(logh)) / _SIGMA_HILL_OBS ** 2) / prec
     sd = 1.0 / np.sqrt(prec)
     return np.exp(mean + sd * rng.standard_normal(n_draws))
+
+
+# --------------------------------------------------------------------------- #
+# Raw regime (sec 2.1): fit (IC50, Hill) from raw concentration-block points
+# --------------------------------------------------------------------------- #
+_RAW_DEFAULT_SEM = 0.06        # fractional-block obs SD when a source reports no SEM
+
+
+def fit_dose_response(concentration_nm, fractional_block, sem, prior: Prior,
+                      likelihood: str = "truncated_normal"):
+    """Bayesian fit of ``(log10 IC50, Hill)`` to one source's raw dose-response points.
+
+    This is the v0.2 **raw regime** (spec sec 2.1): instead of transcribing a fitted
+    IC50 as a point with an *assumed* spread, the IC50 and Hill — and their genuine
+    fit uncertainty — are inferred from the actual ``(concentration, fractional_block)``
+    curve under the declared prior. A 2-D grid over ``(mu = log10 IC50, h)`` evaluates a
+    truncated-normal (or beta) likelihood at each tested concentration; the function
+    returns the marginal posterior mean/SD of ``mu`` and of the Hill coefficient.
+
+    The Hill curve is the stable logistic form ``f = expit(h (log10 c - mu) ln10)``.
+    A source whose top dose does not saturate yields a wide, right-skewed ``mu``
+    marginal automatically — the raw analog of the channel-level censoring in sec 2.3.
+    """
+    from scipy.special import expit
+
+    x = np.log10(np.asarray(concentration_nm, dtype=float))     # log10 concentration
+    y = np.clip(np.asarray(fractional_block, dtype=float), 1e-4, 1 - 1e-4)
+    if x.size == 0:
+        return prior.m0, prior.s0, np.exp(prior.hill_mu), 0.3
+    if sem is not None and len(sem) == len(y):
+        sd = np.maximum(np.asarray(sem, dtype=float), 1e-3)
+    else:
+        sd = np.full(y.size, _RAW_DEFAULT_SEM)
+
+    mu_grid = np.linspace(prior.m0 - 4.0 * prior.s0, prior.m0 + 4.0 * prior.s0, 400)
+    h_grid = np.exp(prior.hill_mu + prior.hill_sigma * np.linspace(-3.0, 3.0, 41))
+    MU, H = np.meshgrid(mu_grid, h_grid, indexing="ij")          # (nmu, nh)
+    # predicted block at every tested concentration: f[k] over the (mu, h) grid
+    log_lik = np.zeros_like(MU)
+    for k in range(x.size):
+        f = expit(H * (x[k] - MU) * np.log(10.0))
+        if likelihood == "beta":
+            # method-of-moments Beta with the same per-point SD
+            var = sd[k] ** 2
+            fc = np.clip(f, 1e-4, 1 - 1e-4)
+            kappa = np.clip(fc * (1 - fc) / var - 1.0, 0.1, 1e4)
+            a = fc * kappa
+            b = (1 - fc) * kappa
+            from scipy.special import gammaln
+            log_lik += ((a - 1) * np.log(y[k]) + (b - 1) * np.log1p(-y[k])
+                        - (gammaln(a) + gammaln(b) - gammaln(a + b)))
+        else:   # truncated_normal (clipped Hill keeps the mean in [0,1])
+            log_lik += -0.5 * ((y[k] - f) / sd[k]) ** 2 - np.log(sd[k])
+    log_prior = (-0.5 * ((MU - prior.m0) / prior.s0) ** 2
+                 - 0.5 * ((np.log(H) - prior.hill_mu) / prior.hill_sigma) ** 2)
+    logpost = log_lik + log_prior
+
+    w = np.exp(logpost - logpost.max())
+    w = w / w.sum()
+    mu_marg = w.sum(axis=1)                                       # over h
+    h_marg = w.sum(axis=0)                                        # over mu
+    mu_mean = float(np.sum(mu_grid * mu_marg))
+    mu_sd = float(np.sqrt(max(np.sum((mu_grid - mu_mean) ** 2 * mu_marg), 1e-6)))
+    h_mean = float(np.sum(h_grid * h_marg))
+    h_sd = float(np.sqrt(max(np.sum((h_grid - h_mean) ** 2 * h_marg), 1e-6)))
+    return mu_mean, mu_sd, h_mean, h_sd
 
 
 # --------------------------------------------------------------------------- #
@@ -444,3 +568,107 @@ def posterior(ds, drug: str, channel: str, prior: Optional[object] = None,
     pr = resolve_prior(ds, prior)
     tau_pop = learn_tau_pop(ds.channel_blocks, pr)
     return infer_channel(block, pr, tau_pop, n_draws=n_draws, seed=seed)
+
+
+# --------------------------------------------------------------------------- #
+# Calibration of the inference itself (spec v0.2 sec 9): SBC + posterior coverage
+# --------------------------------------------------------------------------- #
+def _infer_mu_from_logic50s(y: np.ndarray, prior: Prior, tau_scale: float,
+                            n_draws: int, seed: int) -> np.ndarray:
+    """The true-value (mu) posterior given an array of per-source log10 IC50s — the
+    summary-regime core, exposed for the calibration harness."""
+    rng = np.random.default_rng(seed)
+    mu, _, _ = _infer_summary_core(y, np.zeros_like(y), prior, tau_scale, n_draws, rng)
+    return mu
+
+
+def simulation_based_calibration(prior: Prior, n_sims: int = 256, n_obs: int = 3,
+                                 tau_scale: Optional[float] = None, n_draws: int = 400,
+                                 seed: int = 0):
+    """Simulation-based calibration (spec v0.2 sec 9). Data simulated *from the prior*
+    and then re-inferred must yield **rank-uniform** posteriors — the standard proof
+    that an inference is correctly *implemented*, not merely plausible.
+
+    For each replicate it draws a true ``mu ~ Normal(m0, s0)``, a between-lab
+    ``tau ~ HalfNormal(tau_scale)``, then ``n_obs`` source log10-IC50s
+    ``~ Normal(mu, tau)``; it re-infers the ``mu`` posterior and records the rank of
+    the truth among the posterior draws. Returns ``(ranks, n_draws)``; under correct
+    inference ``ranks`` is uniform on ``0..n_draws``.
+    """
+    ts = prior.tau_scale if tau_scale is None else tau_scale
+    rng = np.random.default_rng(seed)
+    ranks = np.empty(n_sims, dtype=int)
+    for i in range(n_sims):
+        mu_true = prior.m0 + prior.s0 * rng.standard_normal()
+        tau_true = max(abs(rng.standard_normal()) * ts, _TAU_FLOOR)
+        y = mu_true + tau_true * rng.standard_normal(n_obs)
+        draws = _infer_mu_from_logic50s(y, prior, ts, n_draws, seed=seed + 1 + i)
+        ranks[i] = int(np.sum(draws < mu_true))
+    return ranks, n_draws
+
+
+def sbc_uniformity_pvalue(ranks: np.ndarray, n_draws: int, n_bins: int = 16) -> float:
+    """Chi-square goodness-of-fit p-value that the SBC ranks are uniform (high = good).
+    Pure-NumPy survival function of the chi-square via the regularized upper incomplete
+    gamma, so there is no SciPy dependency in the test path."""
+    from math import gamma, exp, log
+    edges = np.linspace(0, n_draws + 1, n_bins + 1)
+    counts, _ = np.histogram(ranks, bins=edges)
+    expected = ranks.size / n_bins
+    chi2 = float(np.sum((counts - expected) ** 2 / expected))
+    df = n_bins - 1
+    # regularized upper incomplete gamma Q(df/2, chi2/2) via a series/continued form
+    a, x = df / 2.0, chi2 / 2.0
+    if x <= 0:
+        return 1.0
+    if x < a + 1.0:                       # lower-gamma series
+        term = 1.0 / a
+        s = term
+        for k in range(1, 200):
+            term *= x / (a + k)
+            s += term
+            if abs(term) < abs(s) * 1e-12:
+                break
+        p_lower = s * exp(-x + a * log(x) - log(gamma(a)))
+        return float(max(0.0, min(1.0, 1.0 - p_lower)))
+    # upper-gamma continued fraction
+    b = x + 1.0 - a
+    c = 1e300
+    dd = 1.0 / b
+    h = dd
+    for k in range(1, 200):
+        an = -k * (k - a)
+        b += 2.0
+        dd = an * dd + b
+        if abs(dd) < 1e-300:
+            dd = 1e-300
+        c = b + an / c
+        if abs(c) < 1e-300:
+            c = 1e-300
+        dd = 1.0 / dd
+        delta = dd * c
+        h *= delta
+        if abs(delta - 1.0) < 1e-12:
+            break
+    q = exp(-x + a * log(x) - log(gamma(a))) * h
+    return float(max(0.0, min(1.0, q)))
+
+
+def posterior_coverage(prior: Prior, n_sims: int = 256, n_obs: int = 3,
+                       tau_scale: Optional[float] = None, n_draws: int = 1500,
+                       seed: int = 0, level: float = 0.90) -> float:
+    """Posterior coverage (spec v0.2 sec 9): on synthetic data drawn from the model the
+    central ``level`` credible interval should cover the true ``mu`` about ``level`` of
+    the time. Returns the empirical coverage fraction."""
+    ts = prior.tau_scale if tau_scale is None else tau_scale
+    rng = np.random.default_rng(seed)
+    lo_q, hi_q = (1 - level) / 2, 1 - (1 - level) / 2
+    hits = 0
+    for i in range(n_sims):
+        mu_true = prior.m0 + prior.s0 * rng.standard_normal()
+        tau_true = max(abs(rng.standard_normal()) * ts, _TAU_FLOOR)
+        y = mu_true + tau_true * rng.standard_normal(n_obs)
+        draws = _infer_mu_from_logic50s(y, prior, ts, n_draws, seed=seed + 1 + i)
+        lo, hi = np.quantile(draws, [lo_q, hi_q])
+        hits += int(lo <= mu_true <= hi)
+    return hits / n_sims
