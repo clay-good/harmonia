@@ -6,6 +6,38 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.3] — 2026-06-10
+
+### Fixed — committed exports were stale; the "never hand-edited" guarantee is now enforced
+The README promised exports are "generated, never hand-edited (CI regenerates on
+every push)", but CI only regenerated them to a throwaway directory and never
+checked the committed `exports/` against the dataset. They had drifted: every
+model stamped a stale `harmonia:datasetVersion` of `0.1.0` (the package was 0.5.x),
+and `exports/tables/citations.bib` was **missing the v0.3/v0.5 citations**
+(moss-2005, britton-2013, passini-2017, …) added since they were last generated.
+
+- **`harmonia:datasetVersion` now resolves to the package `__version__`** instead
+  of a hardcoded `"0.1.0"`. A new `harmonia.export.default_dataset_version()`
+  (lazy, to avoid a circular import) is the single source; every builder
+  (`cellml` / `sbml` / `myokit` / `combine` / `registry`) takes
+  `dataset_version: Optional[str] = None` and resolves it, so a direct builder call
+  stamps the right version, not just the CLI path.
+- **Committed `exports/` regenerated** from the current dataset (correct version +
+  the full citation set).
+- **New CI gate — export reproducibility.** CI regenerates `exports/` in place and
+  `git diff --exit-code`s the committed *text* artifacts (CellML, SBML, Myokit,
+  SED-ML, tables, BibTeX), mirroring the existing `build_records.py` dataset gate —
+  so a hand-edited or stale export now fails the build. The `.omex` zips are
+  regenerated and manifest-checked but excluded from the byte diff (zlib's
+  compressed output is not guaranteed identical across platforms; their text
+  members are covered by the gated directories).
+
+### Changed
+- README: the exports section and validation table document the enforced
+  reproducibility gate. CONTRIBUTING: lists the actual CI gates (ruff + mypy added
+  in 0.5.1) and the regenerate-records-and-exports step; corrects the record-kinds
+  line (channel-block / ap-model / drug-reference / population).
+
 ## [0.5.2] — 2026-06-10
 
 ### Added — the dashboard now surfaces the whole shipped feature set

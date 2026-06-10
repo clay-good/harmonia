@@ -645,8 +645,15 @@ Every exported model carries a universal, machine-readable
 `harmonia:clinicalUse = "PROHIBITED — research / safety-methodology / education
 only; not a regulatory determination"` annotation, plus the propagated tier and
 `bqbiol:isDescribedBy` DOI links as MIRIAM-style RDF. **Exports are generated,
-never hand-edited** (CI regenerates and round-trip-validates on every push —
-`harmonia export --all` fails if any round trip drifts). Three round trips guard
+never hand-edited** — and that is *enforced*: CI regenerates `exports/` on every
+push and `git diff --exit-code`s the committed text artifacts (CellML, SBML,
+Myokit, SED-ML, the CiPA/parameter tables, BibTeX), so a committed export that has
+drifted from the dataset fails the build, exactly as the dataset itself is guarded
+against `build_records.py`. (The `.omex` zips are regenerated and manifest-checked
+but excluded from the byte diff — zlib's compressed output is not guaranteed
+identical across platforms; their text members are covered by the directories
+above.) `harmonia export --all` additionally fails if any round trip drifts. Three
+round trips guard
 the exports: the CiPA-input export has a true numeric round trip (parse back ⇒
 dataset values); the kernel constants are verified to survive the
 CellML/SBML/Myokit text; and — the strongest — the **ODE round trip**
@@ -682,6 +689,7 @@ suite (181 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 | **Lint** | no dead imports, undefined names, or unused variables (Pyflakes + pycodestyle) | `ruff check` |
 | **Type-check** | the package's `py.typed` contract holds — every public `load` / `simulate` / `infer` / `export` signature checks under **mypy** (no implicit Optional, no unused ignores), so the typed views downstream tools rely on cannot silently drift | `mypy` |
 | **Dataset reproducibility** | `dataset/records` regenerates byte-identically from `build_records.py` (the provenance log) — the curated table *is* the dataset | CI `git diff --exit-code` |
+| **Export reproducibility** | the committed `exports/` text artifacts (CellML/SBML/Myokit/SED-ML/tables/BibTeX) regenerate byte-identically from the dataset — a hand-edit or a stale sample fails the build | CI `git diff --exit-code` |
 | **Schema + semantic validation** | every record satisfies the JSON Schema; the reliability gate (block < 60% ⟺ Tier D ⟺ failure-mode) and variability bookkeeping hold | `harmonia validate` |
 | **Prior registry validity** (v0.2) | every prior schema-validates, its id matches its filename, every cited key resolves, and `predictive == false` (no prior carries a risk conclusion) | `harmonia validate` |
 | **Bayesian reduction / non-drift** (v0.2) | the posterior mean → log-geomean for a multi-source channel; the moments path is byte-identical, so `uq="moments"` reproduces v0.1 exactly | `tests/test_infer.py`, `tests/test_uq_assess.py` |

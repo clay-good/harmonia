@@ -22,15 +22,25 @@ JSON record under `dataset/records/`, never to a generated artifact.
 dataset/
 ├── schema/record.schema.json    # the contract every record must satisfy
 ├── schema/context.jsonld        # JSON-LD term mapping (RDF export)
-├── records/*.json               # one channel-block OR ap-model record per file
+├── records/*.json               # one record per file (channel-block / ap-model / drug-reference / population)
 └── citations/*.json             # one Crossref/PubMed-checked citation per file
 ```
 
-Validate before opening a PR:
+Validate before opening a PR — the same gates CI runs:
 
 ```bash
+ruff check .               # lint (Pyflakes + pycodestyle)
+mypy                       # type-check the py.typed package surface
 harmonia validate          # JSON-Schema-validate every record + cross-check citations
 pytest                     # the full test suite, incl. round-trip export validation
+```
+
+If you change a parameter, regenerate the dataset and the committed exports so the
+CI reproducibility gates stay green (they `git diff --exit-code` both):
+
+```bash
+python dataset/tools/build_records.py      # records are a projection of the curated table
+harmonia export --all --output exports     # exports are a projection of the dataset
 ```
 
 ## Confidence tiers (the spine)

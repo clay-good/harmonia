@@ -48,11 +48,18 @@ jobs:
       - name: Reference notebooks execute clean (nbmake)
         run: pytest --nbmake notebooks/ -q
 
-      - name: Exports regenerate cleanly
+      - name: Exports regenerate cleanly and match the committed sample set
         run: |
-          harmonia export --all --output /tmp/exports
-          test -f /tmp/exports/tables/cipa_inputs.csv
-          test -f /tmp/exports/omex/ord.omex
+          harmonia export --all --output exports
+          test -f exports/tables/cipa_inputs.csv
+          test -f exports/omex/ord.omex
+          # The committed exports/ are a deterministic projection of the dataset, so
+          # they must be byte-identical to a fresh regeneration. We diff the TEXT
+          # exports (provably cross-platform deterministic: pure string formatting);
+          # the .omex zips are excluded because zlib's compressed bytes can differ
+          # across platforms, but their text members are covered by the dirs below.
+          git diff --exit-code exports/cellml exports/sbml exports/myokit exports/sedml exports/tables \
+            || (echo "::error::exports/ is out of sync with the dataset — run 'harmonia export --all --output exports' and commit" && exit 1)
 
       - name: Info (smoke)
         run: harmonia info

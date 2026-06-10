@@ -38,7 +38,7 @@ def list_ap_models(ds: Dataset) -> List[str]:
 
 
 def build_text(ds: Dataset, fmt: str, ap_model: str = "cipaordv1.0",
-               dataset_version: str = "0.1.0") -> str:
+               dataset_version: Optional[str] = None) -> str:
     if fmt == "cellml":
         return cellml.build(ds, ap_model, dataset_version=dataset_version)
     if fmt == "sbml":
@@ -59,7 +59,7 @@ def build_text(ds: Dataset, fmt: str, ap_model: str = "cipaordv1.0",
     raise ValueError(f"unknown text format '{fmt}'. Known: {sorted(TEXT_FORMATS)}")
 
 
-def build_all(ds: Dataset, output_dir: str, dataset_version: str = "0.1.0") -> List[str]:
+def build_all(ds: Dataset, output_dir: str, dataset_version: Optional[str] = None) -> List[str]:
     """Write every export artifact under ``output_dir``. Returns written paths."""
     root = pathlib.Path(output_dir)
     written: List[str] = []

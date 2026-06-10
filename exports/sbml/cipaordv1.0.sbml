@@ -144,7 +144,7 @@ Primary sources: https://doi.org/10.3389/fphys.2017.00616
         <rdf:Description rdf:about="#harmonia_0">
           <harmonia:clinicalUse>PROHIBITED — research / safety-methodology / education only; not a regulatory determination</harmonia:clinicalUse>
           <harmonia:confidenceTier>C</harmonia:confidenceTier>
-          <harmonia:datasetVersion>0.1.0</harmonia:datasetVersion>
+          <harmonia:datasetVersion>0.5.3</harmonia:datasetVersion>
             <bqbiol:isDescribedBy rdf:resource="https://doi.org/10.3389/fphys.2017.00616"/>
         </rdf:Description>
       </rdf:RDF>

@@ -187,8 +187,10 @@ def validity_violations(text: str) -> List[str]:
 
 def build(ds: Dataset, ap_model: str = "cipaordv1.0",
           drug: Optional[str] = None, block: Optional[Dict[str, float]] = None,
-          dataset_version: str = "0.1.0") -> str:
+          dataset_version: Optional[str] = None) -> str:
     from ..simulate import _resolve_ap_model
+    from . import default_dataset_version
+    dataset_version = dataset_version or default_dataset_version()
     rec = _resolve_ap_model(ds, ap_model)
     spec = build_model_spec(name=f"harmonia_{rec.id.split('.')[-1]}".replace(".", "_"),
                             conductance_scales=rec.conductance_scales, block=block)

@@ -38,8 +38,10 @@ def _metadata_rdf(tier: str, dataset_version: str, dois) -> str:
 
 def build_bytes(ds: Dataset, ap_model: str = "cipaordv1.0",
                 block: Optional[Dict[str, float]] = None,
-                dataset_version: str = "0.1.0") -> bytes:
+                dataset_version: Optional[str] = None) -> bytes:
     from ..simulate import _resolve_ap_model
+    from . import default_dataset_version
+    dataset_version = dataset_version or default_dataset_version()
     rec = _resolve_ap_model(ds, ap_model)
     cit = ds.citation(rec.primary_citation)
     dois = [cit.doi] if cit and cit.doi else []
@@ -119,7 +121,8 @@ def manifest_violations(data: bytes) -> list:
 
 
 def build(ds: Dataset, output_path: str, ap_model: str = "cipaordv1.0",
-          block: Optional[Dict[str, float]] = None, dataset_version: str = "0.1.0") -> str:
+          block: Optional[Dict[str, float]] = None,
+          dataset_version: Optional[str] = None) -> str:
     data = build_bytes(ds, ap_model, block=block, dataset_version=dataset_version)
     with open(output_path, "wb") as fh:
         fh.write(data)
