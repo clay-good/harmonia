@@ -63,7 +63,7 @@ CiPA net-charge biomarker; lower qNet means higher risk.)
 ```bash
 git clone https://github.com/clay-good/harmonia
 cd harmonia
-pip install -e ".[dev]"      # numpy, scipy, jsonschema
+pip install -e ".[dev]"      # runtime (numpy, scipy, jsonschema) + test/lint tooling
 
 harmonia validate            # JSON-Schema- + semantically validate the dataset
 harmonia info                # counts by subsystem / tier / review status
