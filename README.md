@@ -74,7 +74,7 @@ harmonia priors              # the prior registry (declared, citable, non-predic
 harmonia flip verapamil      # classification stability across AP-model variants
 harmonia sensitivity verapamil                 # which channel's IC50 spread drives the flip
 harmonia sensitivity verapamil --sobol         # variance-based indices WITH interactions (v0.2)
-harmonia combo terfenadine ondansetron         # drug-combination (polypharmacy) assessment
+harmonia combo droperidol ondansetron          # drug-combination (polypharmacy) assessment
 harmonia population sotalol  # population-of-models spread (HYPOTHESIS-TIER, not for prediction)
 harmonia performance         # score qNet vs CiPA expert labels (train/val/all); --metric apd90
 harmonia crosscheck          # v0.8 diff transcribed IC50/Hill vs the published CiPA reference
@@ -126,7 +126,7 @@ res = harmonia.assess(ds, "verapamil", exposure_nM=3200, exposure_kind="total") 
 harmonia.free_from_total(3200, 0.10)          # 320.0 nM free
 
 # Drug combination (polypharmacy): joint variability, the interaction, the flip
-combo = harmonia.assess_combination(ds, ["terfenadine", "ondansetron"], n_mc=200)
+combo = harmonia.assess_combination(ds, ["droperidol", "ondansetron"], n_mc=200)
 combo.classification                          # "high"  (two intermediates -> high together)
 combo.interaction_dapd90_pct                  # extra prolongation beyond the worst single agent
 combo.classification_flip_frequency           # joint-uncertainty flip frequency
@@ -147,7 +147,7 @@ pop.tier                                      # "D"  (always; non-predictive)
 | **Variability is first-class** — multi-source IC50s with computed fold-range / IQR; the reliability gate (max block < 60% ⇒ Tier D, unidentifiable) machine-enforced | ✅ |
 | **Bayesian dose-response UQ** (Phase C, **v0.2**) — the IC50/Hill spread is *inferred* under a declared prior, not transcribed: hierarchical posterior with dataset-learned between-lab pooling, propagated Hill uncertainty, a one-sided **censored** posterior for sub-60%-block channels, a **raw dose-response regime** (fit from concentration-block points), a prior registry with per-channel `prior_sensitivity`, variance-based (Sobol) sensitivity, and a calibrated inference (simulation-based calibration + posterior coverage). Opt-in via `uq="bayes"`; `uq="moments"` (default) reproduces every v0.1 number | ✅ |
 | **Reference kernel** — a SciPy reduced O'Hara-Rudy-lineage ventricular AP (7 currents + Na-Ca exchanger) with Hill block per current; APD90 / qNet / triangulation / **cqInward** / EAD biomarkers | ✅ |
-| **Discriminating qNet** (Phase C) — adding a shape-dependent Na-Ca exchanger (excluded from the qNet sum) makes qNet sensitive; **qNet is now the default metric** (10/12 training, zero two-category errors over all 28 compounds); APD90 selectable | ✅ |
+| **Discriminating qNet** (Phase C) — adding a shape-dependent Na-Ca exchanger (excluded from the qNet sum) makes qNet sensitive; **qNet is now the default metric** (9/12 training, zero two-category errors over all 28 compounds); APD90 selectable | ✅ |
 | **Dynamic hERG binding** (Phase B) — Langmuir kon/koff with **trapping**; reduces to the static Hill block at steady state, captures use-dependent block (`assess(..., herg_dynamic=True)`) | ✅ |
 | **CiPA dynamic-hERG kinetics** (**v0.6**) — the real published Li-2017 IKr-Markov binding parameters (`Kmax`/`Ku`/`halfmax`/`n`/`Vhalf`) for the **12 CiPA dynamic-fit compounds**, sourced from the FDA/CiPA repository as a citation-backed `cipa_binding` field; a faithful binding model reproducing the **trapping phenotype** (`assess(..., herg_dynamic="cipa")`). Data authoritative (shipped `unverified`); model an opt-in Tier-C reduction that touches no default number | ✅ |
 | **Exposure layer** (Phase D) — free ↔ total plasma conversion via protein binding (`fraction_unbound`); assess from a free or total concentration (composable with a Hypnos PK trajectory) | ✅ |
@@ -292,7 +292,7 @@ It is **not** bit-exact to the published ORd CellML, so AP-model records ship at
   genuinely discriminate. ΔAPD90% remains selectable (`metric="apd90"`).
 - **The classifier is a methodology demonstrator, not a qualified classifier.**
   Calibrated on the 12 CiPA training drugs under the default model (qNet
-  thresholds: high < 0.220, low > 0.285), the reduced kernel recovers **10/12**
+  thresholds: high < 0.220, low > 0.285), the reduced kernel recovers **9/12**
   training labels — and across the full 28-compound set it makes **zero
   two-category errors** (it never calls a high-risk drug low, or vice versa):
 
@@ -336,9 +336,9 @@ prints the full confusion matrix. Honest numbers under the default qNet metric:
 
 | Set | Exact accuracy | Within-one-category |
 | --- | --- | --- |
-| Training (12) | 10/12 (83%) | 12/12 (100%) |
+| Training (12) | 9/12 (75%) | 12/12 (100%) |
 | Validation (16) | 7/16 (44%) | 16/16 (100%) |
-| All 28 | 17/28 (61%) | 28/28 (100%) |
+| All 28 | 16/28 (57%) | 28/28 (100%) |
 
 qNet beats the APD90 surrogate (8/12 training, ~82% within-one) on both counts.
 The validation set is honestly harder on exact 3-way accuracy: many validation
@@ -346,7 +346,10 @@ drugs have very low free Cmax, so block at 4× EFTPC is sub-IC50 and *both* metr
 underread them. But qNet never makes a catastrophic (two-category) error on any of
 the 28 compounds — the property that matters most for a safety screen. The durable
 contribution remains the **flip-frequency-under-variability machinery**, correct
-regardless of absolute accuracy.
+regardless of absolute accuracy. (The v0.8 cross-check sharpened these numbers: it
+caught two unidentifiable channels — `terfenadine.inal`, `cisapride.ical` — whose
+erroneous block estimates had been propping up a label; correcting them to Tier D
+honestly cost one training match. A more faithful dataset, a slightly lower score.)
 
 ### Machine cross-check against the published CiPA reference (v0.8)
 
@@ -369,18 +372,23 @@ computed `machine_cross_checked` flag is **deliberately not** `verified`: it
 confirms agreement with a published number, never that a human read the source
 PDF, and it never edits a record. `harmonia info` prints both signals, separately.
 
-**It earned its keep on the first run.** Of 38 records with a published
-reference, 36 agree; two diverge and were surfaced for reconciliation:
-`cisapride.ical` recorded **9,258 nM** vs the published **9,258,075 nM** (identical
-mantissa, off by exactly **1000×** — a dropped-exponent unit error) and
-`terfenadine.inal` **2,000** vs **20,056 nM** (~10×). That is the whole point: a
+**It earned its keep on the first run.** It flagged two records that diverged
+>5× from the published value: `cisapride.ical` recorded **9,258 nM** vs the
+published **9,258,075 nM** (identical mantissa, off by exactly **1000×** — a
+dropped-exponent unit error) and `terfenadine.inal` **2,000** vs **20,056 nM**
+(~10×). Both were reconciled against the **raw Crumb-2016 dose-response** (the
+cited source), which shows ≤2.5% / ~15% block at the highest dose tested — i.e.
+the IC50s are *unidentifiable* — so both channels are now **Tier D**, exactly as
+the reliability gate intends (correcting `terfenadine.inal` honestly cost one
+training-set match; see performance above). The committed dataset now has **zero**
+divergences, and a test guards that it stays that way. That is the whole point: a
 mechanical, non-circular check that catches the unit-scale transcription slips a
 0/104-verified count cannot. See [spec v0.8](docs/specs/v0.8-machine-crosscheck.md).
 
 ```python
 rep = harmonia.cross_check(ds)                # or cross_check(ds, "verapamil")
-rep.n_cross_checked, len(rep.checks)          # 36, 68
-[c.record_id for c in rep.divergent]          # the records to reconcile by hand
+rep.n_cross_checked, len(rep.checks)          # 38, 68
+rep.divergent                                 # []  — the committed dataset is clean
 ```
 
 ### Dynamic hERG binding (Phase B)
@@ -458,8 +466,9 @@ combined call carries its own flip frequency.
 
 ![Drug combination — two intermediates become high](docs/img/combination.png)
 
-`terfenadine + ondansetron` at therapeutic exposures cross into HIGH (qNet 0.21),
-with ~+22% extra APD prolongation beyond the worst single agent and a ~34%
+`droperidol + ondansetron` — two QT-prolonging antiemetics often co-administered,
+each *intermediate* alone — cross into HIGH together (qNet 0.22), with ~+21% extra
+APD prolongation beyond the worst single agent and a ~37%
 classification-flip frequency under joint input variability. The combined safety
 call is only as trustworthy as its least-identifiable input — the single-drug
 principle, extended to the combination.

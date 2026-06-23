@@ -27,8 +27,8 @@ channel_block.chlorpromazine.ina,chlorpromazine,INa,IC50,4710.0,4710.0,4710.0,nM
 channel_block.chlorpromazine.ina,chlorpromazine,INa,h,2.0,,,dimensionless,C,unverified,68,1,1.0,crumb-2016
 channel_block.chlorpromazine.inal,chlorpromazine,INaL,IC50,4559.0,4559.0,4559.0,nM,B,unverified,70,1,1.0,crumb-2016
 channel_block.chlorpromazine.inal,chlorpromazine,INaL,h,0.9,,,dimensionless,B,unverified,70,1,1.0,crumb-2016
-channel_block.cisapride.ical,cisapride,ICaL,IC50,9258.0,9258.0,9258.0,nM,C,unverified,62,1,1.0,crumb-2016
-channel_block.cisapride.ical,cisapride,ICaL,h,0.6,,,dimensionless,C,unverified,62,1,1.0,crumb-2016
+channel_block.cisapride.ical,cisapride,ICaL,IC50,9258075.75,9258075.75,9258075.75,nM,D,unverified,3,1,1.0,crumb-2016
+channel_block.cisapride.ical,cisapride,ICaL,h,0.43,,,dimensionless,D,unverified,3,1,1.0,crumb-2016
 channel_block.cisapride.ikr,cisapride,IKr,IC50,8.0415,4.0,20.0,nM,B,unverified,93,3,5.0,crumb-2016
 channel_block.cisapride.ikr,cisapride,IKr,h,0.9,,,dimensionless,B,unverified,93,3,5.0,crumb-2016
 channel_block.cisapride.ina,cisapride,INa,IC50,15000.0,15000.0,15000.0,nM,C,unverified,60,1,1.0,crumb-2016
@@ -125,8 +125,8 @@ channel_block.terfenadine.ikr,terfenadine,IKr,IC50,21.194,8.5,56.0,nM,B,unverifi
 channel_block.terfenadine.ikr,terfenadine,IKr,h,0.8,,,dimensionless,B,unverified,91,3,6.588,crumb-2016
 channel_block.terfenadine.ina,terfenadine,INa,IC50,1303.0,1303.0,1303.0,nM,B,unverified,80,1,1.0,crumb-2016
 channel_block.terfenadine.ina,terfenadine,INa,h,0.9,,,dimensionless,B,unverified,80,1,1.0,crumb-2016
-channel_block.terfenadine.inal,terfenadine,INaL,IC50,2000.0,2000.0,2000.0,nM,B,unverified,78,1,1.0,crumb-2016
-channel_block.terfenadine.inal,terfenadine,INaL,h,0.6,,,dimensionless,B,unverified,78,1,1.0,crumb-2016
+channel_block.terfenadine.inal,terfenadine,INaL,IC50,20056.02,20056.02,20056.02,nM,D,unverified,15,1,1.0,crumb-2016
+channel_block.terfenadine.inal,terfenadine,INaL,h,0.6,,,dimensionless,D,unverified,15,1,1.0,crumb-2016
 channel_block.vandetanib.ikr,vandetanib,IKr,IC50,400.0,400.0,400.0,nM,B,unverified,85,1,1.0,kramer-2013
 channel_block.vandetanib.ikr,vandetanib,IKr,h,0.9,,,dimensionless,B,unverified,85,1,1.0,kramer-2013
 channel_block.verapamil.ical,verapamil,ICaL,IC50,202.0,202.0,202.0,nM,B,unverified,90,1,1.0,crumb-2016

@@ -108,17 +108,26 @@ def test_cross_check_never_implies_verified(ds):
     assert "not human `verified`" in summary or "not human 'verified'" in summary
 
 
-def test_known_divergences_are_flagged(ds):
-    """The cross-check's reason to exist: it surfaces transcribed values that
-    diverge from the published reference. Two are currently known."""
+def test_committed_dataset_has_no_divergences(ds):
+    """The committed dataset must stay clean against the published reference: no
+    channel-block record may diverge >5x from its published CiPA value. The two
+    that did on the v0.8 first run (cisapride.ical at ~1000x, terfenadine.inal at
+    ~10x) were reconciled against the raw Crumb-2016 data to Tier-D unidentifiable.
+    This is a forward regression guard — a future transcription slip re-trips it."""
     rep = cross_check(ds)
-    divergent_ids = {c.record_id for c in rep.divergent}
-    # cisapride ICaL is recorded ~1000x below the published value (a unit-scale
-    # discrepancy) and terfenadine INaL ~10x below.
-    assert "channel_block.cisapride.ical" in divergent_ids
-    for c in rep.divergent:
-        assert c.status == STATUS_DIVERGENT
-        assert c.ic50_fold_diff > MINOR_FOLD
+    assert rep.divergent == [], (
+        "records diverge >5x from the published CiPA reference: "
+        + ", ".join(f"{c.record_id} ({c.ic50_fold_diff:.0f}x)" for c in rep.divergent))
+
+
+def test_reconciled_records_are_tier_d_unidentifiable(ds):
+    """The two formerly-divergent channels are now honestly unidentifiable
+    (max block << 60% in the cited source) -> Tier D, like ranolazine.ical."""
+    for rid in ("channel_block.cisapride.ical", "channel_block.terfenadine.inal"):
+        block = ds[rid]
+        assert block.tier == "D"
+        assert not block.assay_context.identifiable
+        assert block.known_failure_modes  # carries the unidentifiable failure mode
 
 
 def test_divergent_sorts_first(ds):

@@ -18,11 +18,12 @@ def test_combination_more_block_than_either_single(ds):
 
 
 def test_combination_can_escalate_class(ds):
-    """Two intermediate drugs can combine into high risk."""
-    combo = assess_combination(ds, ["terfenadine", "ondansetron"], n_mc=0)
+    """Two intermediate drugs can combine into high risk (here droperidol +
+    ondansetron — two QT-prolonging antiemetics often co-administered)."""
+    pair = ["droperidol", "ondansetron"]
+    combo = assess_combination(ds, pair, n_mc=0)
     assert combo.classification == "high"
-    assert all(assess(ds, d, n_mc=0).classification != "high"
-               for d in ["terfenadine", "ondansetron"])
+    assert all(assess(ds, d, n_mc=0).classification != "high" for d in pair)
 
 
 def test_combination_distribution_and_flip(ds):

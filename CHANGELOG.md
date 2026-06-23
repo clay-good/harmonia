@@ -6,6 +6,33 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.1] — 2026-06-23
+
+### Fixed — reconciled the two channels the v0.8 cross-check flagged (data correction)
+The v0.8 machine cross-check flagged two channel-block records as diverging >5× from the
+published CiPA value. Both were reviewed against the **raw Crumb-2016 dose-response** (the
+cited source) and corrected — the cross-check found real errors, and a human confirmed and
+reconciled them against the primary source (records stay `unverified`; this is a data fix,
+not a `verified` promotion).
+
+- **`channel_block.cisapride.ical`** — the raw Crumb-2016 data shows ≤2.5% calcium block at
+  the 125 nM top dose tested, so the IC50 is **unidentifiable**. Corrected to the Li-2017
+  extrapolated fit (9,258,075 nM) with `max_block` 62 → 3; now **Tier D** with the
+  unidentifiable failure mode (like `ranolazine.ical`). The prior 9,258 nM was a
+  dropped-exponent unit error.
+- **`channel_block.terfenadine.inal`** — the raw data shows ~15% late-sodium block at the
+  800 nM top dose, so the IC50 is **unidentifiable**. Corrected 2,000 → 20,056 nM (Li-2017
+  fit), `max_block` 78 → 15; now **Tier D**.
+- **Honest performance impact:** correcting `terfenadine.inal` (less *protective* late-Na
+  block, faithfully represented) pushed the reduced kernel to over-predict terfenadine to
+  `high` — an adjacent (one-category) error. qNet exact accuracy: training 10/12 → **9/12**,
+  all-28 17/28 → **16/28**; within-one-category stays **100%** (still zero two-category
+  errors). A more faithful dataset, a slightly lower score — the trade the project exists to
+  make visible.
+- The committed dataset now has **zero** cross-check divergences;
+  `tests/test_crosscheck.py` guards that it stays clean and that both channels are Tier-D
+  unidentifiable.
+
 ## [0.8.0] — 2026-06-23
 
 ### Added — machine cross-check against the published CiPA reference (spec v0.8)

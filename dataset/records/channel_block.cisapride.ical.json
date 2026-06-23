@@ -2,7 +2,7 @@
   "id": "channel_block.cisapride.ical",
   "kind": "channel_block",
   "subsystem": "channel_block",
-  "tier": "C",
+  "tier": "D",
   "primary_citation": "crumb-2016",
   "drug": {
     "name": "cisapride",
@@ -16,24 +16,24 @@
       "symbol": "IC50",
       "label": "half-maximal inhibitory concentration",
       "value": {
-        "central": 9258.0,
-        "low": 9258.0,
-        "high": 9258.0,
+        "central": 9258075.75,
+        "low": 9258075.75,
+        "high": 9258075.75,
         "units": "nM"
       },
-      "tier": "C",
+      "tier": "D",
       "primary_citation": "crumb-2016"
     },
     {
       "symbol": "h",
       "label": "Hill coefficient",
       "value": {
-        "central": 0.6,
+        "central": 0.43,
         "low": null,
         "high": null,
         "units": "dimensionless"
       },
-      "tier": "C",
+      "tier": "D",
       "primary_citation": "crumb-2016"
     }
   ],
@@ -41,15 +41,15 @@
     "platform": "manual_patch_clamp",
     "temperature_c": 37,
     "expression_system": "HEK293 / CHO (heterologous)",
-    "max_block_observed_percent": 62,
+    "max_block_observed_percent": 3,
     "holding_protocol": "depolarizing step protocol per source assay"
   },
   "source_values": [
     {
-      "ic50_nm": 9258.0,
+      "ic50_nm": 9258075.75,
       "platform": "manual",
       "citation": "crumb-2016",
-      "hill": 0.6,
+      "hill": 0.43,
       "temperature_c": 37
     }
   ],
@@ -57,16 +57,24 @@
     "fold_range": 1.0,
     "n_sources": 1,
     "iqr_nm": [
-      9258.0,
-      9258.0
+      9258075.75,
+      9258075.75
     ],
-    "geomean_nm": 9258.0
+    "geomean_nm": 9258075.75
   },
-  "known_failure_modes": [],
+  "known_failure_modes": [
+    {
+      "condition": "max_block_observed_percent < 60",
+      "behavior": "IC50 not identifiable; any point estimate is an extrapolation and is misleading",
+      "action": "tier_down_to_D and warn; exclude from point classification",
+      "citation": "chang-2017"
+    }
+  ],
   "extraction": {
     "review_status": "unverified",
     "method": "literature table transcribed by maintainer; values from CiPA-era patch-clamp datasets",
     "verified_by": [],
     "notes": "Values are literature-derived (see primary_citation / source_values). No source PDF has been confirmed inside Harmonia; review_status stays unverified per spec §9."
-  }
+  },
+  "notes": "Max block observed < 60% — the IC50 is UNIDENTIFIABLE. The value stored is an extrapolation kept only for provenance; it is excluded from point classification and flagged in every assessment that touches this channel."
 }

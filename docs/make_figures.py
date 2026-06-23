@@ -177,7 +177,7 @@ def fig_validation_set():
 def fig_combination():
     """Polypharmacy (Phase D): two intermediate drugs combine into high risk.
     qNet AP traces and the qNet bars for each single agent vs the combination."""
-    pair = ["terfenadine", "ondansetron"]
+    pair = ["droperidol", "ondansetron"]
     combo = assess_combination(ds, pair, n_mc=300)
     singles = {d: assess(ds, d, n_mc=0, exposure_nM=combo.exposures_nM[d]) for d in pair}
 

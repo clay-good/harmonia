@@ -14,7 +14,7 @@ chlorpromazine,ICaL,8191.0,0.8,hill,72,True,B,unverified,1,1.0,crumb-2016
 chlorpromazine,INaL,4559.0,0.9,hill,70,True,B,unverified,1,1.0,crumb-2016
 chlorpromazine,INa,4710.0,2.0,hill,68,True,C,unverified,1,1.0,crumb-2016
 cisapride,IKr,8.0415,0.9,hill,93,True,B,unverified,3,5.0,crumb-2016
-cisapride,ICaL,9258.0,0.6,hill,62,True,C,unverified,1,1.0,crumb-2016
+cisapride,ICaL,9258075.75,0.43,hill,3,False,D,unverified,1,1.0,crumb-2016
 cisapride,INa,15000.0,1.0,hill,60,True,C,unverified,1,1.0,crumb-2016
 clarithromycin,IKr,32900.0,0.9,hill,70,True,B,unverified,1,1.0,crumb-2016
 clozapine,IKr,3200.0,0.8,hill,75,True,B,unverified,1,1.0,crumb-2016
@@ -61,7 +61,7 @@ tamoxifen,IKr,800.0,0.9,hill,80,True,B,unverified,1,1.0,crumb-2016
 tamoxifen,ICaL,6800.0,1.0,hill,62,True,C,unverified,1,1.0,crumb-2016
 terfenadine,IKr,21.194,0.8,hill,91,True,B,unverified,3,6.588,crumb-2016
 terfenadine,ICaL,700.0,0.7,hill,85,True,B,unverified,1,1.0,crumb-2016
-terfenadine,INaL,2000.0,0.6,hill,78,True,B,unverified,1,1.0,crumb-2016
+terfenadine,INaL,20056.02,0.6,hill,15,False,D,unverified,1,1.0,crumb-2016
 terfenadine,INa,1303.0,0.9,hill,80,True,B,unverified,1,1.0,crumb-2016
 vandetanib,IKr,400.0,0.9,hill,85,True,B,unverified,1,1.0,kramer-2013
 verapamil,IKr,252.4427,1.0,dynamic_binding,85,True,B,unverified,3,3.147,crumb-2016

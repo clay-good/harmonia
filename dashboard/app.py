@@ -207,7 +207,7 @@ with tab_combo:
                "drugs can combine into 'high'.")
     cc1, cc2, cc3 = st.columns([3, 1, 1])
     sel = cc1.multiselect("Drugs (pick 2+)", ds.drugs(),
-                          default=["terfenadine", "ondansetron"])
+                          default=["droperidol", "ondansetron"])
     cmetric = cc2.selectbox("Metric", ["qnet", "apd90"], index=0, key="cmetric")
     cmc = cc3.slider("MC draws", 20, 300, 100, step=20, key="cmc")
     if len(sel) < 2:

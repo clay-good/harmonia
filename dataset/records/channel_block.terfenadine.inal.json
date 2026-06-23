@@ -2,7 +2,7 @@
   "id": "channel_block.terfenadine.inal",
   "kind": "channel_block",
   "subsystem": "channel_block",
-  "tier": "B",
+  "tier": "D",
   "primary_citation": "crumb-2016",
   "drug": {
     "name": "terfenadine",
@@ -16,12 +16,12 @@
       "symbol": "IC50",
       "label": "half-maximal inhibitory concentration",
       "value": {
-        "central": 2000.0,
-        "low": 2000.0,
-        "high": 2000.0,
+        "central": 20056.02,
+        "low": 20056.02,
+        "high": 20056.02,
         "units": "nM"
       },
-      "tier": "B",
+      "tier": "D",
       "primary_citation": "crumb-2016"
     },
     {
@@ -33,7 +33,7 @@
         "high": null,
         "units": "dimensionless"
       },
-      "tier": "B",
+      "tier": "D",
       "primary_citation": "crumb-2016"
     }
   ],
@@ -41,12 +41,12 @@
     "platform": "manual_patch_clamp",
     "temperature_c": 37,
     "expression_system": "HEK293 / CHO (heterologous)",
-    "max_block_observed_percent": 78,
+    "max_block_observed_percent": 15,
     "holding_protocol": "depolarizing step protocol per source assay"
   },
   "source_values": [
     {
-      "ic50_nm": 2000.0,
+      "ic50_nm": 20056.02,
       "platform": "manual",
       "citation": "crumb-2016",
       "hill": 0.6,
@@ -57,16 +57,24 @@
     "fold_range": 1.0,
     "n_sources": 1,
     "iqr_nm": [
-      2000.0,
-      2000.0
+      20056.02,
+      20056.02
     ],
-    "geomean_nm": 2000.0
+    "geomean_nm": 20056.02
   },
-  "known_failure_modes": [],
+  "known_failure_modes": [
+    {
+      "condition": "max_block_observed_percent < 60",
+      "behavior": "IC50 not identifiable; any point estimate is an extrapolation and is misleading",
+      "action": "tier_down_to_D and warn; exclude from point classification",
+      "citation": "chang-2017"
+    }
+  ],
   "extraction": {
     "review_status": "unverified",
     "method": "literature table transcribed by maintainer; values from CiPA-era patch-clamp datasets",
     "verified_by": [],
     "notes": "Values are literature-derived (see primary_citation / source_values). No source PDF has been confirmed inside Harmonia; review_status stays unverified per spec §9."
-  }
+  },
+  "notes": "Max block observed < 60% — the IC50 is UNIDENTIFIABLE. The value stored is an extrapolation kept only for provenance; it is excluded from point classification and flagged in every assessment that touches this channel."
 }

@@ -176,7 +176,12 @@ DRUGS = {
                     sources=[(6.5, "manual", "crumb-2016"),
                              (20.0, "automated", "kramer-2013"),
                              (4.0, "manual", "li-2017")]),
-        "ICaL": dict(ic50=9258.0, hill=0.6, max_block=62, primary="crumb-2016"),
+        # The v0.8 machine cross-check flagged a >5x divergence from the published
+        # Li-2017 value; the raw Crumb-2016 dose-response (the cited source) settles
+        # it: cisapride blocks ICaL <=2.5% at the 125 nM top dose tested, so the IC50
+        # is UNIDENTIFIABLE (max block << 60%). The point estimate is the Li-2017
+        # extrapolated fit, kept for provenance only -> Tier D (cf. ranolazine.ical).
+        "ICaL": dict(ic50=9258075.75, hill=0.43, max_block=3, primary="crumb-2016"),
         "INa":  dict(ic50=15000.0, hill=1.0, max_block=60, primary="crumb-2016"),
     }),
     "terfenadine": dict(category="intermediate", unii="73334008C7", eftpc=9.0, fu=0.03, channels={
@@ -185,7 +190,10 @@ DRUGS = {
                              (56.0, "automated", "kramer-2013"),
                              (20.0, "manual", "li-2017")]),
         "ICaL": dict(ic50=700.0, hill=0.7, max_block=85, primary="crumb-2016"),
-        "INaL": dict(ic50=2000.0, hill=0.6, max_block=78, primary="crumb-2016"),
+        # v0.8 cross-check flag, confirmed against the raw Crumb-2016 data: terfenadine
+        # blocks INaL only ~15% at the 800 nM top dose, so the IC50 is UNIDENTIFIABLE
+        # (max block << 60%). Point estimate is the Li-2017 extrapolated fit -> Tier D.
+        "INaL": dict(ic50=20056.02, hill=0.6, max_block=15, primary="crumb-2016"),
         "INa":  dict(ic50=1303.0, hill=0.9, max_block=80, primary="crumb-2016"),
     }),
     "ondansetron": dict(category="intermediate", unii="4AF302ESOS", eftpc=139.0, fu=0.27, channels={
