@@ -6,6 +6,30 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.4] — 2026-06-23
+
+### Added — cipa_binding cross-check; both v0.8 follow-ons resolved (spec v0.8.4)
+Closes the two cross-checks v0.8 deferred as future work, completing every spec's declared
+deliverable.
+
+- **cipa_binding cross-check** — `dataset/references/cipa_binding_reference.json` holds the 12 CiPA
+  dynamic-fit drugs' FDA/CiPA optimized hERG-binding fits (Kmax/Ku/n/halfmax/Vhalf), verified
+  value-by-value against the raw `hERG_fitting/results/<drug>/pars.txt`. New
+  `harmonia.cross_check_binding(ds)` (and a section in `harmonia crosscheck`) confirms each v0.6
+  `cipa_binding` field transcribes its source exactly — **12/12 drugs, 60/60 fields exact**.
+  Unlike the IC50 check this is a same-source transcription check, so any mismatch is a typo.
+- **max_block cross-check — investigated and resolved as deferred-to-human.** The raw Crumb 2016
+  panel tests a fixed, often sub-saturating concentration range, so its "max observed block"
+  systematically understates the true maximum (e.g. dofetilide hERG 95% vs a 70% panel ceiling);
+  an automated fold-flag would manufacture false positives. Left to human PDF verification, with
+  the rationale recorded rather than a misleading gate.
+- Roadmap updated: every Phase's `spec.md` §11 "Done =" criterion is now met; the remaining
+  items (full 9-state Markov IKr, genuine ToR-ORd reformulation, max_block automation) are
+  documented as **deliberate scope boundaries** (the honesty line), and the Zenodo DOI / optional
+  Myokit cross-check as **external** steps — not unfinished spec work.
+
+See [spec v0.8.4](docs/specs/v0.8.4-binding-crosscheck.md).
+
 ## [0.8.3] — 2026-06-23
 
 ### Added — drug-reference corroboration + sourced CiPA EFTPCs (spec v0.8.3)

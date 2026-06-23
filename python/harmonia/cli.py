@@ -208,11 +208,20 @@ def cmd_performance(args) -> int:
 
 
 def cmd_crosscheck(args) -> int:
-    from .crosscheck import cross_check
+    from .crosscheck import cross_check, cross_check_binding
     ds = _load(args)
     rep = cross_check(ds, drug=args.drug)
     print(rep.summary())
-    return 1 if (args.strict and rep.divergent) else 0
+    binding_bad = False
+    if not args.drug:  # the binding check spans the 12 dynamic-fit drugs, not one
+        try:
+            brep = cross_check_binding(ds)
+            print()
+            print(brep.summary())
+            binding_bad = bool(brep.mismatched)
+        except FileNotFoundError:
+            pass
+    return 1 if (args.strict and (rep.divergent or binding_bad)) else 0
 
 
 def cmd_export(args) -> int:

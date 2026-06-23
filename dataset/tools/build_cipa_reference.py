@@ -289,6 +289,53 @@ def build_drugref_reference():
     }
 
 
+# --------------------------------------------------------------------------- #
+# CiPA dynamic-hERG binding reference (spec v0.8.4) — the FDA/CiPA optimized
+# hERG-binding fits (Kmax, Ku, n, halfmax, Vhalf) for the 12 CiPA dynamic-fit
+# drugs, from `hERG_fitting/results/<drug>/pars.txt` @ commit e881df6. These are
+# the source the v0.6 `cipa_binding` fields were transcribed from; this table lets
+# `harmonia crosscheck` confirm that transcription has no errors. Verified to match
+# the raw pars.txt files value-by-value when authored (all 12 x 5 = 60 exact).
+# --------------------------------------------------------------------------- #
+BINDING_SOURCE = {
+    "citation": "li-2017",
+    "source": "FDA/CiPA reference implementation, hERG_fitting/results/<drug>/pars.txt "
+              "(optimized IKr-Markov drug-binding fit: Kmax, Ku, n, halfmax, Vhalf).",
+    "conduit_commit": "e881df6766d1067a08b65184d7a320804aef73d6",
+}
+# drug -> optimized hERG-binding fit (FDA/CiPA pars.txt), verified vs the raw files.
+BINDING = {
+    "bepridil": dict(Kmax=5594000, Ku=0.0001719, n=0.9374, halfmax=147200000, Vhalf=-61.34),
+    "chlorpromazine": dict(Kmax=157900, Ku=0.04671, n=0.8871, halfmax=43510000, Vhalf=-14.45),
+    "cisapride": dict(Kmax=10.22, Ku=0.0004161, n=0.9615, halfmax=42.32, Vhalf=-167.4),
+    "diltiazem": dict(Kmax=182500, Ku=0.282, n=0.9382, halfmax=667700000, Vhalf=-90.65),
+    "dofetilide": dict(Kmax=35.1, Ku=1.816e-05, n=1.08, halfmax=216.6, Vhalf=-1),
+    "mexiletine": dict(Kmax=15, Ku=0.07114, n=1.139, halfmax=723000, Vhalf=-87.51),
+    "ondansetron": dict(Kmax=172000, Ku=0.02324, n=0.891, halfmax=52240000, Vhalf=-82.2),
+    "quinidine": dict(Kmax=275.7, Ku=0.004103, n=0.8488, halfmax=53830, Vhalf=-61.35),
+    "ranolazine": dict(Kmax=52.84, Ku=0.02035, n=0.9532, halfmax=143000, Vhalf=-94.99),
+    "sotalol": dict(Kmax=96190, Ku=0.02225, n=0.7513, halfmax=385600000, Vhalf=-51.5),
+    "terfenadine": dict(Kmax=102200, Ku=7.788e-05, n=0.6502, halfmax=409500, Vhalf=-81.63),
+    "verapamil": dict(Kmax=1694000, Ku=0.0008165, n=1.043, halfmax=335600000, Vhalf=-97.08),
+}
+
+
+def build_binding_reference():
+    entries = [dict(drug=d, **{k: float(v) for k, v in fit.items()})
+               for d, fit in sorted(BINDING.items())]
+    return {
+        "schema": "harmonia.cipa_binding_reference/v1",
+        "description": "FDA/CiPA optimized hERG-binding fits (Kmax/Ku/n/halfmax/Vhalf) for the "
+                       "12 CiPA dynamic-fit drugs, used by `harmonia crosscheck` to confirm the "
+                       "v0.6 cipa_binding fields transcribe the source exactly. NOT a human "
+                       "`verified` stamp (spec.md §9).",
+        "source": BINDING_SOURCE,
+        "fields": ["Kmax", "Ku", "n", "halfmax", "Vhalf"],
+        "n_drugs": len(entries),
+        "entries": entries,
+    }
+
+
 def write_json(path: pathlib.Path, obj) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -309,6 +356,10 @@ def main() -> None:
     write_json(dout, dref)
     print(f"wrote {dref['n_entries']} drug-reference entries across "
           f"{dref['n_drugs']} drugs to {dout}")
+    bref = build_binding_reference()
+    bout = REFERENCES / "cipa_binding_reference.json"
+    write_json(bout, bref)
+    print(f"wrote {bref['n_drugs']} cipa_binding reference entries to {bout}")
 
 
 if __name__ == "__main__":

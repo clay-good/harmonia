@@ -208,3 +208,90 @@ def cross_check(ds: Dataset, drug: Optional[str] = None) -> CrossCheckReport:
     return CrossCheckReport(drug=drug.lower() if drug else None, checks=checks,
                             reference_source=ref.get("source", {}),
                             n_records_total=len(ds.channel_blocks))
+
+
+# --------------------------------------------------------------------------- #
+# cipa_binding cross-check (spec v0.8.4): confirm the v0.6 dynamic-hERG binding
+# fields transcribe the FDA/CiPA optimal fits exactly. Unlike the IC50 cross-check
+# (cross-source, fold-tolerant), this is a same-source transcription check: the
+# values were taken FROM these pars.txt files, so any mismatch is a typo.
+# --------------------------------------------------------------------------- #
+BINDING_FIELDS = ("Kmax", "Ku", "n", "halfmax", "Vhalf")
+BINDING_RTOL = 1e-3  # relative tolerance for "transcribes exactly"
+
+
+@dataclass
+class BindingCheck:
+    drug: str
+    record_id: str
+    fields_checked: int
+    mismatches: List[str]
+
+    @property
+    def ok(self) -> bool:
+        return not self.mismatches
+
+
+@dataclass
+class BindingReport:
+    checks: List[BindingCheck]
+    reference_source: Dict
+
+    @property
+    def n_ok(self) -> int:
+        return sum(c.ok for c in self.checks)
+
+    @property
+    def mismatched(self) -> List[BindingCheck]:
+        return [c for c in self.checks if not c.ok]
+
+    def summary(self) -> str:
+        lines = [
+            f"cipa_binding cross-check — {len(self.checks)} CiPA dynamic-fit drugs",
+            f"  source: {self.reference_source.get('source', '')}",
+            f"  transcribes the FDA/CiPA optimal fit exactly: {self.n_ok}/{len(self.checks)} "
+            f"({len(self.checks) * len(BINDING_FIELDS)} field comparisons)",
+        ]
+        for c in self.mismatched:
+            lines.append(f"    !! {c.record_id}: {', '.join(c.mismatches)}")
+        lines.append("  NOTE: confirms the v0.6 cipa_binding fields match their FDA/CiPA source; "
+                     "not a human `verified` stamp (spec.md §9).")
+        return "\n".join(lines)
+
+
+def _load_binding_reference(ds: Dataset) -> Optional[Dict]:
+    if ds.root is None:
+        return None
+    path = ds.root / "references" / "cipa_binding_reference.json"
+    if not path.is_file():
+        return None
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def cross_check_binding(ds: Dataset) -> BindingReport:
+    """Confirm each drug's stored cipa_binding (v0.6) matches the FDA/CiPA optimal
+    fit it was sourced from, field by field."""
+    ref = _load_binding_reference(ds)
+    if ref is None:
+        raise FileNotFoundError("missing cipa_binding reference "
+                                "(run dataset/tools/build_cipa_reference.py)")
+    index = {e["drug"].lower(): e for e in ref["entries"]}
+    checks = []
+    for b in ds.channel_blocks:
+        if b.channel != "IKr":
+            continue
+        stored = b.cipa_binding
+        ref_entry = index.get(b.drug.lower())
+        if not stored or not ref_entry:
+            continue
+        mismatches = []
+        for f in BINDING_FIELDS:
+            sv, rv = stored.get(f), ref_entry.get(f)
+            if sv is None or rv is None:
+                mismatches.append(f"{f} missing")
+            elif abs(sv - rv) > abs(rv) * BINDING_RTOL + 1e-12:
+                mismatches.append(f"{f} {sv} != {rv}")
+        checks.append(BindingCheck(drug=b.drug, record_id=b.id,
+                                   fields_checked=len(BINDING_FIELDS), mismatches=mismatches))
+    checks.sort(key=lambda c: (c.ok, c.drug))
+    return BindingReport(checks=checks, reference_source=ref.get("source", {}))

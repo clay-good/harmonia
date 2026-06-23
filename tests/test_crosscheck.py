@@ -145,6 +145,30 @@ def test_public_api_exported():
     assert harmonia.cross_check.__module__.endswith("crosscheck")
 
 
+# --------------------------------------------------------------------------- #
+# cipa_binding cross-check (v0.8.4)
+# --------------------------------------------------------------------------- #
+def test_cipa_binding_transcribes_source_exactly(ds):
+    """The v0.6 cipa_binding fields must match the FDA/CiPA optimal fits they were
+    sourced from, field by field (a same-source transcription check)."""
+    rep = harmonia.cross_check_binding(ds)
+    assert len(rep.checks) == 12  # the 12 CiPA dynamic-fit drugs
+    assert rep.mismatched == [], (
+        "cipa_binding fields drifted from the FDA/CiPA source: "
+        + "; ".join(f"{c.record_id}: {c.mismatches}" for c in rep.mismatched))
+    assert rep.n_ok == len(rep.checks)
+
+
+def test_binding_reference_reproducible():
+    path = REPO / "dataset" / "references" / "cipa_binding_reference.json"
+    committed = path.read_text()
+    out = subprocess.run(
+        [sys.executable, str(REPO / "dataset" / "tools" / "build_cipa_reference.py")],
+        capture_output=True, text=True)
+    assert out.returncode == 0, out.stderr
+    assert path.read_text() == committed
+
+
 def test_single_drug_scope(ds):
     rep = cross_check(ds, drug="verapamil")
     assert rep.drug == "verapamil"

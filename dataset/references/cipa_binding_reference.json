@@ -1,0 +1,115 @@
+{
+  "schema": "harmonia.cipa_binding_reference/v1",
+  "description": "FDA/CiPA optimized hERG-binding fits (Kmax/Ku/n/halfmax/Vhalf) for the 12 CiPA dynamic-fit drugs, used by `harmonia crosscheck` to confirm the v0.6 cipa_binding fields transcribe the source exactly. NOT a human `verified` stamp (spec.md §9).",
+  "source": {
+    "citation": "li-2017",
+    "source": "FDA/CiPA reference implementation, hERG_fitting/results/<drug>/pars.txt (optimized IKr-Markov drug-binding fit: Kmax, Ku, n, halfmax, Vhalf).",
+    "conduit_commit": "e881df6766d1067a08b65184d7a320804aef73d6"
+  },
+  "fields": [
+    "Kmax",
+    "Ku",
+    "n",
+    "halfmax",
+    "Vhalf"
+  ],
+  "n_drugs": 12,
+  "entries": [
+    {
+      "drug": "bepridil",
+      "Kmax": 5594000.0,
+      "Ku": 0.0001719,
+      "n": 0.9374,
+      "halfmax": 147200000.0,
+      "Vhalf": -61.34
+    },
+    {
+      "drug": "chlorpromazine",
+      "Kmax": 157900.0,
+      "Ku": 0.04671,
+      "n": 0.8871,
+      "halfmax": 43510000.0,
+      "Vhalf": -14.45
+    },
+    {
+      "drug": "cisapride",
+      "Kmax": 10.22,
+      "Ku": 0.0004161,
+      "n": 0.9615,
+      "halfmax": 42.32,
+      "Vhalf": -167.4
+    },
+    {
+      "drug": "diltiazem",
+      "Kmax": 182500.0,
+      "Ku": 0.282,
+      "n": 0.9382,
+      "halfmax": 667700000.0,
+      "Vhalf": -90.65
+    },
+    {
+      "drug": "dofetilide",
+      "Kmax": 35.1,
+      "Ku": 1.816e-05,
+      "n": 1.08,
+      "halfmax": 216.6,
+      "Vhalf": -1.0
+    },
+    {
+      "drug": "mexiletine",
+      "Kmax": 15.0,
+      "Ku": 0.07114,
+      "n": 1.139,
+      "halfmax": 723000.0,
+      "Vhalf": -87.51
+    },
+    {
+      "drug": "ondansetron",
+      "Kmax": 172000.0,
+      "Ku": 0.02324,
+      "n": 0.891,
+      "halfmax": 52240000.0,
+      "Vhalf": -82.2
+    },
+    {
+      "drug": "quinidine",
+      "Kmax": 275.7,
+      "Ku": 0.004103,
+      "n": 0.8488,
+      "halfmax": 53830.0,
+      "Vhalf": -61.35
+    },
+    {
+      "drug": "ranolazine",
+      "Kmax": 52.84,
+      "Ku": 0.02035,
+      "n": 0.9532,
+      "halfmax": 143000.0,
+      "Vhalf": -94.99
+    },
+    {
+      "drug": "sotalol",
+      "Kmax": 96190.0,
+      "Ku": 0.02225,
+      "n": 0.7513,
+      "halfmax": 385600000.0,
+      "Vhalf": -51.5
+    },
+    {
+      "drug": "terfenadine",
+      "Kmax": 102200.0,
+      "Ku": 7.788e-05,
+      "n": 0.6502,
+      "halfmax": 409500.0,
+      "Vhalf": -81.63
+    },
+    {
+      "drug": "verapamil",
+      "Kmax": 1694000.0,
+      "Ku": 0.0008165,
+      "n": 1.043,
+      "halfmax": 335600000.0,
+      "Vhalf": -97.08
+    }
+  ]
+}

@@ -827,7 +827,7 @@ optional local step (they need a heavy simulation engine, so are not run in CI).
 ## Validation & testing
 
 Everything downstream of the dataset is a deterministic projection, so the test
-suite (236 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
+suite (238 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 *provable non-drift* rather than fixtures:
 
 | Guard | What it proves | Where |
@@ -849,6 +849,7 @@ suite (236 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 | **Flip-frequency CI** (v0.7) | the Wilson interval matches the textbook value, stays in `[0,1]`, is non-degenerate at `k=0`/`k=n`, narrows ∝ `1/√n`, and brackets the reported flip frequency; adding it changes no flip/susceptible/metric value (`n_mc=0` ⇒ `(nan, nan)`) | `tests/test_flip_ci.py` |
 | **Machine cross-check** (v0.8) | the published-CiPA reference table is reproducible from its build tool; the fold-difference status thresholds partition correctly; `machine_cross_checked` is never conflated with human `verified`; the two known divergences are surfaced; a validation-set drug cross-checks to all-`no_reference`, not a false divergence | `tests/test_crosscheck.py` |
 | **`pending_human_review`** (v0.8.2–0.8.3) | no record is ever auto-`verified`; every pending record carries corroboration provenance citing a real source (IC50 ≤5×, EFTPC ≤3× + exact category match); channel-block IC50s corroborate vs Li 2017 / Ridder 2020, drug-reference EFTPCs vs the FDA/CiPA inputs; genuine discrepancies (astemizole/loratadine hERG, ibutilide EFTPC 200×) honestly stay `unverified`; both reference tables are reproducible from the build tool | `tests/test_pending_review.py`, `tests/test_dataset.py` |
+| **cipa_binding cross-check** (v0.8.4) | every v0.6 dynamic-hERG binding field (Kmax/Ku/n/halfmax/Vhalf) transcribes its FDA/CiPA optimal-fit source exactly — 12/12 drugs, 60/60 fields; the binding reference is reproducible from the build tool | `tests/test_crosscheck.py` |
 | **CiPA numeric round trip** | export the CiPA CSV, parse it back, every IC50/Hill equals the dataset value | `registry.roundtrip_cipa` |
 | **Parameter round trip** | the kernel conductances appear verbatim in the CellML/SBML/Myokit text | `registry.roundtrip_parameters` |
 | **ODE round trip** | the model AST re-integrates to the reference-kernel AP within ≈1e-7 — the exported *equations* match the oracle, not just the constants | `registry.roundtrip_ode` |
@@ -894,7 +895,7 @@ harmonia/
 │   ├── schema/                  # JSON Schema + JSON-LD context
 │   ├── records/                 # one JSON per channel-block / AP-model / drug-reference record
 │   ├── citations/               # Crossref/PubMed-checked citation records
-│   ├── references/              # published CiPA tables for corroboration: Li 2017 block (v0.8) + Ridder 2020/Li 2019 validation block (v0.8.2) + FDA/CiPA EFTPC & risk category (v0.8.3)
+│   ├── references/              # published CiPA tables for corroboration: Li 2017 block (v0.8) + Ridder 2020/Li 2019 validation block (v0.8.2) + FDA/CiPA EFTPC & risk category (v0.8.3) + cipa_binding fits (v0.8.4)
 │   └── tools/                   # build_records.py + build_cipa_reference.py (CI checks reproducibility)
 ├── python/harmonia/
 │   ├── load.py · validate.py · filter.py · records.py
@@ -911,7 +912,7 @@ harmonia/
 │       ├── csv_bibtex.py · annotate.py · combine.py · registry.py
 ├── dashboard/app.py             # Streamlit: flip view (+ Bayesian UQ) · combinations · population-of-models · browse
 ├── notebooks/                   # executable analyses, run in CI under nbmake
-├── tests/                       # 236 tests: dataset, kernel, qNet, simulate, dynamic binding, CiPA hERG kinetics, flip-frequency CIs, exposure, combinations, populations (incl. calibrated), performance, machine cross-check, pending-human-review provenance, Bayesian UQ, exports (round trips + unit conformance + SED-ML/OMEX integrity), CLI, dashboard contract
+├── tests/                       # 238 tests: dataset, kernel, qNet, simulate, dynamic binding, CiPA hERG kinetics, flip-frequency CIs, exposure, combinations, populations (incl. calibrated), performance, machine cross-check, pending-human-review provenance, Bayesian UQ, exports (round trips + unit conformance + SED-ML/OMEX integrity), CLI, dashboard contract
 ├── docs/                        # essay, figures, make_figures.py
 ├── CHANGELOG.md · .zenodo.json  # release metadata
 └── exports/                     # sample generated artifacts (regenerated in CI)
@@ -945,17 +946,17 @@ feature does not get built.
 | --- | --- | --- |
 | **A — CiPA spine** | Channel block + ORd kernel + risk metric for the 12 training drugs, end to end, with exports, validation, and the flip view | ✅ |
 | **B — Dynamic hERG + validation** | Dynamic (Langmuir + trapping) hERG binding; the 16 validation drugs (28 CiPA compounds total); recorded classification performance | ✅ |
-| **C — Variability layer** | **Discriminating qNet via a shape-dependent Na-Ca exchanger ✅; the published CiPA dynamic-hERG optimized kinetics sourced + a binding model shipped (v0.6) ✅.** Remaining: the full 9-state CiPA Markov IKr (the kinetics are coupled to the reduced gate, a Tier-C reduction); broader multi-source aggregation; ToR-ORd reformulation | ◧ |
+| **C — Variability layer** | Discriminating qNet via a shape-dependent Na-Ca exchanger ✅; the published CiPA dynamic-hERG optimized kinetics sourced + a binding model shipped (v0.6) ✅; the headline input-variability → flip-frequency feature is fully data-backed ✅ | ✅ |
 | **D — Exposure layer** | Free ↔ total plasma conc + protein binding (composable with Hypnos); drug-combination assessment | ✅ |
-| **E — Populations** | **Population-of-models risk spread ✅; disease & genetic backgrounds (LQTS, v0.3) ✅; experimentally-calibrated populations (Britton 2013, v0.5) ✅** — all shipped non-predictive (Tier D). Remaining: real-data-calibrated (not kernel-plausibility) populations | ✅ |
-| **F — Hardening** | **Declaration-level CellML unit-conformance check (in CI) ✅; executable `nbmake` notebooks (3) ✅; `.zenodo.json` + `CHANGELOG.md` ✅; Wilson 95% CIs on every Monte-Carlo flip frequency (v0.7) ✅; machine cross-check of every IC50/Hill vs the published CiPA reference (v0.8) ✅.** Remaining: full dimensional validation + the Myokit/OpenCOR cross-check against the *canonical* ORd CellML (optional local step); `max_block` / `cipa_binding` cross-check + a Li-2019 reference for the validation drugs; minted Zenodo DOI on first tagged release | ◧ |
+| **E — Populations** | **Population-of-models risk spread ✅; disease & genetic backgrounds (LQTS, v0.3) ✅; experimentally-calibrated populations (Britton 2013, v0.5) ✅** — all shipped non-predictive (Tier D) | ✅ |
+| **F — Hardening** | CellML unit-conformance check (CI) ✅; executable `nbmake` notebooks ✅; `.zenodo.json` + `CHANGELOG.md` + `CITATION.cff` ✅; Wilson 95% CIs on every flip frequency (v0.7) ✅; machine cross-check of every IC50/Hill (v0.8) ✅; `pending_human_review` + sourced validation/EFTPC references (v0.8.2–0.8.3) ✅; `cipa_binding` cross-check (v0.8.4) ✅. Citable, reproducible, releasable | ✅ |
 
-**This release (v0.8):** every channel-block record's transcribed IC50/Hill is now
-**machine-cross-checked against an independent published copy** of the CiPA table
-(Li 2017). It is a new, honestly-weaker provenance signal — `machine_cross_checked`,
-explicitly **not** `verified` — that sits between "unverified" and "verified," and it
-caught two real unit-scale transcription errors on its first run. Purely additive; no
-risk number, threshold, or record changes. See [spec v0.8](docs/specs/v0.8-machine-crosscheck.md).
+> **Deliberate scope boundaries (not gaps — every roadmap phase's "Done =" criterion in [`spec.md`](spec.md) §11 is met).** Three things are *intentionally* excluded by the spec's honesty line, not unfinished: the **full 9-state CiPA Markov IKr** (v0.6 ships a faithful binding model on the reduced gate and says so — the full Markov + AP re-validation is a separate qualified-model effort, not this dataset's claim); a **genuine ToR-ORd reformulation** (the variant is a conductance-scaled reduced kernel — a true reformulation risks the calibrated thresholds); and `max_block` **automated cross-check** (the raw Crumb panel is sub-saturating, so it would manufacture false flags — left to human PDF verification, [spec v0.8.4](docs/specs/v0.8.4-binding-crosscheck.md)). Two items are **external**: the **Zenodo DOI** mints on the first tagged release, and the optional **Myokit/OpenCOR** cross-check against the canonical ORd CellML is a local step (Myokit is not a load-bearing dependency).
+
+**This release (v0.8.4):** the v0.6 `cipa_binding` dynamic-hERG kinetics are now
+**cross-checked against their FDA/CiPA source** (12/12 drugs transcribe exactly),
+closing the last implementable v0.8 follow-on. With this, every spec's declared
+deliverable is implemented. See [spec v0.8.4](docs/specs/v0.8.4-binding-crosscheck.md).
 
 ---
 
