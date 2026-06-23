@@ -909,6 +909,11 @@ moves. See [spec v0.7](docs/specs/v0.7-flip-frequency-ci.md).
   [CITATION.cff](CITATION.cff) and [`.zenodo.json`](.zenodo.json); a concept DOI
   is minted on the first tagged release. Changes are tracked in
   [CHANGELOG.md](CHANGELOG.md).
+- **Contributing:** the highest-leverage contribution is promoting an
+  `unverified` record to `verified` against its primary source — see
+  [CONTRIBUTING.md](CONTRIBUTING.md). Participation is governed by the
+  [Code of Conduct](CODE_OF_CONDUCT.md); report vulnerabilities privately per the
+  [Security Policy](SECURITY.md).
 
 Harmonia shares **CellML** with Nidus (the Physiome lineage) and **composes with
 Hypnos**: a drug's free-plasma-concentration trajectory (Hypnos PK) can scale

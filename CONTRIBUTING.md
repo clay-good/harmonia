@@ -101,5 +101,11 @@ fails the build if a record cites a citation key that does not exist.
 - Match the surrounding style. Keep changes surgical.
 - Add a test for every behavior change.
 
+## Code of conduct & security
+
+Participation is governed by our [Code of Conduct](CODE_OF_CONDUCT.md). To
+report a security vulnerability (as opposed to a data or science question, which
+belongs in a normal issue), follow the [Security Policy](SECURITY.md).
+
 By contributing you agree that your code is licensed MIT and your data
 contributions CC-BY-4.0.
