@@ -56,7 +56,13 @@ def cmd_info(args) -> int:
 
     verified = by_status.get("verified", 0)
     print(f"  VERIFIED: {verified}/{len(ds)} records "
-          f"(LLM-assisted extraction never promotes to verified — spec §9)")
+          f"(human-confirmed against the source PDF; LLM-assisted extraction never "
+          f"promotes to verified — spec §9)")
+    pending = by_status.get("pending_human_review", 0)
+    if pending:
+        print(f"  PENDING HUMAN REVIEW: {pending}/{len(ds)} records "
+              f"(value machine-corroborated against an independent published source, "
+              f"awaiting human confirmation — sourced, NOT verified; spec v0.8.2)")
 
     try:
         from .crosscheck import cross_check

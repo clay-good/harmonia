@@ -137,6 +137,82 @@ def build_reference():
     }
 
 
+# --------------------------------------------------------------------------- #
+# Validation-drug reference (the 16 CiPA VALIDATION drugs).
+#
+# The FDA/CiPA repo tabulates only the 12 TRAINING drugs. The validation set's
+# block potencies come from two published sources, each credited per entry:
+#
+#  * hERG/IKr — Ridder et al. 2020 (Toxicol Appl Pharmacol 394:114961), Table 1:
+#    the Bayesian-hierarchical static hERG IC50 (ambient temp, multi-site). These
+#    16 values were re-verified against the published PMC table (PMC7166077) when
+#    this file was authored — they transcribe exactly.
+#  * ICaL — Li et al. 2019 (Clin Pharmacol Ther; the `li-2019` citation),
+#    Supplement S2 Table 4 (Manual dataset; the table prints IC50 in µM, converted
+#    here to nM x1000). Independently cross-corroborated: these agree within ~5x
+#    with Harmonia's own crumb-2016 ICaL values for the drugs that carry one.
+#
+# This table is used ONLY to corroborate Harmonia's records into
+# `pending_human_review` (a cross-method provenance signal); it is deliberately
+# NOT fed to the `harmonia crosscheck` transcription-error detector, whose tight
+# tolerance assumes the same-lineage Li-2017 training table. INaL/INa were left
+# out: the Li-2019 fits for those are very poorly identified (credible intervals
+# spanning several orders of magnitude), so they are weak corroboration anchors.
+# --------------------------------------------------------------------------- #
+# drug -> hERG IC50 nM (Ridder 2020 Table 1, verified vs PMC7166077)
+VALIDATION_HERG = {
+    "astemizole": 19.0, "azimilide": 380.0, "clarithromycin": 150000.0,
+    "clozapine": 1500.0, "disopyramide": 4700.0, "domperidone": 74.0,
+    "droperidol": 118.0, "ibutilide": 11.0, "loratadine": 1300.0,
+    "metoprolol": 110000.0, "nifedipine": 71000.0, "nitrendipine": 20000.0,
+    "pimozide": 19.0, "risperidone": 451.0, "tamoxifen": 1700.0, "vandetanib": 394.0,
+}
+# drug -> (ICaL IC50 nM, Hill)  (Li 2019 S2 Table 4, Manual; µM x1000)
+VALIDATION_ICAL = {
+    "astemizole": (553.0, 1.2), "azimilide": (13200.0, 0.71),
+    "clarithromycin": (38100.0, 0.88), "clozapine": (5490.0, 0.94),
+    "disopyramide": (32900.0, 0.69), "domperidone": (73.6, 0.49),
+    "droperidol": (3230.0, 1.2), "ibutilide": (37000.0, 0.86),
+    "loratadine": (703.0, 0.56), "metoprolol": (3280000.0, 0.54),
+    "nifedipine": (11.4, 0.67), "nitrendipine": (35.7, 0.5),
+    "pimozide": (64.5, 0.45), "risperidone": (1470.0, 0.59),
+    "tamoxifen": (5720.0, 0.76), "vandetanib": (6060.0, 0.72),
+}
+VALIDATION_SOURCE = {
+    "IKr": {"citation": "ridder-2020",
+            "source": "Ridder et al. 2020, Toxicol Appl Pharmacol 394:114961, Table 1 — "
+                      "Bayesian-hierarchical static hERG IC50 (ambient temp); verified vs PMC7166077."},
+    "ICaL": {"citation": "li-2019",
+             "source": "Li et al. 2019, Clin Pharmacol Ther, Supplement S2 Table 4 (Manual "
+                       "dataset; µM converted to nM x1000)."},
+}
+
+
+def build_validation_reference():
+    entries = []
+    for drug in sorted(VALIDATION_HERG):
+        entries.append({"drug": drug, "channel": "IKr", "ic50_nm": VALIDATION_HERG[drug],
+                        "hill": None, "citation": VALIDATION_SOURCE["IKr"]["citation"]})
+    for drug in sorted(VALIDATION_ICAL):
+        ic50, hill = VALIDATION_ICAL[drug]
+        entries.append({"drug": drug, "channel": "ICaL", "ic50_nm": ic50, "hill": hill,
+                        "citation": VALIDATION_SOURCE["ICaL"]["citation"]})
+    drugs = sorted({e["drug"] for e in entries})
+    return {
+        "schema": "harmonia.cipa_validation_reference/v1",
+        "description": "Published block-potency reference for the 16 CiPA VALIDATION drugs "
+                       "(hERG: Ridder 2020 Table 1, verified; ICaL: Li 2019 S2 Table 4). Used "
+                       "ONLY to corroborate records into pending_human_review — a cross-method "
+                       "provenance signal, NOT a human `verified` stamp and NOT the "
+                       "transcription-error cross-check (spec.md §9, spec v0.8.2).",
+        "sources": VALIDATION_SOURCE,
+        "n_drugs": len(drugs),
+        "n_entries": len(entries),
+        "drugs": drugs,
+        "entries": entries,
+    }
+
+
 def write_json(path: pathlib.Path, obj) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -147,6 +223,11 @@ def main() -> None:
     out = REFERENCES / "cipa_block_reference.json"
     write_json(out, ref)
     print(f"wrote {ref['n_entries']} reference entries across {ref['n_drugs']} drugs to {out}")
+    vref = build_validation_reference()
+    vout = REFERENCES / "cipa_validation_reference.json"
+    write_json(vout, vref)
+    print(f"wrote {vref['n_entries']} validation reference entries across "
+          f"{vref['n_drugs']} drugs to {vout}")
 
 
 if __name__ == "__main__":

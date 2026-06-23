@@ -74,7 +74,7 @@
     "review_status": "unverified",
     "method": "literature table transcribed by maintainer; values from CiPA-era patch-clamp datasets",
     "verified_by": [],
-    "notes": "Values are literature-derived (see primary_citation / source_values). No source PDF has been confirmed inside Harmonia; review_status stays unverified per spec §9."
+    "notes": "Values are literature-derived (see primary_citation / source_values). No source PDF has been confirmed inside Harmonia, and no independent published reference corroborates this value, so review_status stays unverified per spec §9."
   },
   "notes": "Max block observed < 60% — the IC50 is UNIDENTIFIABLE. The value stored is an extrapolation kept only for provenance; it is excluded from point classification and flagged in every assessment that touches this channel."
 }

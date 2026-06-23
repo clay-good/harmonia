@@ -48,8 +48,17 @@ def test_tier_d_iff_unidentifiable(ds):
 
 
 def test_unverified_posture(ds):
-    """Honesty: no record auto-promoted to verified."""
-    assert all(r.review_status == "unverified" for r in ds)
+    """Honesty (spec §9): no record is ever auto-promoted to 'verified'. Records
+    are 'unverified' (uncorroborated/illustrative) or 'pending_human_review'
+    (machine-corroborated against a published source, awaiting human PDF
+    confirmation) — never 'verified' without a human."""
+    assert all(r.review_status in ("unverified", "pending_human_review") for r in ds)
+    assert not any(r.review_status == "verified" for r in ds)
+    # every pending_human_review record must carry its corroboration provenance
+    for r in ds:
+        if r.review_status == "pending_human_review":
+            assert r.raw["extraction"].get("corroboration"), \
+                f"{r.id} is pending_human_review but lacks corroboration provenance"
 
 
 def test_drug_references_have_eftpc_and_label(ds):

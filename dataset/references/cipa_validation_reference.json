@@ -1,0 +1,260 @@
+{
+  "schema": "harmonia.cipa_validation_reference/v1",
+  "description": "Published block-potency reference for the 16 CiPA VALIDATION drugs (hERG: Ridder 2020 Table 1, verified; ICaL: Li 2019 S2 Table 4). Used ONLY to corroborate records into pending_human_review — a cross-method provenance signal, NOT a human `verified` stamp and NOT the transcription-error cross-check (spec.md §9, spec v0.8.2).",
+  "sources": {
+    "IKr": {
+      "citation": "ridder-2020",
+      "source": "Ridder et al. 2020, Toxicol Appl Pharmacol 394:114961, Table 1 — Bayesian-hierarchical static hERG IC50 (ambient temp); verified vs PMC7166077."
+    },
+    "ICaL": {
+      "citation": "li-2019",
+      "source": "Li et al. 2019, Clin Pharmacol Ther, Supplement S2 Table 4 (Manual dataset; µM converted to nM x1000)."
+    }
+  },
+  "n_drugs": 16,
+  "n_entries": 32,
+  "drugs": [
+    "astemizole",
+    "azimilide",
+    "clarithromycin",
+    "clozapine",
+    "disopyramide",
+    "domperidone",
+    "droperidol",
+    "ibutilide",
+    "loratadine",
+    "metoprolol",
+    "nifedipine",
+    "nitrendipine",
+    "pimozide",
+    "risperidone",
+    "tamoxifen",
+    "vandetanib"
+  ],
+  "entries": [
+    {
+      "drug": "astemizole",
+      "channel": "IKr",
+      "ic50_nm": 19.0,
+      "hill": null,
+      "citation": "ridder-2020"
+    },
+    {
+      "drug": "azimilide",
+      "channel": "IKr",
+      "ic50_nm": 380.0,
+      "hill": null,
+      "citation": "ridder-2020"
+    },
+    {
+      "drug": "clarithromycin",
+      "channel": "IKr",
+      "ic50_nm": 150000.0,
+      "hill": null,
+      "citation": "ridder-2020"
+    },
+    {
+      "drug": "clozapine",
+      "channel": "IKr",
+      "ic50_nm": 1500.0,
+      "hill": null,
+      "citation": "ridder-2020"
+    },
+    {
+      "drug": "disopyramide",
+      "channel": "IKr",
+      "ic50_nm": 4700.0,
+      "hill": null,
+      "citation": "ridder-2020"
+    },
+    {
+      "drug": "domperidone",
+      "channel": "IKr",
+      "ic50_nm": 74.0,
+      "hill": null,
+      "citation": "ridder-2020"
+    },
+    {
+      "drug": "droperidol",
+      "channel": "IKr",
+      "ic50_nm": 118.0,
+      "hill": null,
+      "citation": "ridder-2020"
+    },
+    {
+      "drug": "ibutilide",
+      "channel": "IKr",
+      "ic50_nm": 11.0,
+      "hill": null,
+      "citation": "ridder-2020"
+    },
+    {
+      "drug": "loratadine",
+      "channel": "IKr",
+      "ic50_nm": 1300.0,
+      "hill": null,
+      "citation": "ridder-2020"
+    },
+    {
+      "drug": "metoprolol",
+      "channel": "IKr",
+      "ic50_nm": 110000.0,
+      "hill": null,
+      "citation": "ridder-2020"
+    },
+    {
+      "drug": "nifedipine",
+      "channel": "IKr",
+      "ic50_nm": 71000.0,
+      "hill": null,
+      "citation": "ridder-2020"
+    },
+    {
+      "drug": "nitrendipine",
+      "channel": "IKr",
+      "ic50_nm": 20000.0,
+      "hill": null,
+      "citation": "ridder-2020"
+    },
+    {
+      "drug": "pimozide",
+      "channel": "IKr",
+      "ic50_nm": 19.0,
+      "hill": null,
+      "citation": "ridder-2020"
+    },
+    {
+      "drug": "risperidone",
+      "channel": "IKr",
+      "ic50_nm": 451.0,
+      "hill": null,
+      "citation": "ridder-2020"
+    },
+    {
+      "drug": "tamoxifen",
+      "channel": "IKr",
+      "ic50_nm": 1700.0,
+      "hill": null,
+      "citation": "ridder-2020"
+    },
+    {
+      "drug": "vandetanib",
+      "channel": "IKr",
+      "ic50_nm": 394.0,
+      "hill": null,
+      "citation": "ridder-2020"
+    },
+    {
+      "drug": "astemizole",
+      "channel": "ICaL",
+      "ic50_nm": 553.0,
+      "hill": 1.2,
+      "citation": "li-2019"
+    },
+    {
+      "drug": "azimilide",
+      "channel": "ICaL",
+      "ic50_nm": 13200.0,
+      "hill": 0.71,
+      "citation": "li-2019"
+    },
+    {
+      "drug": "clarithromycin",
+      "channel": "ICaL",
+      "ic50_nm": 38100.0,
+      "hill": 0.88,
+      "citation": "li-2019"
+    },
+    {
+      "drug": "clozapine",
+      "channel": "ICaL",
+      "ic50_nm": 5490.0,
+      "hill": 0.94,
+      "citation": "li-2019"
+    },
+    {
+      "drug": "disopyramide",
+      "channel": "ICaL",
+      "ic50_nm": 32900.0,
+      "hill": 0.69,
+      "citation": "li-2019"
+    },
+    {
+      "drug": "domperidone",
+      "channel": "ICaL",
+      "ic50_nm": 73.6,
+      "hill": 0.49,
+      "citation": "li-2019"
+    },
+    {
+      "drug": "droperidol",
+      "channel": "ICaL",
+      "ic50_nm": 3230.0,
+      "hill": 1.2,
+      "citation": "li-2019"
+    },
+    {
+      "drug": "ibutilide",
+      "channel": "ICaL",
+      "ic50_nm": 37000.0,
+      "hill": 0.86,
+      "citation": "li-2019"
+    },
+    {
+      "drug": "loratadine",
+      "channel": "ICaL",
+      "ic50_nm": 703.0,
+      "hill": 0.56,
+      "citation": "li-2019"
+    },
+    {
+      "drug": "metoprolol",
+      "channel": "ICaL",
+      "ic50_nm": 3280000.0,
+      "hill": 0.54,
+      "citation": "li-2019"
+    },
+    {
+      "drug": "nifedipine",
+      "channel": "ICaL",
+      "ic50_nm": 11.4,
+      "hill": 0.67,
+      "citation": "li-2019"
+    },
+    {
+      "drug": "nitrendipine",
+      "channel": "ICaL",
+      "ic50_nm": 35.7,
+      "hill": 0.5,
+      "citation": "li-2019"
+    },
+    {
+      "drug": "pimozide",
+      "channel": "ICaL",
+      "ic50_nm": 64.5,
+      "hill": 0.45,
+      "citation": "li-2019"
+    },
+    {
+      "drug": "risperidone",
+      "channel": "ICaL",
+      "ic50_nm": 1470.0,
+      "hill": 0.59,
+      "citation": "li-2019"
+    },
+    {
+      "drug": "tamoxifen",
+      "channel": "ICaL",
+      "ic50_nm": 5720.0,
+      "hill": 0.76,
+      "citation": "li-2019"
+    },
+    {
+      "drug": "vandetanib",
+      "channel": "ICaL",
+      "ic50_nm": 6060.0,
+      "hill": 0.72,
+      "citation": "li-2019"
+    }
+  ]
+}

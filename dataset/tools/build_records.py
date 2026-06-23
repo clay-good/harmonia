@@ -7,11 +7,17 @@ literature table below, plus the deterministic rules that turn it into records
 JSON files under ../records/ and ../citations/ are the committed source of truth;
 re-running this tool must reproduce them byte-for-byte (CI checks this).
 
-IMPORTANT — honesty posture (spec.md §9): every emitted record ships as
-`review_status: "unverified"`. The values are literature-derived (Crumb 2016,
+IMPORTANT — honesty posture (spec.md §9): no record is ever auto-promoted to
+`review_status: "verified"`. The values are literature-derived (Crumb 2016,
 Li 2017, Kramer 2013, and the CiPA working-group EFTPCs) but NOBODY has opened
 the source PDFs inside Harmonia yet. LLMs may assist extraction; they never
 promote a record to `verified`. The verified count is reported honestly as 0.
+
+A channel-block value that AGREES with the independent published CiPA reference
+(see `corroborate` below) ships as `review_status: "pending_human_review"` — an
+honest middle state: machine-corroborated against a real published source, but
+still awaiting human confirmation against the PDF. Everything uncorroborated (and
+all non-channel-block records) ships as `"unverified"`.
 
 All IC50 values are in nanomolar (nM). All EFTPCs are free (unbound) Cmax in nM.
 """
@@ -70,6 +76,13 @@ CITATIONS_TABLE = [
          authors="Li Z, Ridder BJ, Han X, Wu WW, Sheng J, Tran PN, Wu M, Randolph A, Johnstone RH, Mirams GR, Kuryshev Y, Kramer J, Wu C, Crumb WJ, Strauss DG",
          journal="Clinical Pharmacology & Therapeutics", year=2019,
          doi="10.1002/cpt.1184", pmid="30033627"),
+    dict(key="ridder-2020", type="article",
+         title="A systematic strategy for estimating hERG block potency and its implications "
+               "in a new cardiac safety paradigm",
+         authors="Ridder BJ, Leishman DJ, Bridgland-Taylor M, Samieegohar M, Han X, Wu WW, "
+                 "Randolph A, Tran P, Mirams GR, Strauss DG, Li Z, et al.",
+         journal="Toxicology and Applied Pharmacology", year=2020,
+         doi="10.1016/j.taap.2020.114961", pmid="32209365"),
     dict(key="chang-2017", type="article",
          title="Uncertainty Quantification Reveals the Importance of Data Variability and "
                "Experimental Design Considerations for in Silico Proarrhythmia Risk Assessment",
@@ -353,6 +366,109 @@ def assign_tier(n_sources, fold_range, max_block):
 
 
 # --------------------------------------------------------------------------- #
+# Published-reference corroboration -> review_status (spec v0.8.2).
+#
+# A channel-block value that AGREES (within 5x — the dataset's own divergence
+# threshold) with the INDEPENDENT published CiPA reference table
+# (dataset/references/cipa_block_reference.json) is promoted from "unverified"
+# (literature-transcribed, uncorroborated) to "pending_human_review" (machine-
+# corroborated against a real published source, awaiting human confirmation
+# against the source PDF). This is NEVER "verified" — an LLM/automated process
+# may not promote to verified (spec.md §9); pending_human_review is the honest
+# middle state that distinguishes sourced data from illustrative placeholders.
+#
+# Only IDENTIFIABLE channels (max block >= 60%) are eligible: a Tier-D channel's
+# IC50 is an extrapolation, so "sourced and awaiting confirmation" would mislead.
+# --------------------------------------------------------------------------- #
+CORROBORATION_FOLD = 5.0
+_REFERENCE_INDEX = None
+
+
+def _load_references():
+    """Merge the published reference tables into one index:
+    (drug, channel) -> (ic50_nm, citation_key, source_text). Training (Li 2017,
+    12 drugs) takes precedence over the validation table (Ridder 2020 hERG +
+    Li 2019 ICaL, 16 drugs) where both exist (they do not overlap in practice)."""
+    global _REFERENCE_INDEX
+    if _REFERENCE_INDEX is not None:
+        return _REFERENCE_INDEX
+    idx = {}
+    refdir = HERE.parent / "references"
+    train = refdir / "cipa_block_reference.json"
+    if train.is_file():
+        data = json.loads(train.read_text(encoding="utf-8"))
+        src = data.get("source", {})
+        cit = src.get("citation", "li-2017")
+        stext = src.get("published_table", "published CiPA reference table")
+        for e in data["entries"]:
+            if e.get("ic50_nm"):
+                idx[(e["drug"].lower(), e["channel"].lower())] = (float(e["ic50_nm"]), cit, stext)
+    valn = refdir / "cipa_validation_reference.json"
+    if valn.is_file():
+        data = json.loads(valn.read_text(encoding="utf-8"))
+        sources = data.get("sources", {})
+        for e in data["entries"]:
+            if e.get("ic50_nm"):
+                stext = sources.get(e["channel"], {}).get("source", "published reference")
+                idx.setdefault((e["drug"].lower(), e["channel"].lower()),
+                               (float(e["ic50_nm"]), e.get("citation", ""), stext))
+    _REFERENCE_INDEX = idx
+    return idx
+
+
+def corroborate(drug, channel, central, max_block):
+    """If the value is identifiable and agrees (<=5x) with an independent
+    published reference, return (review_status, corroboration_dict); else
+    (None, None)."""
+    if max_block is not None and max_block < 60:
+        return None, None  # unidentifiable -> not eligible (its IC50 is extrapolated)
+    if not central:
+        return None, None
+    entry = _load_references().get((drug.lower(), channel.lower()))
+    if not entry:
+        return None, None
+    ref_ic50, citation, source_text = entry
+    fold = max(central / ref_ic50, ref_ic50 / central)
+    if fold > CORROBORATION_FOLD:
+        return None, None
+    return "pending_human_review", {
+        "source": source_text,
+        "citation": citation,
+        "ic50_fold_diff": round(fold, 3),
+        "note": "IC50 machine-corroborated against an independent published value; "
+                "a human has NOT confirmed it against the source PDF, so it is "
+                "pending_human_review, not verified (spec.md §9).",
+    }
+
+
+def _channel_extraction(drug, channel, central, max_block):
+    """Build the channel-block extraction block, setting review_status to
+    pending_human_review (with provenance) when the value is corroborated against
+    the published reference, else unverified. Never verified (spec.md §9)."""
+    status, corroboration = corroborate(drug, channel, central, max_block)
+    if status == "pending_human_review":
+        return {
+            "review_status": "pending_human_review",
+            "method": "literature value transcribed by maintainer, then machine-corroborated "
+                      "against the independent published CiPA reference table",
+            "verified_by": [],
+            "corroboration": corroboration,
+            "notes": "IC50 agrees with an independent published value (see corroboration). "
+                     "Still awaiting human confirmation against the source PDF — "
+                     "pending_human_review, NOT verified (spec.md §9).",
+        }
+    return {
+        "review_status": "unverified",
+        "method": "literature table transcribed by maintainer; values from CiPA-era patch-clamp datasets",
+        "verified_by": [],
+        "notes": "Values are literature-derived (see primary_citation / source_values). "
+                 "No source PDF has been confirmed inside Harmonia, and no independent "
+                 "published reference corroborates this value, so review_status stays "
+                 "unverified per spec §9.",
+    }
+
+
+# --------------------------------------------------------------------------- #
 # CiPA dynamic-hERG binding kinetics (spec v0.6).
 # The optimized per-drug parameters of the Li et al. 2017 IKr-Markov drug-binding
 # model (saturating, voltage-dependent trapping), validated in Li et al. 2019.
@@ -459,13 +575,7 @@ def build_channel_block(drug, dmeta, channel, cmeta):
         "source_values": source_values,
         "variability": variability,
         "known_failure_modes": failure_modes,
-        "extraction": {
-            "review_status": "unverified",
-            "method": "literature table transcribed by maintainer; values from CiPA-era patch-clamp datasets",
-            "verified_by": [],
-            "notes": "Values are literature-derived (see primary_citation / source_values). "
-                     "No source PDF has been confirmed inside Harmonia; review_status stays unverified per spec §9.",
-        },
+        "extraction": _channel_extraction(drug, channel, central, max_block),
     }
     if dyn:
         rec["dynamic_binding"] = {

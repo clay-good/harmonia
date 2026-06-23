@@ -64,9 +64,15 @@
   },
   "known_failure_modes": [],
   "extraction": {
-    "review_status": "unverified",
-    "method": "literature table transcribed by maintainer; values from CiPA-era patch-clamp datasets",
+    "review_status": "pending_human_review",
+    "method": "literature value transcribed by maintainer, then machine-corroborated against the independent published CiPA reference table",
     "verified_by": [],
-    "notes": "Values are literature-derived (see primary_citation / source_values). No source PDF has been confirmed inside Harmonia; review_status stays unverified per spec §9."
+    "corroboration": {
+      "source": "Ridder et al. 2020, Toxicol Appl Pharmacol 394:114961, Table 1 — Bayesian-hierarchical static hERG IC50 (ambient temp); verified vs PMC7166077.",
+      "citation": "ridder-2020",
+      "ic50_fold_diff": 1.015,
+      "note": "IC50 machine-corroborated against an independent published value; a human has NOT confirmed it against the source PDF, so it is pending_human_review, not verified (spec.md §9)."
+    },
+    "notes": "IC50 agrees with an independent published value (see corroboration). Still awaiting human confirmation against the source PDF — pending_human_review, NOT verified (spec.md §9)."
   }
 }

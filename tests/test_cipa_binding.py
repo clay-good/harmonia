@@ -34,10 +34,15 @@ def test_cipa_data_present_for_the_12_and_absent_otherwise(ds):
         assert cb["validation_citation"] == "li-2019"
 
 
-def test_cipa_records_ship_unverified(ds):
-    """Sourced from the FDA/CiPA repo by the maintainer — never auto-promoted (§9)."""
+def test_cipa_records_never_auto_verified(ds):
+    """Sourced from the FDA/CiPA repo by the maintainer — never auto-promoted to
+    'verified' (§9). These training-drug hERG IC50s agree with the published
+    reference, so they ship 'pending_human_review' (corroborated, awaiting a human),
+    never 'verified'."""
     for drug in CIPA_DYNAMIC_DRUGS:
-        assert ds[f"channel_block.{drug}.ikr"].review_status == "unverified"
+        status = ds[f"channel_block.{drug}.ikr"].review_status
+        assert status == "pending_human_review"
+        assert status != "verified"
 
 
 def test_cipa_zero_drug_is_no_block(ds):

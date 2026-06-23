@@ -32,9 +32,20 @@
       "required": ["review_status"],
       "additionalProperties": false,
       "properties": {
-        "review_status": { "enum": ["verified", "unverified", "contested"] },
+        "review_status": { "enum": ["verified", "unverified", "pending_human_review", "contested"] },
         "method": { "type": "string" },
         "verified_by": { "type": "array", "items": { "type": "string" } },
+        "corroboration": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "For review_status=pending_human_review: the independent published source the value was machine-corroborated against. NOT a human verification (spec.md §9).",
+          "properties": {
+            "source": { "type": "string" },
+            "citation": { "type": "string" },
+            "ic50_fold_diff": { "type": "number" },
+            "note": { "type": "string" }
+          }
+        },
         "notes": { "type": "string" }
       }
     },

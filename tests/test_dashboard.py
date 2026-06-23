@@ -127,6 +127,6 @@ def test_browse_tab_contract(ds):
         assert isinstance(b.identifiable, bool)
         b.variability.n_sources
         b.variability.fold_range
-        assert b.review_status in ("verified", "unverified", "contested")
+        assert b.review_status in ("verified", "unverified", "pending_human_review", "contested")
     # the verified-count line
     assert isinstance(sum(1 for r in ds if r.review_status == "verified"), int)

@@ -143,13 +143,13 @@ pop.tier                                      # "D"  (always; non-predictive)
 
 | Layer | Status |
 | --- | --- |
-| **Dataset** — 68 channel-block records across the **28 CiPA compounds** (12 training + 16 validation), 28 drug-reference records (expert risk label + free Cmax + protein binding), 3 AP-model records, 5 population specs (1 variability + 3 LQTS disease backgrounds + 1 experimentally-calibrated), 15 Crossref-checked citations | ✅ |
+| **Dataset** — 68 channel-block records across the **28 CiPA compounds** (12 training + 16 validation), 28 drug-reference records (expert risk label + free Cmax + protein binding), 3 AP-model records, 5 population specs (1 variability + 3 LQTS disease backgrounds + 1 experimentally-calibrated), 16 Crossref-checked citations | ✅ |
 | **Variability is first-class** — multi-source IC50s with computed fold-range / IQR; the reliability gate (max block < 60% ⇒ Tier D, unidentifiable) machine-enforced | ✅ |
 | **Bayesian dose-response UQ** (Phase C, **v0.2**) — the IC50/Hill spread is *inferred* under a declared prior, not transcribed: hierarchical posterior with dataset-learned between-lab pooling, propagated Hill uncertainty, a one-sided **censored** posterior for sub-60%-block channels, a **raw dose-response regime** (fit from concentration-block points), a prior registry with per-channel `prior_sensitivity`, variance-based (Sobol) sensitivity, and a calibrated inference (simulation-based calibration + posterior coverage). Opt-in via `uq="bayes"`; `uq="moments"` (default) reproduces every v0.1 number | ✅ |
 | **Reference kernel** — a SciPy reduced O'Hara-Rudy-lineage ventricular AP (7 currents + Na-Ca exchanger) with Hill block per current; APD90 / qNet / triangulation / **cqInward** / EAD biomarkers | ✅ |
 | **Discriminating qNet** (Phase C) — adding a shape-dependent Na-Ca exchanger (excluded from the qNet sum) makes qNet sensitive; **qNet is now the default metric** (9/12 training, zero two-category errors over all 28 compounds); APD90 selectable | ✅ |
 | **Dynamic hERG binding** (Phase B) — Langmuir kon/koff with **trapping**; reduces to the static Hill block at steady state, captures use-dependent block (`assess(..., herg_dynamic=True)`) | ✅ |
-| **CiPA dynamic-hERG kinetics** (**v0.6**) — the real published Li-2017 IKr-Markov binding parameters (`Kmax`/`Ku`/`halfmax`/`n`/`Vhalf`) for the **12 CiPA dynamic-fit compounds**, sourced from the FDA/CiPA repository as a citation-backed `cipa_binding` field; a faithful binding model reproducing the **trapping phenotype** (`assess(..., herg_dynamic="cipa")`). Data authoritative (shipped `unverified`); model an opt-in Tier-C reduction that touches no default number | ✅ |
+| **CiPA dynamic-hERG kinetics** (**v0.6**) — the real published Li-2017 IKr-Markov binding parameters (`Kmax`/`Ku`/`halfmax`/`n`/`Vhalf`) for the **12 CiPA dynamic-fit compounds**, sourced from the FDA/CiPA repository as a citation-backed `cipa_binding` field; a faithful binding model reproducing the **trapping phenotype** (`assess(..., herg_dynamic="cipa")`). Data authoritative (not human-`verified`; the IC50 ships `pending_human_review`); model an opt-in Tier-C reduction that touches no default number | ✅ |
 | **Exposure layer** (Phase D) — free ↔ total plasma conversion via protein binding (`fraction_unbound`); assess from a free or total concentration (composable with a Hypnos PK trajectory) | ✅ |
 | **Drug combinations** (Phase D) — `assess_combination` propagates *joint* IC50 variability; independent block multiplies per channel; reports the interaction and how often the combined class flips | ✅ |
 | **Population-of-models** (Phase E) — `assess_population` samples a population of virtual myocytes (per-conductance variability) to spread a drug's risk across individuals. **Hypothesis-tier, Tier D, NOT FOR PREDICTION** | ✅ |
@@ -160,6 +160,7 @@ pop.tier                                      # "D"  (always; non-predictive)
 | **Flip sensitivity** — `flip_sensitivity` attributes the flip to each channel's IC50 spread (solo / frozen effects), surfacing the dominant uncertain input to pin down first | ✅ |
 | **Recorded classification performance** (Phase B) — `harmonia performance` scores either metric vs CiPA expert labels on training / validation / all, with the full confusion matrix | ✅ |
 | **Machine cross-check** (**v0.8**) — `harmonia.cross_check` diffs every channel-block record's transcribed IC50/Hill against an *independent* published copy of the CiPA table (Li 2017, via the FDA/CiPA file) and assigns `machine_cross_checked` — a provenance signal between `unverified` and `verified` that is **deliberately not** `verified` (no human read the PDF). Caught two real unit-scale transcription errors on first run | ✅ |
+| **`pending_human_review` + sourced validation data** (**v0.8.2**) — a third `review_status` between `unverified` and `verified`: a value that agrees ≤5× with an *independent* published source (provenance in `extraction.corroboration`), awaiting a human's PDF confirmation. Filled by sourcing the 16 validation drugs' hERG (**Ridder 2020**, re-verified vs the published table) and ICaL (**Li 2019**). **56/104 records** now sourced-and-corroborated; `verified` stays 0/104 (§9) | ✅ |
 | **Exports** — CellML 2.0, Myokit `.mmt`, SBML L3v2, SED-ML, CiPA inputs (CSV/JSON), CSV, BibTeX, COMBINE `.omex` — all carrying `clinicalUse = PROHIBITED`, tier, and DOI RDF | ✅ |
 | **CLI · Streamlit dashboard · CI** | ✅ |
 | **Release hardening** (Phase F) — declaration-level CellML unit-conformance check, three executable `nbmake` notebooks, `.zenodo.json`, `CHANGELOG.md`, machine cross-check vs the published CiPA reference (v0.8) | ✅ |
@@ -260,13 +261,18 @@ The two load-bearing fields:
    assessment at D — *and* the input variability is propagated by Monte-Carlo,
    producing a distribution of outcomes and a flip frequency, never a bare class.
 
-> **`verified` vs the tier.** The *tier* is data quality (do labs agree? is the
-> IC50 identifiable?). `review_status` is whether a human opened the source PDF.
-> They are orthogonal. Every v0.1 record ships **`unverified`** — the values are
-> literature-derived but no PDF has been confirmed inside Harmonia. *LLMs assist
-> extraction but never promote to verified.* `harmonia info` reports the verified
-> count honestly (currently 0/104). Promoting records by reading the source is the
-> single highest-leverage contribution — see [CONTRIBUTING](CONTRIBUTING.md).
+> **`review_status` vs the tier.** The *tier* is data quality (do labs agree? is
+> the IC50 identifiable?). `review_status` is provenance — how corroborated the
+> value is. They are orthogonal. There are three states (**v0.8.2**):
+> `unverified` (literature-derived but uncorroborated — illustrative),
+> `pending_human_review` (the IC50 agrees ≤5× with an *independent* published
+> source, recorded in `extraction.corroboration` — sourced, but no human has read
+> the PDF), and `verified` (a human confirmed it against the primary source —
+> which *LLMs may never set*, §9). `harmonia info` reports each count honestly:
+> **0/104 verified, 56/104 pending_human_review** (corroborated against Li 2017 for
+> the training drugs, Ridder 2020 / Li 2019 for the validation drugs). Promoting a
+> `pending_human_review` record to `verified` by reading the source is the single
+> highest-leverage contribution — see [CONTRIBUTING](CONTRIBUTING.md).
 
 ---
 
@@ -820,7 +826,7 @@ optional local step (they need a heavy simulation engine, so are not run in CI).
 ## Validation & testing
 
 Everything downstream of the dataset is a deterministic projection, so the test
-suite (224 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
+suite (233 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 *provable non-drift* rather than fixtures:
 
 | Guard | What it proves | Where |
@@ -841,6 +847,7 @@ suite (224 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 | **Sobol consistency** (v0.2) | total-effect ≥ first-order per channel (within MC error); indices deterministic; standard errors reported | `tests/test_sobol.py` |
 | **Flip-frequency CI** (v0.7) | the Wilson interval matches the textbook value, stays in `[0,1]`, is non-degenerate at `k=0`/`k=n`, narrows ∝ `1/√n`, and brackets the reported flip frequency; adding it changes no flip/susceptible/metric value (`n_mc=0` ⇒ `(nan, nan)`) | `tests/test_flip_ci.py` |
 | **Machine cross-check** (v0.8) | the published-CiPA reference table is reproducible from its build tool; the fold-difference status thresholds partition correctly; `machine_cross_checked` is never conflated with human `verified`; the two known divergences are surfaced; a validation-set drug cross-checks to all-`no_reference`, not a false divergence | `tests/test_crosscheck.py` |
+| **`pending_human_review`** (v0.8.2) | no record is ever auto-`verified`; every pending record carries corroboration provenance citing a real source ≤5×; training drugs corroborate vs Li 2017 and validation hERG vs Ridder 2020; cross-method disagreements (astemizole, loratadine) honestly stay `unverified`; the validation reference is reproducible from its build tool | `tests/test_pending_review.py`, `tests/test_dataset.py` |
 | **CiPA numeric round trip** | export the CiPA CSV, parse it back, every IC50/Hill equals the dataset value | `registry.roundtrip_cipa` |
 | **Parameter round trip** | the kernel conductances appear verbatim in the CellML/SBML/Myokit text | `registry.roundtrip_parameters` |
 | **ODE round trip** | the model AST re-integrates to the reference-kernel AP within ≈1e-7 — the exported *equations* match the oracle, not just the constants | `registry.roundtrip_ode` |
@@ -886,7 +893,7 @@ harmonia/
 │   ├── schema/                  # JSON Schema + JSON-LD context
 │   ├── records/                 # one JSON per channel-block / AP-model / drug-reference record
 │   ├── citations/               # Crossref/PubMed-checked citation records
-│   ├── references/              # published CiPA block table (Li 2017) for the v0.8 cross-check
+│   ├── references/              # published CiPA tables: Li 2017 (v0.8 cross-check) + Ridder 2020/Li 2019 validation (v0.8.2 corroboration)
 │   └── tools/                   # build_records.py + build_cipa_reference.py (CI checks reproducibility)
 ├── python/harmonia/
 │   ├── load.py · validate.py · filter.py · records.py
@@ -903,7 +910,7 @@ harmonia/
 │       ├── csv_bibtex.py · annotate.py · combine.py · registry.py
 ├── dashboard/app.py             # Streamlit: flip view (+ Bayesian UQ) · combinations · population-of-models · browse
 ├── notebooks/                   # executable analyses, run in CI under nbmake
-├── tests/                       # 224 tests: dataset, kernel, qNet, simulate, dynamic binding, CiPA hERG kinetics, flip-frequency CIs, exposure, combinations, populations (incl. calibrated), performance, machine cross-check, Bayesian UQ, exports (round trips + unit conformance + SED-ML/OMEX integrity), CLI, dashboard contract
+├── tests/                       # 233 tests: dataset, kernel, qNet, simulate, dynamic binding, CiPA hERG kinetics, flip-frequency CIs, exposure, combinations, populations (incl. calibrated), performance, machine cross-check, pending-human-review provenance, Bayesian UQ, exports (round trips + unit conformance + SED-ML/OMEX integrity), CLI, dashboard contract
 ├── docs/                        # essay, figures, make_figures.py
 ├── CHANGELOG.md · .zenodo.json  # release metadata
 └── exports/                     # sample generated artifacts (regenerated in CI)

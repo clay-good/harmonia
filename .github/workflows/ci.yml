@@ -36,10 +36,12 @@ jobs:
       - name: Validate dataset (schema + semantic rules)
         run: harmonia validate
 
-      - name: Dataset is reproducible from the build tool
+      - name: Dataset is reproducible from the build tools
         run: |
-          python dataset/tools/build_records.py
+          # the reference table must build first — build_records reads it to set
+          # review_status (pending_human_review when a value is corroborated)
           python dataset/tools/build_cipa_reference.py
+          python dataset/tools/build_records.py
           git diff --exit-code dataset/records dataset/citations dataset/references \
             || (echo "::error::dataset/ is out of sync with its build tools — re-run them and commit" && exit 1)
 

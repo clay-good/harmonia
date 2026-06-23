@@ -6,6 +6,40 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.2] — 2026-06-23
+
+### Added — `pending_human_review` provenance state + sourced validation data (spec v0.8.2)
+Every record used to be `unverified` or `verified` (the latter an LLM may never set — §9).
+That conflated a value corroborated by an independent published source with an illustrative
+placeholder nobody has checked. v0.8.2 adds the honest middle state, **`pending_human_review`**,
+and fills it by fetching real published data and corroborating Harmonia's values against it —
+paying down verification debt without ever claiming a human read the PDF.
+
+- **New `review_status: "pending_human_review"`** (schema enum) with an
+  `extraction.corroboration` block (`source`, `citation`, `ic50_fold_diff`). Set
+  **deterministically** by the build tool — reproducible, never hand-edited.
+- **Promotion rule:** a channel-block record is promoted from `unverified` only if it is
+  identifiable (`max_block ≥ 60`) AND its IC50 agrees within **5×** with an independent
+  published reference. Uncorroborated channels, non-channel-block records, and Tier-D
+  unidentifiable channels stay `unverified`. Disagreements are surfaced, not silently filled.
+- **Sourced validation-drug data** (the 16 CiPA validation drugs the FDA/CiPA repo omits),
+  in a new `dataset/references/cipa_validation_reference.json`:
+  - **hERG/IKr — Ridder et al. 2020 Table 1** (`ridder-2020`, new citation). Re-verified
+    value-by-value against the published PMC table (PMC7166077) — all 16 transcribe exactly.
+  - **ICaL — Li et al. 2019 (`li-2019`) Supplement S2 Table 4** (µM→nM). Independently
+    cross-corroborated against Harmonia's pre-existing crumb-2016 ICaL values (agree ~≤5×).
+  - INaL/INa omitted: the Li-2019 fits there are too poorly identified (orders-of-magnitude
+    credible intervals) to be corroboration anchors.
+- **Result: 56/104 records are now `pending_human_review`** (was 0), 48 remain `unverified`.
+  Honest non-promotions include `astemizole.ikr` (0.9 nM Kramer vs 19 nM Ridder, 21×) and
+  `loratadine` — real cross-method discrepancies a human should reconcile first. `verified`
+  stays **0/104**. `harmonia info` reports both states on separate lines.
+- The validation table feeds **only** the corroboration; it is deliberately NOT mixed into the
+  v0.8 `harmonia crosscheck` transcription-error detector (still 38/68, 0 divergent), whose
+  tight tolerance assumes the same-lineage Li-2017 training table.
+
+See [spec v0.8.2](docs/specs/v0.8.2-pending-human-review.md).
+
 ## [0.8.1] — 2026-06-23
 
 ### Fixed — reconciled the two channels the v0.8 cross-check flagged (data correction)
