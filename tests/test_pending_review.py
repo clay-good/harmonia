@@ -29,8 +29,12 @@ def test_pending_records_carry_corroboration(ds):
         corr = r.raw["extraction"].get("corroboration")
         assert corr, f"{r.id} pending but no corroboration"
         assert corr["citation"] in ds.citations, f"{r.id} corroboration cites unknown {corr['citation']}"
-        assert corr["ic50_fold_diff"] <= 5.0
-        assert r.tier != "D"  # unidentifiable channels are not eligible
+        if r.kind == "channel_block":
+            assert corr["ic50_fold_diff"] <= 5.0
+            assert r.tier != "D"  # unidentifiable channels are not eligible
+        elif r.kind == "drug_reference":
+            assert corr["eftpc_fold_diff"] <= 3.0
+            assert corr["category_match"] is True
 
 
 def test_training_drugs_corroborated_by_li2017(ds):
@@ -62,6 +66,29 @@ def test_reconciled_tier_d_channels_not_promoted(ds):
     (their IC50 is an extrapolation)."""
     for rid in ("channel_block.cisapride.ical", "channel_block.terfenadine.inal"):
         assert ds[rid].review_status == "unverified"
+
+
+def test_training_drug_reference_corroborated(ds):
+    """The 12 training drug_reference records corroborate their EFTPC + CiPA risk
+    category against the FDA/CiPA reference -> pending_human_review."""
+    for drug in ("dofetilide", "verapamil", "sotalol", "diltiazem"):
+        rec = ds[f"drug_reference.{drug}"]
+        assert rec.review_status == "pending_human_review"
+        assert rec.raw["extraction"]["corroboration"]["category_match"] is True
+
+
+def test_validation_drug_reference_corroborated(ds):
+    """Validation drug_reference records corroborate EFTPC + category against the
+    FDA/CiPA newCiPA.csv (cross-checked vs Llopis-Lorente 2022) -> pending."""
+    for drug in ("azimilide", "vandetanib", "loratadine", "pimozide"):
+        assert ds[f"drug_reference.{drug}"].review_status == "pending_human_review"
+
+
+def test_ibutilide_eftpc_discrepancy_stays_unverified(ds):
+    """ibutilide's free EFTPC is 0.52 nM in Harmonia but 100 nM in two independent
+    CiPA sources (FDA newCiPA.csv + Llopis-Lorente 2022) — a ~200x discrepancy.
+    The corroboration must NOT promote it; it stays unverified, flagged for a human."""
+    assert ds["drug_reference.ibutilide"].review_status == "unverified"
 
 
 def test_validation_reference_reproducible():

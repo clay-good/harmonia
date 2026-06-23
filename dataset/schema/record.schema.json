@@ -43,6 +43,8 @@
             "source": { "type": "string" },
             "citation": { "type": "string" },
             "ic50_fold_diff": { "type": "number" },
+            "eftpc_fold_diff": { "type": "number" },
+            "category_match": { "type": "boolean" },
             "note": { "type": "string" }
           }
         },

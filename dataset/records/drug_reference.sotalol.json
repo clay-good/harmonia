@@ -18,10 +18,17 @@
     "citation": "li-2017"
   },
   "extraction": {
-    "review_status": "unverified",
-    "method": "CiPA working-group training set + free Cmax (EFTPC) from CiPA references",
+    "review_status": "pending_human_review",
+    "method": "CiPA working-group training set + free Cmax (EFTPC), machine-corroborated against an independent published CiPA source",
     "verified_by": [],
-    "notes": "Expert risk label and EFTPC from the CiPA training-set literature; unverified."
+    "corroboration": {
+      "source": "FDA/CiPA reference implementation, AP_simulation/data/CiPA_training_drugs.csv (therapeutic = free EFTPC nM; CiPA risk category). Verified against the file when authored.",
+      "citation": "li-2017",
+      "eftpc_fold_diff": 1.0,
+      "category_match": true,
+      "note": "EFTPC agrees and the CiPA risk category matches an independent published source; a human has NOT confirmed it against the source PDF, so it is pending_human_review, not verified (spec.md §9)."
+    },
+    "notes": "Expert risk label and EFTPC from the CiPA training-set literature, corroborated against an independent published CiPA source (see corroboration). pending_human_review, NOT verified (spec.md §9)."
   },
   "notes": "Expert consensus risk label is GROUND TRUTH for classifier calibration/scoring only — it is NOT a Harmonia output and NOT a clinical determination.",
   "protein_binding": {

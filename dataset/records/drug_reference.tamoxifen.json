@@ -18,10 +18,17 @@
     "citation": "li-2019"
   },
   "extraction": {
-    "review_status": "unverified",
-    "method": "CiPA working-group validation set + free Cmax (EFTPC) from CiPA references",
+    "review_status": "pending_human_review",
+    "method": "CiPA working-group validation set + free Cmax (EFTPC), machine-corroborated against an independent published CiPA source",
     "verified_by": [],
-    "notes": "Expert risk label and EFTPC from the CiPA validation-set literature; unverified."
+    "corroboration": {
+      "source": "FDA/CiPA reference implementation, AP_simulation/data/newCiPA.csv (therapeutic = free EFTPC nM; CiPA code 2/1/0 = high/intermediate/low), the simulation input behind Li et al. 2019. Verified vs the raw file; EFTPC cross-corroborated against Llopis-Lorente 2022 Table 1; categories also confirmed in Colatsky 2016.",
+      "citation": "li-2019",
+      "eftpc_fold_diff": 1.19,
+      "category_match": true,
+      "note": "EFTPC agrees and the CiPA risk category matches an independent published source; a human has NOT confirmed it against the source PDF, so it is pending_human_review, not verified (spec.md §9)."
+    },
+    "notes": "Expert risk label and EFTPC from the CiPA validation-set literature, corroborated against an independent published CiPA source (see corroboration). pending_human_review, NOT verified (spec.md §9)."
   },
   "notes": "Expert consensus risk label is GROUND TRUTH for classifier calibration/scoring only — it is NOT a Harmonia output and NOT a clinical determination."
 }

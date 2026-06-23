@@ -6,6 +6,32 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.3] — 2026-06-23
+
+### Added — drug-reference corroboration + sourced CiPA EFTPCs (spec v0.8.3)
+Extends the v0.8.2 `pending_human_review` mechanism to the 28 **drug_reference** records (CiPA
+expert risk label + free EFTPC), by sourcing and verifying the published CiPA exposures and
+categories. **`pending_human_review` rises from 56/104 to 83/104**; `verified` stays 0/104 (§9).
+
+- **New `dataset/references/cipa_drugref_reference.json`** — free EFTPC (nM) + CiPA risk category
+  per drug:
+  - Training (12): FDA/CiPA `CiPA_training_drugs.csv` (`therapeutic`/`CiPA`), independent of the
+    `li-2017` primary citation; **verified value-by-value** (all categories match; 11/12 EFTPCs
+    exact, terfenadine 2.25×).
+  - Validation (16): FDA/CiPA `newCiPA.csv` (the Li-2019 simulation input), **verified against the
+    raw file**, EFTPCs cross-corroborated vs Llopis-Lorente 2022, categories confirmed in
+    Colatsky 2016. (The unreliable `freedrug` columns — off 1000× for metoprolol/risperidone —
+    were avoided in favor of `therapeutic`, per the FDA AP_simulation README.)
+- **Promotion rule:** a drug_reference record promotes only if the CiPA category matches exactly
+  AND the EFTPC agrees within 3×. 27/28 promote.
+- **It surfaced a real flag:** `drug_reference.ibutilide` did not corroborate — its free EFTPC is
+  0.52 nM in Harmonia but 100 nM in two independent CiPA sources (a ~200× discrepancy). It stays
+  `unverified` (disagreement surfaced, not silently filled), flagged for human reconciliation.
+- AP-model (reduced kernel) and population (hypothesis-tier) records remain `unverified` by design
+  — they have no independent published counterpart to corroborate.
+
+See [spec v0.8.3](docs/specs/v0.8.3-drug-reference-corroboration.md).
+
 ## [0.8.2] — 2026-06-23
 
 ### Added — `pending_human_review` provenance state + sourced validation data (spec v0.8.2)

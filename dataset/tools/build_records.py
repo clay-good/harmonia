@@ -468,6 +468,63 @@ def _channel_extraction(drug, channel, central, max_block):
     }
 
 
+# Drug-reference corroboration: the EFTPC may legitimately vary across labels/
+# sources, so a looser fold applies; the risk CATEGORY must match exactly.
+DRUGREF_EFTPC_FOLD = 3.0
+_DRUGREF_INDEX = None
+
+
+def _drugref_index():
+    global _DRUGREF_INDEX
+    if _DRUGREF_INDEX is not None:
+        return _DRUGREF_INDEX
+    idx = {}
+    path = HERE.parent / "references" / "cipa_drugref_reference.json"
+    if path.is_file():
+        data = json.loads(path.read_text(encoding="utf-8"))
+        srcs = data.get("sources", {})
+        for e in data["entries"]:
+            stext = srcs.get(e.get("set", ""), {}).get("source", "published CiPA reference")
+            idx[e["drug"].lower()] = (e.get("eftpc_free_nm"), e.get("cipa_risk_category"),
+                                      e.get("citation", ""), stext)
+    _DRUGREF_INDEX = idx
+    return idx
+
+
+def _drugref_extraction(drug, cipa_set, label, eftpc):
+    """drug_reference extraction: pending_human_review when the EFTPC agrees
+    (<=3x) AND the CiPA risk category matches an independent published source."""
+    entry = _drugref_index().get(drug.lower())
+    if entry and eftpc:
+        ref_eftpc, ref_cat, citation, source_text = entry
+        if ref_cat == label and ref_eftpc and \
+                max(eftpc / ref_eftpc, ref_eftpc / eftpc) <= DRUGREF_EFTPC_FOLD:
+            return {
+                "review_status": "pending_human_review",
+                "method": f"CiPA working-group {cipa_set} set + free Cmax (EFTPC), "
+                          "machine-corroborated against an independent published CiPA source",
+                "verified_by": [],
+                "corroboration": {
+                    "source": source_text,
+                    "citation": citation,
+                    "eftpc_fold_diff": round(max(eftpc / ref_eftpc, ref_eftpc / eftpc), 3),
+                    "category_match": True,
+                    "note": "EFTPC agrees and the CiPA risk category matches an independent "
+                            "published source; a human has NOT confirmed it against the source "
+                            "PDF, so it is pending_human_review, not verified (spec.md §9).",
+                },
+                "notes": f"Expert risk label and EFTPC from the CiPA {cipa_set}-set literature, "
+                         "corroborated against an independent published CiPA source (see "
+                         "corroboration). pending_human_review, NOT verified (spec.md §9).",
+            }
+    return {
+        "review_status": "unverified",
+        "method": f"CiPA working-group {cipa_set} set + free Cmax (EFTPC) from CiPA references",
+        "verified_by": [],
+        "notes": f"Expert risk label and EFTPC from the CiPA {cipa_set}-set literature; unverified.",
+    }
+
+
 # --------------------------------------------------------------------------- #
 # CiPA dynamic-hERG binding kinetics (spec v0.6).
 # The optimized per-drug parameters of the Li et al. 2017 IKr-Markov drug-binding
@@ -612,12 +669,7 @@ def build_drug_reference(drug, dmeta):
         "expert_risk_label": dmeta["category"],
         "eftpc_nm": {"central": dmeta["eftpc"], "units": "nM", "kind": "free",
                      "citation": cit},
-        "extraction": {
-            "review_status": "unverified",
-            "method": f"CiPA working-group {cipa_set} set + free Cmax (EFTPC) from CiPA references",
-            "verified_by": [],
-            "notes": f"Expert risk label and EFTPC from the CiPA {cipa_set}-set literature; unverified.",
-        },
+        "extraction": _drugref_extraction(drug, cipa_set, dmeta["category"], dmeta["eftpc"]),
         "notes": "Expert consensus risk label is GROUND TRUTH for classifier calibration/scoring only — "
                  "it is NOT a Harmonia output and NOT a clinical determination.",
     }

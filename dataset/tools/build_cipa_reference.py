@@ -213,6 +213,82 @@ def build_validation_reference():
     }
 
 
+# --------------------------------------------------------------------------- #
+# Drug-reference table: free EFTPC (nM) + CiPA consensus risk category, used to
+# corroborate the drug_reference records into pending_human_review (spec v0.8.3).
+#
+#  * Training (12) — the FDA/CiPA reference implementation,
+#    `AP_simulation/data/CiPA_training_drugs.csv` (`therapeutic` = free EFTPC nM;
+#    `CiPA` = 2/1/0 -> high/intermediate/low). Independent of the `li-2017`
+#    primary citation on those records; verified value-by-value when authored
+#    (11/12 EFTPCs match exactly, terfenadine 9 vs 4 nM = 2.25x; all 12 categories
+#    match).
+#  * Validation (16) — Li et al. 2019 (`li-2019`), main Table 1: the CiPA
+#    validation-set risk category and free EFTPC. The category is the stable CiPA
+#    consensus (it also appears in Colatsky 2016); the EFTPC is the exposure used
+#    in the validation simulations.
+# --------------------------------------------------------------------------- #
+# drug -> (free EFTPC nM, CiPA category)  — TRAINING, FDA/CiPA CiPA_training_drugs.csv
+DRUGREF_TRAINING = {
+    "quinidine": (3237.0, "high"), "bepridil": (33.0, "high"),
+    "dofetilide": (2.0, "high"), "sotalol": (14690.0, "high"),
+    "chlorpromazine": (38.0, "intermediate"), "cisapride": (2.6, "intermediate"),
+    "terfenadine": (4.0, "intermediate"), "ondansetron": (139.0, "intermediate"),
+    "diltiazem": (122.0, "low"), "mexiletine": (4129.0, "low"),
+    "ranolazine": (1948.2, "low"), "verapamil": (81.0, "low"),
+}
+# drug -> (free EFTPC nM, CiPA category)  — VALIDATION, FDA/CiPA newCiPA.csv
+# (therapeutic column + CiPA code), verified value-by-value against the raw file
+# and cross-corroborated against Llopis-Lorente 2022 Table 1; categories also
+# independently confirmed in Colatsky 2016. NB: ibutilide's published EFTPC is
+# 100 nM here (FDA + Llopis agree) vs 0.52 nM in Harmonia's record — a 200x
+# discrepancy that this table surfaces; ibutilide's record is left UNcorroborated.
+DRUGREF_VALIDATION = {
+    "astemizole": (0.26, "intermediate"), "azimilide": (70.0, "high"),
+    "clarithromycin": (1206.0, "intermediate"), "clozapine": (71.0, "intermediate"),
+    "disopyramide": (742.0, "high"), "domperidone": (19.0, "intermediate"),
+    "droperidol": (6.33, "intermediate"), "ibutilide": (100.0, "high"),
+    "loratadine": (0.45, "low"), "metoprolol": (1800.0, "low"),
+    "nifedipine": (7.7, "low"), "nitrendipine": (3.02, "low"),
+    "pimozide": (0.431, "intermediate"), "risperidone": (1.81, "intermediate"),
+    "tamoxifen": (21.0, "low"), "vandetanib": (255.4, "high"),
+}
+DRUGREF_SOURCE = {
+    "training": {"citation": "li-2017",
+                 "source": "FDA/CiPA reference implementation, AP_simulation/data/"
+                           "CiPA_training_drugs.csv (therapeutic = free EFTPC nM; "
+                           "CiPA risk category). Verified against the file when authored."},
+    "validation": {"citation": "li-2019",
+                   "source": "FDA/CiPA reference implementation, AP_simulation/data/newCiPA.csv "
+                             "(therapeutic = free EFTPC nM; CiPA code 2/1/0 = high/intermediate/low), "
+                             "the simulation input behind Li et al. 2019. Verified vs the raw file; "
+                             "EFTPC cross-corroborated against Llopis-Lorente 2022 Table 1; categories "
+                             "also confirmed in Colatsky 2016."},
+}
+
+
+def build_drugref_reference():
+    entries = []
+    for drug, (eftpc, cat) in sorted(DRUGREF_TRAINING.items()):
+        entries.append({"drug": drug, "eftpc_free_nm": eftpc, "cipa_risk_category": cat,
+                        "set": "training", "citation": DRUGREF_SOURCE["training"]["citation"]})
+    for drug, (eftpc, cat) in sorted(DRUGREF_VALIDATION.items()):
+        entries.append({"drug": drug, "eftpc_free_nm": eftpc, "cipa_risk_category": cat,
+                        "set": "validation", "citation": DRUGREF_SOURCE["validation"]["citation"]})
+    drugs = sorted({e["drug"] for e in entries})
+    return {
+        "schema": "harmonia.cipa_drugref_reference/v1",
+        "description": "Free EFTPC (nM) + CiPA consensus risk category per drug, used ONLY to "
+                       "corroborate drug_reference records into pending_human_review (spec "
+                       "v0.8.3). NOT a human `verified` stamp (spec.md §9).",
+        "sources": DRUGREF_SOURCE,
+        "n_drugs": len(drugs),
+        "n_entries": len(entries),
+        "drugs": drugs,
+        "entries": entries,
+    }
+
+
 def write_json(path: pathlib.Path, obj) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -228,6 +304,11 @@ def main() -> None:
     write_json(vout, vref)
     print(f"wrote {vref['n_entries']} validation reference entries across "
           f"{vref['n_drugs']} drugs to {vout}")
+    dref = build_drugref_reference()
+    dout = REFERENCES / "cipa_drugref_reference.json"
+    write_json(dout, dref)
+    print(f"wrote {dref['n_entries']} drug-reference entries across "
+          f"{dref['n_drugs']} drugs to {dout}")
 
 
 if __name__ == "__main__":

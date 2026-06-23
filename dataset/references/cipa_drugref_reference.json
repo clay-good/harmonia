@@ -1,0 +1,244 @@
+{
+  "schema": "harmonia.cipa_drugref_reference/v1",
+  "description": "Free EFTPC (nM) + CiPA consensus risk category per drug, used ONLY to corroborate drug_reference records into pending_human_review (spec v0.8.3). NOT a human `verified` stamp (spec.md §9).",
+  "sources": {
+    "training": {
+      "citation": "li-2017",
+      "source": "FDA/CiPA reference implementation, AP_simulation/data/CiPA_training_drugs.csv (therapeutic = free EFTPC nM; CiPA risk category). Verified against the file when authored."
+    },
+    "validation": {
+      "citation": "li-2019",
+      "source": "FDA/CiPA reference implementation, AP_simulation/data/newCiPA.csv (therapeutic = free EFTPC nM; CiPA code 2/1/0 = high/intermediate/low), the simulation input behind Li et al. 2019. Verified vs the raw file; EFTPC cross-corroborated against Llopis-Lorente 2022 Table 1; categories also confirmed in Colatsky 2016."
+    }
+  },
+  "n_drugs": 28,
+  "n_entries": 28,
+  "drugs": [
+    "astemizole",
+    "azimilide",
+    "bepridil",
+    "chlorpromazine",
+    "cisapride",
+    "clarithromycin",
+    "clozapine",
+    "diltiazem",
+    "disopyramide",
+    "dofetilide",
+    "domperidone",
+    "droperidol",
+    "ibutilide",
+    "loratadine",
+    "metoprolol",
+    "mexiletine",
+    "nifedipine",
+    "nitrendipine",
+    "ondansetron",
+    "pimozide",
+    "quinidine",
+    "ranolazine",
+    "risperidone",
+    "sotalol",
+    "tamoxifen",
+    "terfenadine",
+    "vandetanib",
+    "verapamil"
+  ],
+  "entries": [
+    {
+      "drug": "bepridil",
+      "eftpc_free_nm": 33.0,
+      "cipa_risk_category": "high",
+      "set": "training",
+      "citation": "li-2017"
+    },
+    {
+      "drug": "chlorpromazine",
+      "eftpc_free_nm": 38.0,
+      "cipa_risk_category": "intermediate",
+      "set": "training",
+      "citation": "li-2017"
+    },
+    {
+      "drug": "cisapride",
+      "eftpc_free_nm": 2.6,
+      "cipa_risk_category": "intermediate",
+      "set": "training",
+      "citation": "li-2017"
+    },
+    {
+      "drug": "diltiazem",
+      "eftpc_free_nm": 122.0,
+      "cipa_risk_category": "low",
+      "set": "training",
+      "citation": "li-2017"
+    },
+    {
+      "drug": "dofetilide",
+      "eftpc_free_nm": 2.0,
+      "cipa_risk_category": "high",
+      "set": "training",
+      "citation": "li-2017"
+    },
+    {
+      "drug": "mexiletine",
+      "eftpc_free_nm": 4129.0,
+      "cipa_risk_category": "low",
+      "set": "training",
+      "citation": "li-2017"
+    },
+    {
+      "drug": "ondansetron",
+      "eftpc_free_nm": 139.0,
+      "cipa_risk_category": "intermediate",
+      "set": "training",
+      "citation": "li-2017"
+    },
+    {
+      "drug": "quinidine",
+      "eftpc_free_nm": 3237.0,
+      "cipa_risk_category": "high",
+      "set": "training",
+      "citation": "li-2017"
+    },
+    {
+      "drug": "ranolazine",
+      "eftpc_free_nm": 1948.2,
+      "cipa_risk_category": "low",
+      "set": "training",
+      "citation": "li-2017"
+    },
+    {
+      "drug": "sotalol",
+      "eftpc_free_nm": 14690.0,
+      "cipa_risk_category": "high",
+      "set": "training",
+      "citation": "li-2017"
+    },
+    {
+      "drug": "terfenadine",
+      "eftpc_free_nm": 4.0,
+      "cipa_risk_category": "intermediate",
+      "set": "training",
+      "citation": "li-2017"
+    },
+    {
+      "drug": "verapamil",
+      "eftpc_free_nm": 81.0,
+      "cipa_risk_category": "low",
+      "set": "training",
+      "citation": "li-2017"
+    },
+    {
+      "drug": "astemizole",
+      "eftpc_free_nm": 0.26,
+      "cipa_risk_category": "intermediate",
+      "set": "validation",
+      "citation": "li-2019"
+    },
+    {
+      "drug": "azimilide",
+      "eftpc_free_nm": 70.0,
+      "cipa_risk_category": "high",
+      "set": "validation",
+      "citation": "li-2019"
+    },
+    {
+      "drug": "clarithromycin",
+      "eftpc_free_nm": 1206.0,
+      "cipa_risk_category": "intermediate",
+      "set": "validation",
+      "citation": "li-2019"
+    },
+    {
+      "drug": "clozapine",
+      "eftpc_free_nm": 71.0,
+      "cipa_risk_category": "intermediate",
+      "set": "validation",
+      "citation": "li-2019"
+    },
+    {
+      "drug": "disopyramide",
+      "eftpc_free_nm": 742.0,
+      "cipa_risk_category": "high",
+      "set": "validation",
+      "citation": "li-2019"
+    },
+    {
+      "drug": "domperidone",
+      "eftpc_free_nm": 19.0,
+      "cipa_risk_category": "intermediate",
+      "set": "validation",
+      "citation": "li-2019"
+    },
+    {
+      "drug": "droperidol",
+      "eftpc_free_nm": 6.33,
+      "cipa_risk_category": "intermediate",
+      "set": "validation",
+      "citation": "li-2019"
+    },
+    {
+      "drug": "ibutilide",
+      "eftpc_free_nm": 100.0,
+      "cipa_risk_category": "high",
+      "set": "validation",
+      "citation": "li-2019"
+    },
+    {
+      "drug": "loratadine",
+      "eftpc_free_nm": 0.45,
+      "cipa_risk_category": "low",
+      "set": "validation",
+      "citation": "li-2019"
+    },
+    {
+      "drug": "metoprolol",
+      "eftpc_free_nm": 1800.0,
+      "cipa_risk_category": "low",
+      "set": "validation",
+      "citation": "li-2019"
+    },
+    {
+      "drug": "nifedipine",
+      "eftpc_free_nm": 7.7,
+      "cipa_risk_category": "low",
+      "set": "validation",
+      "citation": "li-2019"
+    },
+    {
+      "drug": "nitrendipine",
+      "eftpc_free_nm": 3.02,
+      "cipa_risk_category": "low",
+      "set": "validation",
+      "citation": "li-2019"
+    },
+    {
+      "drug": "pimozide",
+      "eftpc_free_nm": 0.431,
+      "cipa_risk_category": "intermediate",
+      "set": "validation",
+      "citation": "li-2019"
+    },
+    {
+      "drug": "risperidone",
+      "eftpc_free_nm": 1.81,
+      "cipa_risk_category": "intermediate",
+      "set": "validation",
+      "citation": "li-2019"
+    },
+    {
+      "drug": "tamoxifen",
+      "eftpc_free_nm": 21.0,
+      "cipa_risk_category": "low",
+      "set": "validation",
+      "citation": "li-2019"
+    },
+    {
+      "drug": "vandetanib",
+      "eftpc_free_nm": 255.4,
+      "cipa_risk_category": "high",
+      "set": "validation",
+      "citation": "li-2019"
+    }
+  ]
+}
