@@ -8,7 +8,7 @@ uncertainty; it never issues a bare "safe/unsafe" verdict. See spec.md §10.
 """
 from __future__ import annotations
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"
 
 from .load import Dataset, load, find_dataset_dir
 from .validate import validate_dataset, ValidationReport
@@ -26,6 +26,7 @@ from .exposure import free_from_total, total_from_free
 from .infer import (posterior, infer_channel, Posterior, Prior, resolve_prior,
                     learn_tau_pop, fit_dose_response, simulation_based_calibration,
                     posterior_coverage)
+from .crosscheck import cross_check, CrossCheckReport, ChannelCrossCheck
 
 CLINICAL_USE = (
     "PROHIBITED — research / safety-methodology / education only; "
@@ -69,5 +70,8 @@ __all__ = [
     "fit_dose_response",
     "simulation_based_calibration",
     "posterior_coverage",
+    "cross_check",
+    "CrossCheckReport",
+    "ChannelCrossCheck",
     "CLINICAL_USE",
 ]

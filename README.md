@@ -77,6 +77,7 @@ harmonia sensitivity verapamil --sobol         # variance-based indices WITH int
 harmonia combo terfenadine ondansetron         # drug-combination (polypharmacy) assessment
 harmonia population sotalol  # population-of-models spread (HYPOTHESIS-TIER, not for prediction)
 harmonia performance         # score qNet vs CiPA expert labels (train/val/all); --metric apd90
+harmonia crosscheck          # v0.8 diff transcribed IC50/Hill vs the published CiPA reference
 harmonia export --all --output exports/
 ```
 
@@ -158,9 +159,10 @@ pop.tier                                      # "D"  (always; non-predictive)
 | **Flip-frequency confidence interval** (**v0.7**) — the headline flip frequency is a Monte-Carlo binomial proportion, so it now carries a **Wilson 95% CI** (`flip_ci`) derived from `n_mc`; same for the combination flip, the all-vary flip sensitivity, the new-lab reproducibility flip, and the population susceptible fraction. The project's own "never a number without its uncertainty" rule, applied to its own headline number. Purely additive — no previously-reported value moves | ✅ |
 | **Flip sensitivity** — `flip_sensitivity` attributes the flip to each channel's IC50 spread (solo / frozen effects), surfacing the dominant uncertain input to pin down first | ✅ |
 | **Recorded classification performance** (Phase B) — `harmonia performance` scores either metric vs CiPA expert labels on training / validation / all, with the full confusion matrix | ✅ |
+| **Machine cross-check** (**v0.8**) — `harmonia.cross_check` diffs every channel-block record's transcribed IC50/Hill against an *independent* published copy of the CiPA table (Li 2017, via the FDA/CiPA file) and assigns `machine_cross_checked` — a provenance signal between `unverified` and `verified` that is **deliberately not** `verified` (no human read the PDF). Caught two real unit-scale transcription errors on first run | ✅ |
 | **Exports** — CellML 2.0, Myokit `.mmt`, SBML L3v2, SED-ML, CiPA inputs (CSV/JSON), CSV, BibTeX, COMBINE `.omex` — all carrying `clinicalUse = PROHIBITED`, tier, and DOI RDF | ✅ |
 | **CLI · Streamlit dashboard · CI** | ✅ |
-| **Release hardening** (Phase F) — declaration-level CellML unit-conformance check, three executable `nbmake` notebooks, `.zenodo.json`, `CHANGELOG.md` | ✅ |
+| **Release hardening** (Phase F) — declaration-level CellML unit-conformance check, three executable `nbmake` notebooks, `.zenodo.json`, `CHANGELOG.md`, machine cross-check vs the published CiPA reference (v0.8) | ✅ |
 | Full CiPA Markov hERG + published optimized kinetics, ToR-ORd reformulation, broader multi-source aggregation, full dimensional/OpenCOR cross-check | Phase C/F (roadmap below) |
 
 ---
@@ -345,6 +347,41 @@ underread them. But qNet never makes a catastrophic (two-category) error on any 
 the 28 compounds — the property that matters most for a safety screen. The durable
 contribution remains the **flip-frequency-under-variability machinery**, correct
 regardless of absolute accuracy.
+
+### Machine cross-check against the published CiPA reference (v0.8)
+
+Every record ships `unverified` — and an LLM never promotes one to `verified`
+(spec §9). Honest, but it left no automated signal of whether a transcribed IC50
+is even in the right ballpark. **v0.8 diffs every channel-block record against an
+*independent* published copy of the canonical CiPA block table** (Li et al. 2017,
+via the FDA/CiPA machine-readable file — a different transcription pass than the
+records, so the comparison is non-circular).
+
+```bash
+harmonia crosscheck            # every channel-block record vs the published value
+harmonia crosscheck verapamil  # one drug; --strict exits non-zero on any divergence
+```
+
+Each record gets a fold-difference and a four-way status — `match` (≤2×), `minor`
+(≤5×, within the documented inter-lab spread), `divergent` (>5×, **flagged for
+human review**), or `no_reference` (outside the 12-training-drug table). The
+computed `machine_cross_checked` flag is **deliberately not** `verified`: it
+confirms agreement with a published number, never that a human read the source
+PDF, and it never edits a record. `harmonia info` prints both signals, separately.
+
+**It earned its keep on the first run.** Of 38 records with a published
+reference, 36 agree; two diverge and were surfaced for reconciliation:
+`cisapride.ical` recorded **9,258 nM** vs the published **9,258,075 nM** (identical
+mantissa, off by exactly **1000×** — a dropped-exponent unit error) and
+`terfenadine.inal` **2,000** vs **20,056 nM** (~10×). That is the whole point: a
+mechanical, non-circular check that catches the unit-scale transcription slips a
+0/104-verified count cannot. See [spec v0.8](docs/specs/v0.8-machine-crosscheck.md).
+
+```python
+rep = harmonia.cross_check(ds)                # or cross_check(ds, "verapamil")
+rep.n_cross_checked, len(rep.checks)          # 36, 68
+[c.record_id for c in rep.divergent]          # the records to reconcile by hand
+```
 
 ### Dynamic hERG binding (Phase B)
 
@@ -774,14 +811,14 @@ optional local step (they need a heavy simulation engine, so are not run in CI).
 ## Validation & testing
 
 Everything downstream of the dataset is a deterministic projection, so the test
-suite (211 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
+suite (224 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 *provable non-drift* rather than fixtures:
 
 | Guard | What it proves | Where |
 | --- | --- | --- |
 | **Lint** | no dead imports, undefined names, or unused variables (Pyflakes + pycodestyle) | `ruff check` |
 | **Type-check** | the package's `py.typed` contract holds — every public `load` / `simulate` / `infer` / `export` signature checks under **mypy** (no implicit Optional, no unused ignores), so the typed views downstream tools rely on cannot silently drift | `mypy` |
-| **Dataset reproducibility** | `dataset/records` regenerates byte-identically from `build_records.py` (the provenance log) — the curated table *is* the dataset | CI `git diff --exit-code` |
+| **Dataset reproducibility** | `dataset/records` (and the v0.8 `dataset/references` table) regenerate byte-identically from their build tools (`build_records.py`, `build_cipa_reference.py`) — the curated table *is* the dataset | CI `git diff --exit-code` |
 | **Export reproducibility** | the committed `exports/` text artifacts (CellML/SBML/Myokit/SED-ML/tables/BibTeX) regenerate byte-identically from the dataset — a hand-edit or a stale sample fails the build | CI `git diff --exit-code` |
 | **Schema + semantic validation** | every record satisfies the JSON Schema; the reliability gate (block < 60% ⟺ Tier D ⟺ failure-mode) and variability bookkeeping hold | `harmonia validate` |
 | **Prior registry validity** (v0.2) | every prior schema-validates, its id matches its filename, every cited key resolves, and `predictive == false` (no prior carries a risk conclusion) | `harmonia validate` |
@@ -794,6 +831,7 @@ suite (211 tests, all run in CI on Python 3.9 / 3.11 / 3.12) is mostly about
 | **CiPA dynamic-hERG kinetics** (v0.6) | the 12 CiPA dynamic-fit compounds carry `cipa_binding` (the rest don't); zero-drug ⇒ no block; block rises with concentration; the trapping phenotype (dofetilide retains ≫ verapamil washes out); the opt-in path leaves the default classification unchanged | `tests/test_cipa_binding.py` |
 | **Sobol consistency** (v0.2) | total-effect ≥ first-order per channel (within MC error); indices deterministic; standard errors reported | `tests/test_sobol.py` |
 | **Flip-frequency CI** (v0.7) | the Wilson interval matches the textbook value, stays in `[0,1]`, is non-degenerate at `k=0`/`k=n`, narrows ∝ `1/√n`, and brackets the reported flip frequency; adding it changes no flip/susceptible/metric value (`n_mc=0` ⇒ `(nan, nan)`) | `tests/test_flip_ci.py` |
+| **Machine cross-check** (v0.8) | the published-CiPA reference table is reproducible from its build tool; the fold-difference status thresholds partition correctly; `machine_cross_checked` is never conflated with human `verified`; the two known divergences are surfaced; a validation-set drug cross-checks to all-`no_reference`, not a false divergence | `tests/test_crosscheck.py` |
 | **CiPA numeric round trip** | export the CiPA CSV, parse it back, every IC50/Hill equals the dataset value | `registry.roundtrip_cipa` |
 | **Parameter round trip** | the kernel conductances appear verbatim in the CellML/SBML/Myokit text | `registry.roundtrip_parameters` |
 | **ODE round trip** | the model AST re-integrates to the reference-kernel AP within ≈1e-7 — the exported *equations* match the oracle, not just the constants | `registry.roundtrip_ode` |
@@ -839,13 +877,15 @@ harmonia/
 │   ├── schema/                  # JSON Schema + JSON-LD context
 │   ├── records/                 # one JSON per channel-block / AP-model / drug-reference record
 │   ├── citations/               # Crossref/PubMed-checked citation records
-│   └── tools/build_records.py   # provenance log: the curated table → records (CI checks reproducibility)
+│   ├── references/              # published CiPA block table (Li 2017) for the v0.8 cross-check
+│   └── tools/                   # build_records.py + build_cipa_reference.py (CI checks reproducibility)
 ├── python/harmonia/
 │   ├── load.py · validate.py · filter.py · records.py
 │   ├── simulate.py              # Monte-Carlo variability → risk distribution + flip view; dynamic hERG; combinations
 │   ├── exposure.py              # free ↔ total plasma concentration (protein binding)
 │   ├── populations.py           # population-of-models risk spread + Britton-2013 calibration (hypothesis-tier, Tier D)
 │   ├── performance.py           # score the kernel vs CiPA expert labels (confusion matrix)
+│   ├── crosscheck.py            # v0.8 diff transcribed IC50/Hill vs the published CiPA reference (≠ verified)
 │   ├── cli.py
 │   └── export/
 │       ├── reference.py         # SciPy ORd-lineage AP kernel + risk metrics (the oracle)
@@ -854,7 +894,7 @@ harmonia/
 │       ├── csv_bibtex.py · annotate.py · combine.py · registry.py
 ├── dashboard/app.py             # Streamlit: flip view (+ Bayesian UQ) · combinations · population-of-models · browse
 ├── notebooks/                   # executable analyses, run in CI under nbmake
-├── tests/                       # 211 tests: dataset, kernel, qNet, simulate, dynamic binding, CiPA hERG kinetics, flip-frequency CIs, exposure, combinations, populations (incl. calibrated), performance, Bayesian UQ, exports (round trips + unit conformance + SED-ML/OMEX integrity), CLI, dashboard contract
+├── tests/                       # 224 tests: dataset, kernel, qNet, simulate, dynamic binding, CiPA hERG kinetics, flip-frequency CIs, exposure, combinations, populations (incl. calibrated), performance, machine cross-check, Bayesian UQ, exports (round trips + unit conformance + SED-ML/OMEX integrity), CLI, dashboard contract
 ├── docs/                        # essay, figures, make_figures.py
 ├── CHANGELOG.md · .zenodo.json  # release metadata
 └── exports/                     # sample generated artifacts (regenerated in CI)
@@ -891,13 +931,14 @@ feature does not get built.
 | **C — Variability layer** | **Discriminating qNet via a shape-dependent Na-Ca exchanger ✅; the published CiPA dynamic-hERG optimized kinetics sourced + a binding model shipped (v0.6) ✅.** Remaining: the full 9-state CiPA Markov IKr (the kinetics are coupled to the reduced gate, a Tier-C reduction); broader multi-source aggregation; ToR-ORd reformulation | ◧ |
 | **D — Exposure layer** | Free ↔ total plasma conc + protein binding (composable with Hypnos); drug-combination assessment | ✅ |
 | **E — Populations** | **Population-of-models risk spread ✅; disease & genetic backgrounds (LQTS, v0.3) ✅; experimentally-calibrated populations (Britton 2013, v0.5) ✅** — all shipped non-predictive (Tier D). Remaining: real-data-calibrated (not kernel-plausibility) populations | ✅ |
-| **F — Hardening** | **Declaration-level CellML unit-conformance check (in CI) ✅; executable `nbmake` notebooks (3) ✅; `.zenodo.json` + `CHANGELOG.md` ✅; Wilson 95% CIs on every Monte-Carlo flip frequency (v0.7) ✅.** Remaining: full dimensional validation + the Myokit/OpenCOR cross-check against the *canonical* ORd CellML (optional local step); minted Zenodo DOI on first tagged release | ◧ |
+| **F — Hardening** | **Declaration-level CellML unit-conformance check (in CI) ✅; executable `nbmake` notebooks (3) ✅; `.zenodo.json` + `CHANGELOG.md` ✅; Wilson 95% CIs on every Monte-Carlo flip frequency (v0.7) ✅; machine cross-check of every IC50/Hill vs the published CiPA reference (v0.8) ✅.** Remaining: full dimensional validation + the Myokit/OpenCOR cross-check against the *canonical* ORd CellML (optional local step); `max_block` / `cipa_binding` cross-check + a Li-2019 reference for the validation drugs; minted Zenodo DOI on first tagged release | ◧ |
 
-**This release (v0.7):** the headline flip frequency — the number the whole
-dataset exists to compute — now carries its own **Wilson 95% confidence
-interval**, because it is a Monte-Carlo estimate and the project's rule is *never a
-number without its uncertainty.* Purely additive; no previously-reported value
-moves. See [spec v0.7](docs/specs/v0.7-flip-frequency-ci.md).
+**This release (v0.8):** every channel-block record's transcribed IC50/Hill is now
+**machine-cross-checked against an independent published copy** of the CiPA table
+(Li 2017). It is a new, honestly-weaker provenance signal — `machine_cross_checked`,
+explicitly **not** `verified` — that sits between "unverified" and "verified," and it
+caught two real unit-scale transcription errors on its first run. Purely additive; no
+risk number, threshold, or record changes. See [spec v0.8](docs/specs/v0.8-machine-crosscheck.md).
 
 ---
 

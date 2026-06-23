@@ -39,8 +39,9 @@ jobs:
       - name: Dataset is reproducible from the build tool
         run: |
           python dataset/tools/build_records.py
-          git diff --exit-code dataset/records dataset/citations \
-            || (echo "::error::dataset/ is out of sync with build_records.py — re-run it and commit" && exit 1)
+          python dataset/tools/build_cipa_reference.py
+          git diff --exit-code dataset/records dataset/citations dataset/references \
+            || (echo "::error::dataset/ is out of sync with its build tools — re-run them and commit" && exit 1)
 
       - name: Run tests
         run: pytest -q

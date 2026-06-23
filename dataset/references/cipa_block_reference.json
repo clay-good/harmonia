@@ -1,0 +1,419 @@
+{
+  "schema": "harmonia.cipa_block_reference/v1",
+  "description": "Published CiPA multichannel block-potency reference (IC50 nM, Hill) for the 12 CiPA training drugs, used by `harmonia crosscheck` to independently diff Harmonia's transcribed channel-block records. A machine cross-check is NOT a human `verified` stamp (spec.md §9).",
+  "source": {
+    "citation": "li-2017",
+    "published_table": "Li et al. 2017, Circ Arrhythm Electrophysiol, DOI 10.1161/CIRCEP.116.004628 — multichannel IC50/Hill for the 12 CiPA training drugs.",
+    "machine_readable_conduit": "github.com/FDA/CiPA, Hill_fitting/data/Li2017_IC50.csv",
+    "conduit_commit": "e881df6766d1067a08b65184d7a320804aef73d6",
+    "conduit_repo_license": "GPL-3.0 (software); the numeric values reproduced here are uncopyrightable facts from the Li 2017 publication, redistributed under CC-BY-4.0 with attribution."
+  },
+  "n_drugs": 12,
+  "n_entries": 65,
+  "drugs": [
+    "bepridil",
+    "chlorpromazine",
+    "cisapride",
+    "diltiazem",
+    "dofetilide",
+    "mexiletine",
+    "ondansetron",
+    "quinidine",
+    "ranolazine",
+    "sotalol",
+    "terfenadine",
+    "verapamil"
+  ],
+  "entries": [
+    {
+      "drug": "bepridil",
+      "channel": "IKr",
+      "ic50_nm": 50.0,
+      "hill": 0.92
+    },
+    {
+      "drug": "bepridil",
+      "channel": "ICaL",
+      "ic50_nm": 2808.055446,
+      "hill": 0.648641112
+    },
+    {
+      "drug": "bepridil",
+      "channel": "INa",
+      "ic50_nm": 2929.272579,
+      "hill": 1.163653755
+    },
+    {
+      "drug": "bepridil",
+      "channel": "INaL",
+      "ic50_nm": 1813.91,
+      "hill": 1.42
+    },
+    {
+      "drug": "bepridil",
+      "channel": "IKs",
+      "ic50_nm": 28628.30722,
+      "hill": 0.706125727
+    },
+    {
+      "drug": "bepridil",
+      "channel": "Ito",
+      "ic50_nm": 8594.04,
+      "hill": 3.54
+    },
+    {
+      "drug": "chlorpromazine",
+      "channel": "IKr",
+      "ic50_nm": 929.2,
+      "hill": 0.85
+    },
+    {
+      "drug": "chlorpromazine",
+      "channel": "ICaL",
+      "ic50_nm": 8191.915057,
+      "hill": 0.844107446
+    },
+    {
+      "drug": "chlorpromazine",
+      "channel": "INa",
+      "ic50_nm": 4535.599203,
+      "hill": 1.995393819
+    },
+    {
+      "drug": "chlorpromazine",
+      "channel": "INaL",
+      "ic50_nm": 4559.55,
+      "hill": 0.94
+    },
+    {
+      "drug": "chlorpromazine",
+      "channel": "Ito",
+      "ic50_nm": 17616711.07,
+      "hill": 0.37
+    },
+    {
+      "drug": "chlorpromazine",
+      "channel": "IK1",
+      "ic50_nm": 9269.939647,
+      "hill": 0.687753884
+    },
+    {
+      "drug": "cisapride",
+      "channel": "IKr",
+      "ic50_nm": 10.1,
+      "hill": 0.73
+    },
+    {
+      "drug": "cisapride",
+      "channel": "ICaL",
+      "ic50_nm": 9258075.75,
+      "hill": 0.43
+    },
+    {
+      "drug": "cisapride",
+      "channel": "IKs",
+      "ic50_nm": 81192862.0,
+      "hill": 0.29
+    },
+    {
+      "drug": "cisapride",
+      "channel": "Ito",
+      "ic50_nm": 219112.35,
+      "hill": 0.24
+    },
+    {
+      "drug": "cisapride",
+      "channel": "IK1",
+      "ic50_nm": 29498.04,
+      "hill": 0.51
+    },
+    {
+      "drug": "diltiazem",
+      "channel": "IKr",
+      "ic50_nm": 13150.0,
+      "hill": 0.9254
+    },
+    {
+      "drug": "diltiazem",
+      "channel": "ICaL",
+      "ic50_nm": 112.1303862,
+      "hill": 0.714205489
+    },
+    {
+      "drug": "diltiazem",
+      "channel": "INa",
+      "ic50_nm": 110859.7524,
+      "hill": 0.70224184
+    },
+    {
+      "drug": "diltiazem",
+      "channel": "INaL",
+      "ic50_nm": 21868.47,
+      "hill": 0.68
+    },
+    {
+      "drug": "diltiazem",
+      "channel": "Ito",
+      "ic50_nm": 2821526904.0,
+      "hill": 0.17
+    },
+    {
+      "drug": "dofetilide",
+      "channel": "IKr",
+      "ic50_nm": 4.87,
+      "hill": 0.93
+    },
+    {
+      "drug": "dofetilide",
+      "channel": "ICaL",
+      "ic50_nm": 260.32,
+      "hill": 1.16
+    },
+    {
+      "drug": "dofetilide",
+      "channel": "INa",
+      "ic50_nm": 380.5,
+      "hill": 0.89
+    },
+    {
+      "drug": "dofetilide",
+      "channel": "INaL",
+      "ic50_nm": 753160.41,
+      "hill": 0.26
+    },
+    {
+      "drug": "dofetilide",
+      "channel": "Ito",
+      "ic50_nm": 18.82,
+      "hill": 0.77
+    },
+    {
+      "drug": "dofetilide",
+      "channel": "IK1",
+      "ic50_nm": 394.26,
+      "hill": 0.77
+    },
+    {
+      "drug": "mexiletine",
+      "channel": "IKr",
+      "ic50_nm": 28880.0,
+      "hill": 0.9246
+    },
+    {
+      "drug": "mexiletine",
+      "channel": "ICaL",
+      "ic50_nm": 38243.58316,
+      "hill": 1.030674129
+    },
+    {
+      "drug": "mexiletine",
+      "channel": "INaL",
+      "ic50_nm": 8956.75,
+      "hill": 1.41
+    },
+    {
+      "drug": "ondansetron",
+      "channel": "IKr",
+      "ic50_nm": 1320.0,
+      "hill": 0.9134
+    },
+    {
+      "drug": "ondansetron",
+      "channel": "ICaL",
+      "ic50_nm": 22551.37898,
+      "hill": 0.752643717
+    },
+    {
+      "drug": "ondansetron",
+      "channel": "INa",
+      "ic50_nm": 57666.4315,
+      "hill": 1.019672018
+    },
+    {
+      "drug": "ondansetron",
+      "channel": "INaL",
+      "ic50_nm": 19180.8,
+      "hill": 1.03
+    },
+    {
+      "drug": "ondansetron",
+      "channel": "IKs",
+      "ic50_nm": 569807.4225,
+      "hill": 0.65344884
+    },
+    {
+      "drug": "ondansetron",
+      "channel": "Ito",
+      "ic50_nm": 1023377.67,
+      "hill": 0.99
+    },
+    {
+      "drug": "quinidine",
+      "channel": "IKr",
+      "ic50_nm": 992.0,
+      "hill": 0.8199
+    },
+    {
+      "drug": "quinidine",
+      "channel": "ICaL",
+      "ic50_nm": 51592.34546,
+      "hill": 0.589208762
+    },
+    {
+      "drug": "quinidine",
+      "channel": "INa",
+      "ic50_nm": 12329.0369,
+      "hill": 1.493724623
+    },
+    {
+      "drug": "quinidine",
+      "channel": "INaL",
+      "ic50_nm": 9416.98,
+      "hill": 1.34
+    },
+    {
+      "drug": "quinidine",
+      "channel": "IKs",
+      "ic50_nm": 4898.902693,
+      "hill": 1.36305201
+    },
+    {
+      "drug": "quinidine",
+      "channel": "Ito",
+      "ic50_nm": 3487.43,
+      "hill": 1.28
+    },
+    {
+      "drug": "quinidine",
+      "channel": "IK1",
+      "ic50_nm": 39589919.0,
+      "hill": 0.35
+    },
+    {
+      "drug": "ranolazine",
+      "channel": "IKr",
+      "ic50_nm": 8270.0,
+      "hill": 0.8866
+    },
+    {
+      "drug": "ranolazine",
+      "channel": "INa",
+      "ic50_nm": 68774.53398,
+      "hill": 1.424957384
+    },
+    {
+      "drug": "ranolazine",
+      "channel": "INaL",
+      "ic50_nm": 7884.47,
+      "hill": 0.94
+    },
+    {
+      "drug": "ranolazine",
+      "channel": "IKs",
+      "ic50_nm": 36155020.0,
+      "hill": 0.52
+    },
+    {
+      "drug": "sotalol",
+      "channel": "IKr",
+      "ic50_nm": 110600.0,
+      "hill": 0.7678
+    },
+    {
+      "drug": "sotalol",
+      "channel": "ICaL",
+      "ic50_nm": 7061526.92,
+      "hill": 0.86510548
+    },
+    {
+      "drug": "sotalol",
+      "channel": "INa",
+      "ic50_nm": 1140000000.0,
+      "hill": 0.51
+    },
+    {
+      "drug": "sotalol",
+      "channel": "IKs",
+      "ic50_nm": 4221855.541,
+      "hill": 1.167218474
+    },
+    {
+      "drug": "sotalol",
+      "channel": "Ito",
+      "ic50_nm": 43143455.32,
+      "hill": 0.66
+    },
+    {
+      "drug": "sotalol",
+      "channel": "IK1",
+      "ic50_nm": 3050260.348,
+      "hill": 1.204371947
+    },
+    {
+      "drug": "terfenadine",
+      "channel": "IKr",
+      "ic50_nm": 23.0,
+      "hill": 0.6468
+    },
+    {
+      "drug": "terfenadine",
+      "channel": "ICaL",
+      "ic50_nm": 700.4003343,
+      "hill": 0.660062997
+    },
+    {
+      "drug": "terfenadine",
+      "channel": "INa",
+      "ic50_nm": 4803.18322,
+      "hill": 1.015027823
+    },
+    {
+      "drug": "terfenadine",
+      "channel": "INaL",
+      "ic50_nm": 20056.02,
+      "hill": 0.6
+    },
+    {
+      "drug": "terfenadine",
+      "channel": "IKs",
+      "ic50_nm": 399754.0,
+      "hill": 0.54
+    },
+    {
+      "drug": "terfenadine",
+      "channel": "Ito",
+      "ic50_nm": 239960.82,
+      "hill": 0.26
+    },
+    {
+      "drug": "verapamil",
+      "channel": "IKr",
+      "ic50_nm": 288.0,
+      "hill": 0.96
+    },
+    {
+      "drug": "verapamil",
+      "channel": "ICaL",
+      "ic50_nm": 201.7832944,
+      "hill": 1.096809669
+    },
+    {
+      "drug": "verapamil",
+      "channel": "INaL",
+      "ic50_nm": 7028.01,
+      "hill": 1.03
+    },
+    {
+      "drug": "verapamil",
+      "channel": "Ito",
+      "ic50_nm": 13429.25,
+      "hill": 0.82
+    },
+    {
+      "drug": "verapamil",
+      "channel": "IK1",
+      "ic50_nm": 348913215.6,
+      "hill": 0.27
+    }
+  ]
+}

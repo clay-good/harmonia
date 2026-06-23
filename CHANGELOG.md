@@ -6,6 +6,42 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-06-23
+
+### Added — machine cross-check against the published CiPA reference (spec v0.8)
+Every Harmonia record ships `review_status: "unverified"` (the values are
+literature-derived but nobody has opened the source PDF inside Harmonia, and an LLM
+never promotes a record to `verified` — spec §9). That is honest, but it left a reader
+with no automated signal of whether a transcribed IC50 is even in the right ballpark.
+v0.8 adds a second, **independent** rendering of the canonical CiPA block table and diffs
+every channel-block record against it — a new, honestly-weaker provenance signal,
+`machine_cross_checked`, that sits between "unverified" and "verified".
+
+- **`dataset/references/cipa_block_reference.json`** — IC50 (nM) + Hill per drug × current
+  for the 12 CiPA training drugs (65 entries), transcribed from **Li et al. 2017**
+  (the `li-2017` citation) via the FDA/CiPA machine-readable table. Built deterministically
+  by **`dataset/tools/build_cipa_reference.py`** (byte-reproducible; new CI gate). The
+  GPL-3.0 FDA/CiPA *file* is **not** vendored — only the uncopyrightable numeric facts, with
+  attribution to Li 2017 under Harmonia's CC-BY-4.0 dataset license.
+- **`harmonia.cross_check(ds, drug=None)` → `CrossCheckReport`** — per-record IC50/Hill
+  fold-difference with a four-way status: `match` (≤2×), `minor` (≤5×, within documented
+  inter-lab spread), `divergent` (>5×, flagged for human review), `no_reference` (outside the
+  training-drug table). `machine_cross_checked := status ∈ {match, minor}`. The 5× divergence
+  line mirrors the dataset's own `fold_range > 5` failure-mode trigger.
+- **CLI `harmonia crosscheck [drug] [--strict]`** and a `MACHINE-CROSS-CHECKED:` line in
+  `harmonia info` (printed separately from, and never conflated with, the `VERIFIED:` count).
+  `--strict` exits non-zero if any record diverges.
+- **It found real defects on first run** (the point of building it): `cisapride.ical` recorded
+  9 258 nM vs published 9 258 075 nM (exactly 1000× — a dropped-exponent unit error) and
+  `terfenadine.inal` 2 000 vs 20 056 nM (~10×). Both are *flagged for human reconciliation*,
+  not auto-corrected — `machine_cross_checked` is **not** `verified`, and no record is mutated.
+
+### Honesty posture
+The cross-check changes no risk number, no threshold, and no record; the `verified` count
+remains 0/104. A `match` confirms only that two independent renderings of one published number
+agree — never that a human read the source PDF, and never a safety claim. Coverage
+(`no_reference`) is reported, never hidden. See [spec v0.8](docs/specs/v0.8-machine-crosscheck.md).
+
 ## [0.7.0] — 2026-06-10
 
 ### Added — Monte-Carlo confidence intervals on the flip frequency (spec v0.7)

@@ -58,6 +58,16 @@ def cmd_info(args) -> int:
     print(f"  VERIFIED: {verified}/{len(ds)} records "
           f"(LLM-assisted extraction never promotes to verified — spec §9)")
 
+    try:
+        from .crosscheck import cross_check
+        cc = cross_check(ds)
+        print(f"  MACHINE-CROSS-CHECKED: {cc.n_cross_checked}/{len(cc.checks)} channel-block "
+              f"records agree with the published CiPA reference (≠ verified; spec v0.8)"
+              + (f"; {len(cc.divergent)} DIVERGENT — see `harmonia crosscheck`"
+                 if cc.divergent else ""))
+    except FileNotFoundError:
+        pass
+
     drugs = ds.drugs()
     print(f"  drugs ({len(drugs)}): {', '.join(drugs)}")
 
@@ -189,6 +199,14 @@ def cmd_performance(args) -> int:
         print(rep.summary())
         print()
     return 0
+
+
+def cmd_crosscheck(args) -> int:
+    from .crosscheck import cross_check
+    ds = _load(args)
+    rep = cross_check(ds, drug=args.drug)
+    print(rep.summary())
+    return 1 if (args.strict and rep.divergent) else 0
 
 
 def cmd_export(args) -> int:
@@ -337,6 +355,15 @@ def build_parser() -> argparse.ArgumentParser:
     pf.add_argument("--dynamic", action="store_true", help="use dynamic hERG binding where available")
     pf.add_argument("--exposure-multiple", type=float, default=4.0, dest="exposure_multiple")
     pf.set_defaults(func=cmd_performance)
+
+    cc = sub.add_parser("crosscheck",
+                        help="diff transcribed IC50/Hill vs the published CiPA reference "
+                             "(machine cross-check, NOT human verification)")
+    cc.add_argument("drug", nargs="?", default=None,
+                    help="one drug, or omit for every channel-block record")
+    cc.add_argument("--strict", action="store_true",
+                    help="exit non-zero if any record diverges >5x from the published value")
+    cc.set_defaults(func=cmd_crosscheck)
 
     e = sub.add_parser("export", help="generate export artifacts")
     e.add_argument("--format", choices=["cellml", "myokit", "sbml", "sedml", "cipa",
