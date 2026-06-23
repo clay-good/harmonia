@@ -80,10 +80,12 @@ ignore = ["E501", "E702"]
 # CI. We check the package only (tests/notebooks/figure scripts are not part of
 # the typed contract). The heavy scientific/interop dependencies do not ship
 # type stubs; we trust their runtime contracts rather than vendoring stubs.
-# Type-check target is 3.10 (the floor current mypy accepts); runtime support
-# down to 3.9 is guaranteed by the pytest matrix, and the package uses
-# `from __future__ import annotations` so no 3.10+ runtime syntax is required.
-python_version = "3.10"
+# Type-check target is 3.12: NumPy's current published stubs (>=2.5) use PEP 695
+# `type` statements, which mypy refuses to parse under an older target (it errors
+# "Type statement is only supported in Python 3.12 and greater" and aborts).
+# Runtime support down to 3.9 is guaranteed by the pytest matrix, and the package
+# uses `from __future__ import annotations` so no 3.10+ runtime syntax is emitted.
+python_version = "3.12"
 files = ["python/harmonia"]
 warn_unused_ignores = true
 no_implicit_optional = true
